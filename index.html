@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GotCracked | Operations Portal</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="workflow.css" />
+    <link rel="stylesheet" href="complete.css" />
+  </head>
+  <body>
+    <section id="login-screen" class="login-screen">
+      <div class="login-panel"><a class="brand login-brand" href="#"><span class="brand-mark">G</span><span>Got<span>Cracked</span></span></a><p class="eyebrow">Staff portal</p><h1>Welcome back.</h1><p class="subtle">Sign in to manage today’s repair work.</p><form id="login-form"><label>Work email<input id="login-email" type="email" required value="austin@gotcracked.com" /></label><label>Password<input type="password" required value="gotcracked" /></label><button class="primary-button" type="submit">Sign in to portal</button></form><p class="demo-note">Demo access is enabled for this foundation. Production sign-in will use secure staff accounts.</p></div>
+      <div class="login-aside"><div><p class="eyebrow">GotCracked operations</p><h2>Every repair.<br />One clear workflow.</h2><p>Intake, repair status, parts, customer communication, and pickup—kept together.</p></div></div>
+    </section>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#dashboard" aria-label="GotCracked dashboard"><span class="brand-mark">G</span><span>Got<span>Cracked</span></span></a>
+        <nav aria-label="Main navigation">
+          <a class="nav-link active" href="#dashboard" data-view="dashboard"><span>▦</span>Dashboard</a>
+          <a class="nav-link" href="#repairs" data-view="repairs"><span>⌁</span>Repairs <b id="repair-count">5</b></a>
+          <a class="nav-link" href="#appointments" data-view="appointments"><span>◷</span>Appointments</a>
+          <a class="nav-link" href="#customers" data-view="customers"><span>♙</span>Customers</a>
+          <a class="nav-link" href="#inventory" data-view="inventory"><span>▤</span>Inventory</a>
+          <a class="nav-link" href="#reports" data-view="reports"><span>◫</span>Reports</a>
+        </nav>
+        <div class="sidebar-bottom">
+          <a class="nav-link" href="#settings" data-view="settings"><span>⚙</span>Settings</a>
+          <div class="profile"><div id="staff-initials" class="avatar">AC</div><div><strong id="staff-name">Austin C.</strong><small id="staff-role">Owner</small></div><button id="sign-out" class="icon-button" aria-label="Sign out">↪</button></div>
+        </div>
+      </aside>
+
+      <main>
+        <header class="topbar"><button class="mobile-menu icon-button" aria-label="Open menu">☰</button><div class="location"><span class="status-dot"></span> GotCracked — Main Store <span class="chevron">⌄</span></div><div class="top-actions"><button class="icon-button" aria-label="Notifications">♧<i></i></button><button class="help">?</button></div></header>
+
+        <section id="dashboard" class="view active-view">
+          <div class="page-heading"><div><p class="eyebrow">Monday, August 23</p><h1>Good morning, Austin.</h1><p class="subtle">Here’s what needs attention at GotCracked today.</p></div><button class="primary-button" data-open-ticket>+ New repair</button></div>
+          <section class="metrics" aria-label="Today at a glance">
+            <article><span class="metric-icon blue">⌁</span><div><p>Open repairs</p><strong>18</strong><small class="up">↑ 3 since yesterday</small></div></article>
+            <article><span class="metric-icon amber">◷</span><div><p>Today’s appointments</p><strong>7</strong><small>2 arriving in the next hour</small></div></article>
+            <article><span class="metric-icon green">✓</span><div><p>Ready for pickup</p><strong>4</strong><small>Send pickup reminders</small></div></article>
+            <article><span class="metric-icon violet">$</span><div><p>Today’s sales</p><strong>$1,284</strong><small class="up">↑ 12% vs. last Monday</small></div></article>
+          </section>
+          <section class="content-grid">
+            <article class="card work-queue"><div class="card-title"><div><h2>Repair work queue</h2><p>Active tickets by current stage</p></div><a href="#repairs" data-view="repairs">View all →</a></div><div id="repair-list" class="repair-list"></div></article>
+            <aside class="right-column"><article class="card"><div class="card-title"><div><h2>Today’s schedule</h2><p>Next appointments</p></div><a href="#appointments" data-view="appointments">Calendar →</a></div><div class="schedule-item"><time>10:30 <small>AM</small></time><div><strong>Maria Thompson</strong><p>iPhone 14 Pro · Screen repair</p></div><span class="tag confirmed">Confirmed</span></div><div class="schedule-item"><time>11:15 <small>AM</small></time><div><strong>Jordan Lee</strong><p>PS5 · HDMI diagnosis</p></div><span class="tag walkin">Walk-in</span></div><div class="schedule-item"><time>1:00 <small>PM</small></time><div><strong>David Miller</strong><p>MacBook Air · Battery service</p></div><span class="tag confirmed">Confirmed</span></div></article><article class="card attention"><div class="card-title"><div><h2>Needs attention</h2><p>Keep these repairs moving</p></div></div><button class="attention-item"><span class="warning">!</span><span><strong>2 parts are below reorder level</strong><small>iPhone 13 batteries · USB-C ports</small></span><em>›</em></button><button class="attention-item"><span class="warning">!</span><span><strong>3 estimates need approval</strong><small>Waiting on customer response</small></span><em>›</em></button></article></aside>
+          </section>
+        </section>
+
+        <section id="repairs" class="view"><div class="page-heading"><div><p class="eyebrow">Operations</p><h1>Repair tickets</h1><p class="subtle">Track every device from intake through pickup.</p></div><button class="primary-button" data-open-ticket>+ New repair</button></div><div class="card"><div class="toolbar"><div class="search">⌕ <input id="repair-search" placeholder="Search ticket, customer, or device" /></div><select id="status-filter"><option value="all">All statuses</option><option>In diagnosis</option><option>Waiting on parts</option><option>In repair</option><option>Ready for pickup</option></select></div><div class="table-wrap"><table><thead><tr><th>Ticket</th><th>Customer / device</th><th>Service</th><th>Assigned to</th><th>Status</th><th>Updated</th></tr></thead><tbody id="repair-table"></tbody></table></div></div></section>
+        <section id="appointments" class="view"><div class="page-heading"><div><p class="eyebrow">Scheduling</p><h1>Appointments</h1><p class="subtle">Reserve time without losing room for walk-ins.</p></div><button class="primary-button" data-open-ticket>+ Walk-in repair</button></div><div class="empty-card"><span>◷</span><h2>Appointment calendar is ready for your schedule.</h2><p>Connect your booking page when you’re ready; today’s appointments already appear on the dashboard.</p></div></section>
+        <section id="customers" class="view"><div class="page-heading"><div><p class="eyebrow">Relationships</p><h1>Customers</h1><p class="subtle">A complete repair history for every customer.</p></div><button class="primary-button">+ New customer</button></div><div class="empty-card"><span>♙</span><h2>Customer records are linked to every repair ticket.</h2><p>Search, contact, and view devices from one place.</p></div></section>
+        <section id="inventory" class="view"><div class="page-heading"><div><p class="eyebrow">Parts & supplies</p><h1>Inventory</h1><p class="subtle">Know what is on hand before you promise a turnaround.</p></div><button class="primary-button">+ Add part</button></div><div class="empty-card"><span>▤</span><h2>Inventory management foundation is in place.</h2><p>Parts will support stock levels, suppliers, reorder points, and ticket reservations.</p></div></section>
+        <section id="reports" class="view"><div class="page-heading"><div><p class="eyebrow">Business intelligence</p><h1>Reports</h1><p class="subtle">Repair velocity, sales, margins, and technician workload.</p></div></div><div class="empty-card"><span>◫</span><h2>Your reports will grow with real shop data.</h2><p>The dashboard starts the process with your daily operating picture.</p></div></section>
+      </main>
+    </div>
+    <dialog id="new-ticket"><form method="dialog" id="ticket-form"><div class="modal-head"><div><p class="eyebrow">New intake</p><h2>Create repair ticket</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><div class="form-grid"><label>Customer name<input required name="customer" placeholder="e.g. Taylor Morgan" /></label><label>Phone number<input required name="phone" placeholder="(555) 555-5555" /></label><label>Device<input required name="device" placeholder="e.g. iPhone 15 Pro" /></label><label>Repair type<select name="service"><option>Screen repair</option><option>Battery replacement</option><option>Diagnosis</option><option>Charging issue</option><option>Other repair</option></select></label><label class="full">Customer-reported issue<textarea name="issue" placeholder="What is happening with the device?"></textarea></label></div><div class="modal-actions"><button value="cancel" class="secondary-button">Cancel</button><button class="primary-button" value="default">Create ticket</button></div></form></dialog>
+    <dialog id="ticket-detail"><div id="ticket-detail-content"></div></dialog>
+    <script src="app.js"></script>
+    <script src="workflow.js"></script>
+    <script src="portal-complete.js"></script>
+  </body>
+</html>
