@@ -1,4 +1,4 @@
-let repairs = [];
+window.repairs = [];
 
 const statusClass = value => ({
     'In diagnosis': 'diagnosis',
@@ -46,7 +46,7 @@ async function loadRepairs() {
     }
 
 
-    repairs = (data || []).map(ticket => ({
+    window.repairs = (data || []).map(ticket => ({
 
         id: ticket.ticket_number,
 
@@ -81,7 +81,7 @@ async function loadRepairs() {
 
 
 
-function renderRepairs(items = repairs) {
+function renderRepairs(items = window.repairs) {
 
     if (!Array.isArray(items)) {
         items = [];
@@ -184,7 +184,7 @@ function renderRepairs(items = repairs) {
     if (count) {
 
         count.textContent =
-            repairs.filter(
+            window.repairs.filter(
                 r => r.status !== 'Ready for pickup'
             ).length;
 
@@ -207,7 +207,7 @@ function filterRepairs() {
 
     renderRepairs(
 
-        repairs.filter(r =>
+        window.repairs.filter(r =>
 
             (status === 'all' || r.status === status)
 
