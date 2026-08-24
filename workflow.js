@@ -32,8 +32,149 @@ function showTicket(ticketId) {
 document.addEventListener('click', event => { const row = event.target.closest('[data-ticket]'); if (row) showTicket(row.dataset.ticket); });
 
 const loginScreen = document.querySelector('#login-screen');
-function setStaff(staff) { document.querySelector('#staff-name').textContent = staff.name; document.querySelector('#staff-role').textContent = staff.role; document.querySelector('#staff-initials').textContent = staff.initials; }
-const savedStaff = JSON.parse(sessionStorage.getItem('gotcracked-staff') || 'null');
-if (savedStaff) { setStaff(savedStaff); loginScreen.classList.add('hidden'); }
-document.querySelector('#login-form').addEventListener('submit', event => { event.preventDefault(); const name = document.querySelector('#login-email').value.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, char => char.toUpperCase()); const staff = { name, role: 'Owner', initials: name.split(' ').map(part => part[0]).join('').slice(0, 2) || 'GC' }; sessionStorage.setItem('gotcracked-staff', JSON.stringify(staff)); setStaff(staff); loginScreen.classList.add('hidden'); });
-document.querySelector('#sign-out').addEventListener('click', () => { sessionStorage.removeItem('gotcracked-staff'); loginScreen.classList.remove('hidden'); });
+
+function setStaff(staff) {
+    document.querySelector('#staff-name').textContent = staff.name;
+    document.querySelector('#staff-role').textContent = staff.role;
+
+    document.querySelector('#staff-initials').textContent =
+        staff.name
+            .split(' ')
+            .map(part => part[0])
+            .join('')
+            .slice(0,2)
+            .toUpperCase();
+}
+
+
+async function loadSession() {
+
+    const {
+        data: {
+            session
+        }
+    } = await supabaseClient.auth.getSession();
+
+
+    if (!session) {
+        return;
+    }
+
+
+    await loadProfile(session.user.id);
+}
+
+
+
+async function loadProfile(userId) {
+
+    const {
+        data: profile,
+        error
+    } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+
+    if (error) {
+        console.error(error);
+        return;
+    }
+
+
+    const staff = {
+        id: userId,
+        name: profile.display_name,
+        role: profile.role
+    };
+
+
+    sessionStorage.setItem(
+        'gotcracked-staff',
+        JSON.stringify(staff)
+    );
+
+
+    setStaff(staff);
+
+
+    if (profile.must_change_password) {
+
+        window.location.href = '/setup-password.html';
+
+        return;
+    }
+
+
+    loginScreen.classList.add('hidden');
+}
+
+
+
+document
+.querySelector('#login-form')
+.addEventListener('submit', async event => {
+
+    event.preventDefault();
+
+
+    const email =
+        document.querySelector('#login-email').value;
+
+
+    const password =
+        document.querySelector('#login-password').value;
+
+
+
+    const {
+        data,
+        error
+    } =
+    await supabaseClient.auth.signInWithPassword({
+
+        email,
+
+        password
+
+    });
+
+
+
+    if (error) {
+
+        alert(error.message);
+
+        return;
+
+    }
+
+
+
+    await loadProfile(data.user.id);
+
+});
+
+
+
+document
+.querySelector('#sign-out')
+.addEventListener('click', async () => {
+
+
+    await supabaseClient.auth.signOut();
+
+
+    sessionStorage.removeItem(
+        'gotcracked-staff'
+    );
+
+
+    loginScreen.classList.remove('hidden');
+
+});
+ 
+
+loadSession();
