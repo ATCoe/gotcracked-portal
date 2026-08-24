@@ -2,20 +2,30 @@
 
 
 .sidebar .brand {
-  height: 115px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: visible;
+  height: 115px !important;
+  min-height: 115px !important;
+  max-height: 115px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: visible !important;
 }
 
 .sidebar .brand-logo {
-  width: 230px !important;
-  height: 140px !important;
-  max-width: 230px !important;
-  max-height: 140px !important;
-  display: block;
-  object-fit: contain;
-  margin: 0;
-  transform: none;
+  width: 135px !important;
+  height: 90px !important;
+  max-width: 135px !important;
+  max-height: 90px !important;
+  display: block !important;
+  object-fit: contain !important;
+  margin: 0 !important;
+  transform: scale(1.75) !important;
+  transform-origin: center center !important;
+}
+
+.sidebar nav {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
 }
