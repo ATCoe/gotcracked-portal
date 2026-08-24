@@ -21,7 +21,7 @@
   display: block !important;
   object-fit: contain !important;
   margin: 0 !important;
-  transform: scale(2.05) !important;
+  transform: scale(2.05) translateY(-3px) !important;
   transform-origin: center center !important;
 }
 
