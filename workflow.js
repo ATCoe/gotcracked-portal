@@ -1,99 +1,419 @@
-const storageKey = 'gotcracked-repairs';
+let repairs = [];
+
+const statusClass = value => ({
+    'In diagnosis':'diagnosis',
+    'Waiting on parts':'parts',
+    'In repair':'in-repair',
+    'Ready for pickup':'ready'
+}[value] || '');
+
 const repairListElement = document.querySelector('#repair-list');
 const repairTableElement = document.querySelector('#repair-table');
 const ticketModalElement = document.querySelector('#new-ticket');
-const savedRepairs = JSON.parse(localStorage.getItem(storageKey) || 'null');
-if (savedRepairs) repairs.splice(0, repairs.length, ...savedRepairs);
-const persist = () => localStorage.setItem(storageKey, JSON.stringify(repairs));
 
-renderRepairs = function (items = []) {
-  if (!Array.isArray(items)) {
-    items = [];
+async function loadRepairs() {
+
+    const {
+        data,
+        error
+    } = await window.supabaseClient
+        .from('repair_tickets')
+        .select(`
+            *,
+            customers (
+                name
+            ),
+            devices (
+                model
+            ),
+            profiles:assigned_user_id (
+                display_name
+            )
+        `)
+        .order('ticket_number', {
+            ascending:false
+        });
+
+
+    if(error){
+        console.error('Repair load failed:', error);
+        return;
+    }
+
+
+    repairs = (data || []).map(ticket => ({
+        id: ticket.ticket_number,
+
+        customer:
+            ticket.customers?.name || 'Unknown',
+
+        device:
+            ticket.devices?.model || 'Unknown device',
+
+        service:
+            ticket.customer_issue || 'No service listed',
+
+        tech:
+            ticket.profiles?.display_name || '—',
+
+        status:
+            ticket.status,
+
+        updated:
+            'Recently updated',
+
+        icon:
+            '▯'
+    }));
+
+
+    renderRepairs();
 }
-  repairListElement.innerHTML = items.map(r => `<div class="repair-row" data-ticket="${r.id}"><div class="device-icon">${r.icon}</div><div class="repair-customer"><strong>${r.customer}</strong><small>${r.device} · ${r.service}</small></div><div class="repair-tech">${r.tech}</div><span class="status ${statusClass(r.status)}">${r.status}</span><div class="ticket-id">${r.id}<br>${r.updated}</div></div>`).join('');
-  repairTableElement.innerHTML = items.map(r => `<tr data-ticket="${r.id}"><td><strong>${r.id}</strong><small>${r.updated}</small></td><td><strong>${r.customer}</strong><small>${r.device}</small></td><td>${r.service}</td><td>${r.tech}</td><td><span class="status ${statusClass(r.status)}">${r.status}</span></td><td>${r.updated}</td></tr>`).join('');
-  document.querySelector('#repair-count').textContent = repairs.filter(r => r.status !== 'Ready for pickup').length;
-};
-renderRepairs();
 
-document.querySelector('#ticket-form').addEventListener('submit', event => {
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  const data = new FormData(event.currentTarget);
-  repairs.unshift({ id: `GC-${String(1049 + repairs.length).padStart(4, '0')}`, customer: data.get('customer'), phone: data.get('phone'), device: data.get('device'), service: data.get('service'), issue: data.get('issue'), tech: '—', status: 'In diagnosis', updated: 'Just now', icon: '▯' });
-  persist(); renderRepairs(); event.currentTarget.reset(); ticketModalElement.close(); document.querySelector('[data-view="repairs"]').click();
-}, true);
 
-const detailModal = document.querySelector('#ticket-detail');
-function showTicket(ticketId) {
-  const r = repairs.find(ticket => ticket.id === ticketId); if (!r) return;
-  document.querySelector('#ticket-detail-content').innerHTML = `<div class="modal-head"><div><p class="eyebrow">${r.id}</p><h2>${r.customer}’s repair</h2></div><button class="icon-button" id="close-ticket" aria-label="Close">×</button></div><span class="status ${statusClass(r.status)}">${r.status}</span><div class="ticket-detail"><div class="detail-row"><span>Device</span><strong>${r.device}</strong></div><div class="detail-row"><span>Requested service</span><strong>${r.service}</strong></div><div class="detail-row"><span>Assigned technician</span><strong>${r.tech}</strong></div><div class="detail-row"><span>Customer contact</span><strong>${r.phone || 'Not yet recorded'}</strong></div><div class="detail-row"><span>Reported issue</span><strong>${r.issue || 'No notes recorded'}</strong></div></div><div class="detail-actions"><button class="secondary-button" id="advance-ticket">Advance status</button></div>`;
-  detailModal.showModal();
-  document.querySelector('#close-ticket').addEventListener('click', () => detailModal.close());
-  document.querySelector('#advance-ticket').addEventListener('click', () => {
-    const flow = ['In diagnosis', 'Waiting on parts', 'In repair', 'Ready for pickup']; const next = flow[flow.indexOf(r.status) + 1];
-    if (next) { r.status = next; r.updated = 'Just now'; persist(); renderRepairs(); showTicket(ticketId); }
-  });
+function renderRepairs(items = repairs) {
+
+    if (!Array.isArray(items)) {
+        items = [];
+    }
+
+
+    if (repairListElement) {
+        repairListElement.innerHTML = items.map(r => `
+            <div class="repair-row" data-ticket="${r.id}">
+                <div class="device-icon">${r.icon}</div>
+
+                <div class="repair-customer">
+                    <strong>${r.customer}</strong>
+                    <small>${r.device} · ${r.service}</small>
+                </div>
+
+                <div class="repair-tech">
+                    ${r.tech}
+                </div>
+
+                <span class="status ${statusClass(r.status)}">
+                    ${r.status}
+                </span>
+
+                <div class="ticket-id">
+                    ${r.id}<br>${r.updated}
+                </div>
+            </div>
+        `).join('');
+    }
+
+
+    if (repairTableElement) {
+        repairTableElement.innerHTML = items.map(r => `
+            <tr data-ticket="${r.id}">
+                <td>
+                    <strong>${r.id}</strong>
+                    <small>${r.updated}</small>
+                </td>
+
+                <td>
+                    <strong>${r.customer}</strong>
+                    <small>${r.device}</small>
+                </td>
+
+                <td>${r.service}</td>
+                <td>${r.tech}</td>
+
+                <td>
+                    <span class="status ${statusClass(r.status)}">
+                        ${r.status}
+                    </span>
+                </td>
+
+                <td>${r.updated}</td>
+            </tr>
+        `).join('');
+    }
+
+
+    const count = document.querySelector('#repair-count');
+
+    if(count){
+        count.textContent =
+            repairs.filter(
+                r => r.status !== 'Ready for pickup'
+            ).length;
+    }
 }
-document.addEventListener('click', event => { const row = event.target.closest('[data-ticket]'); if (row) showTicket(row.dataset.ticket); });
 
-const loginScreen = document.querySelector('#login-screen');
 
-function setStaff(staff) {
-    document.querySelector('#staff-name').textContent = staff.name;
-    document.querySelector('#staff-role').textContent = staff.role;
 
-    document.querySelector('#staff-initials').textContent =
-        staff.name
+function filterRepairs(){
+
+    const search =
+        document.querySelector('#repair-search')?.value.toLowerCase() || '';
+
+    const status =
+        document.querySelector('#status-filter')?.value || 'all';
+
+
+    renderRepairs(
+        repairs.filter(r =>
+            (status === 'all' || r.status === status)
+            &&
+            Object.values(r)
+            .join(' ')
+            .toLowerCase()
+            .includes(search)
+        )
+    );
+}
+
+
+
+document.querySelectorAll('[data-view]')
+.forEach(link => {
+
+    link.addEventListener('click', event => {
+
+        event.preventDefault();
+
+        const id = link.dataset.view;
+
+
+        document.querySelectorAll('.view')
+        .forEach(v =>
+            v.classList.toggle(
+                'active-view',
+                v.id === id
+            )
+        );
+
+
+        document.querySelectorAll('.nav-link')
+        .forEach(v =>
+            v.classList.toggle(
+                'active',
+                v.dataset.view === id
+            )
+        );
+
+
+        window.location.hash = id;
+
+    });
+
+});
+
+
+
+document.querySelector('#repair-search')
+?.addEventListener(
+    'input',
+    filterRepairs
+);
+
+
+document.querySelector('#status-filter')
+?.addEventListener(
+    'change',
+    filterRepairs
+);
+
+
+
+document.querySelectorAll('[data-open-ticket]')
+.forEach(button => {
+
+    button.addEventListener(
+        'click',
+        () => ticketModalElement.showModal()
+    );
+
+});
+
+
+
+const detailModal =
+    document.querySelector('#ticket-detail');
+
+
+function showTicket(ticketId){
+
+    const ticket =
+        repairs.find(
+            r => r.id === ticketId
+        );
+
+
+    if(!ticket) return;
+
+
+    document.querySelector('#ticket-detail-content')
+    .innerHTML = `
+
+    <div class="modal-head">
+
+        <div>
+            <p class="eyebrow">${ticket.id}</p>
+            <h2>${ticket.customer}'s repair</h2>
+        </div>
+
+        <button 
+            class="icon-button"
+            id="close-ticket">
+            ×
+        </button>
+
+    </div>
+
+
+    <span class="status ${statusClass(ticket.status)}">
+        ${ticket.status}
+    </span>
+
+
+    <div class="ticket-detail">
+
+        <div class="detail-row">
+            <span>Device</span>
+            <strong>${ticket.device}</strong>
+        </div>
+
+
+        <div class="detail-row">
+            <span>Service</span>
+            <strong>${ticket.service}</strong>
+        </div>
+
+
+        <div class="detail-row">
+            <span>Technician</span>
+            <strong>${ticket.tech}</strong>
+        </div>
+
+    </div>
+    `;
+
+
+    detailModal.showModal();
+
+
+    document.querySelector('#close-ticket')
+    ?.addEventListener(
+        'click',
+        () => detailModal.close()
+    );
+
+}
+
+
+
+document.addEventListener(
+    'click',
+    event => {
+
+        const row =
+            event.target.closest('[data-ticket]');
+
+
+        if(row){
+            showTicket(row.dataset.ticket);
+        }
+
+    }
+);
+
+
+
+const loginScreen =
+    document.querySelector('#login-screen');
+
+
+
+function setStaff(staff){
+
+    document.querySelector('#staff-name').textContent =
+        staff.name;
+
+
+    document.querySelector('#staff-role').textContent =
+        staff.role;
+
+
+    const initials =
+        document.querySelector('#staff-initials');
+
+
+    if(initials){
+
+        initials.textContent =
+            staff.name
             .split(' ')
-            .map(part => part[0])
+            .map(p => p[0])
             .join('')
             .slice(0,2)
             .toUpperCase();
+
+    }
+
 }
 
 
-async function loadSession() {
+
+async function loadSession(){
 
     const {
-        data: {
+        data:{
             session
         }
-    } = await window.supabaseClient.auth.getSession();
+    } =
+    await window.supabaseClient.auth.getSession();
 
 
-    if (!session) {
+    if(!session){
         return;
     }
 
 
-    await loadProfile(session.user.id);
+    await loadProfile(
+        session.user.id
+    );
+
 }
 
 
 
-async function loadProfile(userId) {
+async function loadProfile(userId){
 
     const {
-        data: profile,
+        data:profile,
         error
-    } = await window.supabaseClient
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+    } =
+    await window.supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
 
 
-    if (error) {
+
+    if(error){
+
         console.error(error);
+
         return;
+
     }
+
 
 
     const staff = {
-        id: userId,
-        name: profile.display_name,
-        role: profile.role
+
+        id:userId,
+
+        name:
+            profile.display_name,
+
+        role:
+            profile.role
+
     };
 
 
@@ -106,22 +426,29 @@ async function loadProfile(userId) {
     setStaff(staff);
 
 
-    if (profile.must_change_password) {
 
-        window.location.href = '/setup-password.html';
+    if(profile.must_change_password){
+
+        window.location.href =
+            '/setup-password.html';
 
         return;
+
     }
 
 
-    loginScreen.classList.add('hidden');
+
+    loginScreen?.classList.add('hidden');
+
 }
 
 
 
-document
-.querySelector('#login-form')
-.addEventListener('submit', async event => {
+document.querySelector('#login-form')
+?.addEventListener(
+'submit',
+async event => {
+
 
     event.preventDefault();
 
@@ -149,31 +476,44 @@ document
 
 
 
-    if (error) {
+    if(error){
 
-    const message = document.querySelector('#login-error');
+        const message =
+            document.querySelector('#login-error');
 
-    if (message) {
-        message.textContent = error.message;
-    } else {
-        console.error(error.message);
+
+        if(message){
+
+            message.textContent =
+                error.message;
+
+        }
+        else{
+
+            console.error(error.message);
+
+        }
+
+
+        return;
+
     }
 
-    return;
-
-}
 
 
+    await loadProfile(
+        data.user.id
+    );
 
-    await loadProfile(data.user.id);
 
 });
 
 
 
-document
-.querySelector('#sign-out')
-.addEventListener('click', async () => {
+document.querySelector('#sign-out')
+?.addEventListener(
+'click',
+async ()=>{
 
 
     await window.supabaseClient.auth.signOut();
@@ -184,9 +524,15 @@ document
     );
 
 
-    loginScreen.classList.remove('hidden');
+    loginScreen?.classList.remove(
+        'hidden'
+    );
+
 
 });
- 
+
+
 
 loadSession();
+
+loadRepairs();
