@@ -59,6 +59,8 @@
     </div>
     <dialog id="new-ticket"><form method="dialog" id="ticket-form"><div class="modal-head"><div><p class="eyebrow">New intake</p><h2>Create repair ticket</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><div class="form-grid"><label>Customer name<input required name="customer" placeholder="e.g. Taylor Morgan" /></label><label>Phone number<input required name="phone" placeholder="(555) 555-5555" /></label><label>Device<input required name="device" placeholder="e.g. iPhone 15 Pro" /></label><label>Repair type<select name="service"><option>Screen repair</option><option>Battery replacement</option><option>Diagnosis</option><option>Charging issue</option><option>Other repair</option></select></label><label class="full">Customer-reported issue<textarea name="issue" placeholder="What is happening with the device?"></textarea></label></div><div class="modal-actions"><button value="cancel" class="secondary-button">Cancel</button><button class="primary-button" value="default">Create ticket</button></div></form></dialog>
     <dialog id="ticket-detail"><div id="ticket-detail-content"></div></dialog>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase.js"></script>
     <script src="app.js"></script>
     <script src="workflow.js"></script>
     <script src="portal-complete.js"></script>
