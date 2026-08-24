@@ -1,4 +1,7 @@
 const storageKey = 'gotcracked-repairs';
+const list = document.querySelector('#repair-list');
+const table = document.querySelector('#repair-table');
+const modal = document.querySelector('#new-ticket');
 const savedRepairs = JSON.parse(localStorage.getItem(storageKey) || 'null');
 if (savedRepairs) repairs.splice(0, repairs.length, ...savedRepairs);
 const persist = () => localStorage.setItem(storageKey, JSON.stringify(repairs));
