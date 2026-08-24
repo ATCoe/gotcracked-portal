@@ -1,14 +1,17 @@
 const storageKey = 'gotcracked-repairs';
-const list = document.querySelector('#repair-list');
-const table = document.querySelector('#repair-table');
-const modal = document.querySelector('#new-ticket');
+const repairListElement = document.querySelector('#repair-list');
+const repairTableElement = document.querySelector('#repair-table');
+const ticketModalElement = document.querySelector('#new-ticket');
 const savedRepairs = JSON.parse(localStorage.getItem(storageKey) || 'null');
 if (savedRepairs) repairs.splice(0, repairs.length, ...savedRepairs);
 const persist = () => localStorage.setItem(storageKey, JSON.stringify(repairs));
 
-renderRepairs = function (items = repairs) {
-  list.innerHTML = items.map(r => `<div class="repair-row" data-ticket="${r.id}"><div class="device-icon">${r.icon}</div><div class="repair-customer"><strong>${r.customer}</strong><small>${r.device} · ${r.service}</small></div><div class="repair-tech">${r.tech}</div><span class="status ${statusClass(r.status)}">${r.status}</span><div class="ticket-id">${r.id}<br>${r.updated}</div></div>`).join('');
-  table.innerHTML = items.map(r => `<tr data-ticket="${r.id}"><td><strong>${r.id}</strong><small>${r.updated}</small></td><td><strong>${r.customer}</strong><small>${r.device}</small></td><td>${r.service}</td><td>${r.tech}</td><td><span class="status ${statusClass(r.status)}">${r.status}</span></td><td>${r.updated}</td></tr>`).join('');
+renderRepairs = function (items = []) {
+  if (!Array.isArray(items)) {
+    items = [];
+}
+  repairListElement.innerHTML = items.map(r => `<div class="repair-row" data-ticket="${r.id}"><div class="device-icon">${r.icon}</div><div class="repair-customer"><strong>${r.customer}</strong><small>${r.device} · ${r.service}</small></div><div class="repair-tech">${r.tech}</div><span class="status ${statusClass(r.status)}">${r.status}</span><div class="ticket-id">${r.id}<br>${r.updated}</div></div>`).join('');
+  repairTableElement.innerHTML = items.map(r => `<tr data-ticket="${r.id}"><td><strong>${r.id}</strong><small>${r.updated}</small></td><td><strong>${r.customer}</strong><small>${r.device}</small></td><td>${r.service}</td><td>${r.tech}</td><td><span class="status ${statusClass(r.status)}">${r.status}</span></td><td>${r.updated}</td></tr>`).join('');
   document.querySelector('#repair-count').textContent = repairs.filter(r => r.status !== 'Ready for pickup').length;
 };
 renderRepairs();
@@ -18,7 +21,7 @@ document.querySelector('#ticket-form').addEventListener('submit', event => {
   event.stopImmediatePropagation();
   const data = new FormData(event.currentTarget);
   repairs.unshift({ id: `GC-${String(1049 + repairs.length).padStart(4, '0')}`, customer: data.get('customer'), phone: data.get('phone'), device: data.get('device'), service: data.get('service'), issue: data.get('issue'), tech: '—', status: 'In diagnosis', updated: 'Just now', icon: '▯' });
-  persist(); renderRepairs(); event.currentTarget.reset(); modal.close(); document.querySelector('[data-view="repairs"]').click();
+  persist(); renderRepairs(); event.currentTarget.reset(); ticketModalElement.close(); document.querySelector('[data-view="repairs"]').click();
 }, true);
 
 const detailModal = document.querySelector('#ticket-detail');
