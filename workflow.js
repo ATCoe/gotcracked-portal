@@ -1,4 +1,6 @@
-let repairs = [];
+let repairs = Array.isArray(window.repairs)
+    ? window.repairs
+    : [];
 
 const statusClass = value => ({
     'In diagnosis':'diagnosis',
@@ -444,11 +446,14 @@ async function loadProfile(userId){
 
 
 
+console.log("LOGIN HANDLER LOADED");
+
 document.querySelector('#login-form')
 ?.addEventListener(
 'submit',
 async event => {
 
+console.log("LOGIN SUBMIT FIRED");
 
     event.preventDefault();
 
@@ -533,6 +538,5 @@ async ()=>{
 
 
 
-loadSession();
-
-loadRepairs();
+loadSession()
+    .then(() => loadRepairs());
