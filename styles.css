@@ -2,11 +2,11 @@
 
 
 .sidebar .brand-logo {
-    width: 210px !important;
-    height: 130px !important;
-    max-width: 210px !important;
-    max-height: 130px !important;
-    display: block;
-    object-fit: contain;
-    margin: -15px auto -35px;
+  width: 120px !important;
+  height: 80px !important;
+  display: block;
+  object-fit: contain;
+  margin: 0 auto;
+  transform: scale(1.45);
+  transform-origin: center center;
 }
