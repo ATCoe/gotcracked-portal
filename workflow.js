@@ -145,11 +145,17 @@ document
 
     if (error) {
 
-        alert(error.message);
+    const message = document.querySelector('#login-error');
 
-        return;
-
+    if (message) {
+        message.textContent = error.message;
+    } else {
+        console.error(error.message);
     }
+
+    return;
+
+}
 
 
 
