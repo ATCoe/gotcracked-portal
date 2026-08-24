@@ -2,9 +2,9 @@
 
 
 .sidebar .brand {
-  height: 115px !important;
-  min-height: 115px !important;
-  max-height: 115px !important;
+  height: 125px !important;
+  min-height: 125px !important;
+  max-height: 125px !important;
   margin: 0 !important;
   padding: 0 !important;
   display: flex !important;
@@ -21,7 +21,7 @@
   display: block !important;
   object-fit: contain !important;
   margin: 0 !important;
-  transform: scale(2.05) translateY(-3px) !important;
+  transform: scale(2.08) translateY(-3px) !important;
   transform-origin: center center !important;
 }
 
