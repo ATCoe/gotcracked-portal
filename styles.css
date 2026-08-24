@@ -14,9 +14,9 @@
 }
 
 .sidebar .brand-logo {
-  width: 120px !important;
+  width: 125px !important;
   height: 80px !important;
-  max-width: 120px !important;
+  max-width: 125px !important;
   max-height: 80px !important;
   display: block !important;
   object-fit: contain !important;
