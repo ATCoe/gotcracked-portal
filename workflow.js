@@ -53,7 +53,7 @@ async function loadSession() {
         data: {
             session
         }
-    } = await supabaseClient.auth.getSession();
+    } = await window.supabaseClient.auth.getSession();
 
 
     if (!session) {
@@ -71,7 +71,7 @@ async function loadProfile(userId) {
     const {
         data: profile,
         error
-    } = await supabaseClient
+    } = await window.supabaseClient
         .from('profiles')
         .select('*')
         .eq('id', userId)
@@ -133,7 +133,7 @@ document
         data,
         error
     } =
-    await supabaseClient.auth.signInWithPassword({
+    await window.supabaseClient.auth.signInWithPassword({
 
         email,
 
@@ -170,7 +170,7 @@ document
 .addEventListener('click', async () => {
 
 
-    await supabaseClient.auth.signOut();
+    await window.supabaseClient.auth.signOut();
 
 
     sessionStorage.removeItem(
