@@ -14,14 +14,14 @@
 }
 
 .sidebar .brand-logo {
-  width: 135px !important;
-  height: 90px !important;
-  max-width: 135px !important;
-  max-height: 90px !important;
+  width: 120px !important;
+  height: 80px !important;
+  max-width: 120px !important;
+  max-height: 80px !important;
   display: block !important;
   object-fit: contain !important;
   margin: 0 !important;
-  transform: scale(1.75) !important;
+  transform: scale(1.85) !important;
   transform-origin: center center !important;
 }
 
