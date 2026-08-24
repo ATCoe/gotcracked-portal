@@ -2,7 +2,7 @@
 
 
 .sidebar .brand {
-  height: 145px;
+  height: 115px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -10,10 +10,10 @@
 }
 
 .sidebar .brand-logo {
-  width: 220px !important;
-  height: 135px !important;
-  max-width: 220px !important;
-  max-height: 135px !important;
+  width: 230px !important;
+  height: 140px !important;
+  max-width: 230px !important;
+  max-height: 140px !important;
   display: block;
   object-fit: contain;
   margin: 0;
