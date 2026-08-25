@@ -1,9 +1,12 @@
 (() => {
   'use strict';
-  if (document.querySelector('link[data-gc-sales-ops]')) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = 'sales-ops.css?v=20260825-release7';
-  link.dataset.gcSalesOps = 'true';
-  document.head.appendChild(link);
+  const VERSION = '20260825-release8';
+  for (const file of ['sales-ops.css','checkout-receipts.css']) {
+    if (document.querySelector(`link[data-gc-finance-style="${file}"]`)) continue;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `${file}?v=${VERSION}`;
+    link.dataset.gcFinanceStyle = file;
+    document.head.appendChild(link);
+  }
 })();
