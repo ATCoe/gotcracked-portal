@@ -20,32 +20,45 @@
   }
 
   async function verifyDiscordSession({ force = false } = {}) {
-    if (!client) return { authorized: false, reason: 'client-unavailable' };
+    if (!client) return { authorized:false, reason:'client-unavailable', transient:true };
 
-    // getSession() restores from the local Supabase session store and does not
-    // perform the expensive /auth/v1/user round-trip used by getUser().
-    const { data: { session }, error: sessionError } = await client.auth.getSession();
-    if (sessionError || !session) return { authorized: false, reason: 'no-session' };
+    const restored = window.GotCrackedAuth?.restoreSession
+      ? await window.GotCrackedAuth.restoreSession()
+      : await client.auth.getSession().then(({data,error}) => ({ session:data?.session || null, error }));
+
+    const session = restored?.session;
+    if (restored?.error || !session) {
+      return { authorized:false, reason:'no-session', transient:Boolean(restored?.error) };
+    }
 
     const hasDiscord = session.user.identities?.some(identity => identity.provider === 'discord');
-    if (!hasDiscord) return { authorized: true, skipped: true };
+    if (!hasDiscord) return { authorized:true, skipped:true };
 
     const verifiedUser = sessionStorage.getItem('gc-discord-verified-user');
-    if (!force && verifiedUser === session.user.id) {
-      return { authorized: true, cached: true };
-    }
+    if (!force && verifiedUser === session.user.id) return { authorized:true, cached:true };
 
     const inviteToken = sessionStorage.getItem('gc-staff-invite');
     const { data, error } = await client.functions.invoke('discord-verify', {
       body: { inviteToken: inviteToken || null }
     });
 
-    if (error || !data?.authorized) {
+    /*
+     * Transport errors are not authorization failures. A temporary network or
+     * Edge Function problem must never revoke a valid remembered staff session.
+     * Fresh OAuth can decide whether to wait/retry, but returning staff remain
+     * signed in until the server explicitly says authorized:false.
+     */
+    if (error) {
+      console.warn('Discord verification deferred:', error.message);
+      return { authorized:false, transient:true, reason:error.message || 'verification-unavailable' };
+    }
+
+    if (!data?.authorized) {
       sessionStorage.removeItem('gc-discord-verified-user');
-      await client.auth.signOut();
-      const message = data?.error || error?.message || 'This Discord account is not authorized for the GotCracked Portal.';
+      try { await client.auth.signOut({ scope:'local' }); } catch {}
+      const message = data?.error || 'This Discord account is not authorized for the GotCracked Portal.';
       sessionStorage.setItem('gc-auth-error', message);
-      return { authorized: false, reason: message };
+      return { authorized:false, transient:false, reason:message };
     }
 
     sessionStorage.setItem('gc-discord-verified-user', session.user.id);
@@ -58,7 +71,7 @@
       history.replaceState({}, document.title, `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`);
     }
 
-    return { authorized: true };
+    return { authorized:true };
   }
 
   let verificationPromise = null;
@@ -68,6 +81,7 @@
       .finally(() => { verificationPromise = null; });
     return verificationPromise;
   }
+  window.GotCrackedVerifyDiscord = verifyOnce;
 
   async function linkDiscord() {
     const { error } = await client.auth.linkIdentity({
@@ -102,7 +116,8 @@
       button.textContent = 'Connecting to Discord…';
       try { await signInWithDiscord(); }
       catch (error) {
-        document.querySelector('#login-error').textContent = error.message;
+        const output = document.querySelector('#login-error');
+        if (output) output.textContent = error.message;
         button.disabled = false;
         button.textContent = 'Continue with Discord';
       }
@@ -141,38 +156,35 @@
     });
   }
 
-  /*
-   * IMPORTANT: workflow.js awaits GotCrackedDiscordReady before restoring the
-   * local Supabase session. That promise must therefore never represent a
-   * network request. Session restoration opens Portal first; Discord membership
-   * verification runs once in the background and can still sign out an account
-   * that is no longer authorized.
-   */
-  window.GotCrackedDiscordReady = Promise.resolve({ ready: true });
+  // workflow.js no longer depends on this promise for returning-session restore.
+  window.GotCrackedDiscordReady = Promise.resolve({ ready:true });
 
-  const backgroundVerify = force => {
-    setTimeout(() => {
-      verifyOnce({ force }).catch(error => {
-        console.error('Discord verification failed', error);
-        sessionStorage.setItem('gc-auth-error', 'Discord verification failed. Please try again.');
-      });
-    }, force ? 0 : 900);
-  };
+  function scheduleBackgroundVerify(force = false) {
+    const run = async () => {
+      const result = await verifyOnce({ force }).catch(error => ({ authorized:false, transient:true, reason:error?.message }));
+      if (!result.authorized && result.transient) {
+        // Retry once later without blocking or signing out a remembered session.
+        setTimeout(() => verifyOnce({ force:false }).catch(() => {}), 15000);
+      }
+    };
+
+    if (force) return setTimeout(run, 50);
+    if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout:4000 });
+    else setTimeout(run, 3000);
+  }
 
   client.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
       sessionStorage.removeItem('gc-discord-verified-user');
       return;
     }
-
     if (event === 'SIGNED_IN' && session) {
       const oauthJustStarted = sessionStorage.getItem('gc-discord-auth-started') === '1';
-      backgroundVerify(oauthJustStarted);
+      scheduleBackgroundVerify(oauthJustStarted);
     }
   });
 
-  // Existing remembered sessions should open Portal immediately. Re-check
-  // Discord shortly afterward without blocking the login screen.
-  backgroundVerify(false);
+  // Existing sessions verify after the Portal shell is free to render.
+  scheduleBackgroundVerify(false);
   wireUi();
 })();
