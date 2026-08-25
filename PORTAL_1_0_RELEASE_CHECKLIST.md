@@ -1,26 +1,41 @@
 # GotCracked Portal 1.0 release checklist
 
-This document separates **code-complete** from **production-ready**. Do not remove the Beta designation until the production migration, workflow smoke tests, visual pass, and hard bug pass are complete.
+This document separates **code-complete** from **production-ready**. Do not remove the Beta designation until the workflow smoke tests, visual pass, hard bug pass, Discord consumer verification, and physical DYMO commissioning are complete.
 
-## 1. Database upgrade
+## 1. Database upgrade — COMPLETE
 
-Apply these Supabase migrations in order to the production project:
+The Portal 1.0 production database rollout was applied and verified against Supabase project `uvpmmbioerejeyybfntb` on 2026-08-25.
 
-1. `supabase/migrations/0002_portal_v1_operations.sql`
-2. `supabase/migrations/0003_portal_v1_permission_admin.sql`
-3. `supabase/migrations/0004_portal_v1_discord_outbox.sql`
-4. `supabase/migrations/0005_portal_v1_permission_rls.sql`
+Because the live database already contained Beta-era schema and purchase-order objects that predated the repository migration history, production was upgraded transactionally in compatibility-safe stages rather than replaying `0002` as one monolithic statement. Supabase recorded these live migrations:
 
-After applying them, verify:
+1. `portal_v1_beta_compatibility`
+2. `portal_v1_operations_core`
+3. `portal_v1_operations_workflows`
+4. `portal_v1_reference_seed`
+5. `portal_v1_permission_admin`
+6. `portal_v1_discord_outbox`
+7. `portal_v1_permission_rls`
+8. `portal_v1_security_advisor_cleanup`
+9. `portal_v1_operational_indexes`
 
-- `permission_definitions` is populated.
+Repository migrations `0002`–`0005` remain the canonical feature migrations for a clean database. `0006_portal_v1_security_performance.sql` records the final security-advisor cleanup and high-value operational indexes used in production.
+
+Verified live:
+
+- `permission_definitions` contains 23 permissions.
 - `staff_permission_overrides` exists.
 - `intake_templates` contains Phone, Tablet, Laptop, Desktop, and Console templates.
-- `repair_guides` contains the seeded internal reference entries.
-- `purchase_orders` and `purchase_order_items` exist.
+- `repair_guides` contains six seeded internal reference entries.
+- `purchase_orders` and `purchase_order_items` preserve the existing Beta data model and now support 1.0 receiving/label fields.
 - `discord_notification_outbox` exists.
 - `repair_tickets` accepts `awaiting_customer`.
-- Lead rows expose `pipeline_status`, `contact_attempted_at`, and conversion-link fields.
+- Lead rows expose `pipeline_status`, `contact_attempted_at`, contact notes, customer/device links, conversion links, and device detail fields.
+- Legacy permissive `Authenticated users can manage ...` RLS policies were removed from customers, devices, repair tickets, ticket events, and inventory.
+- Trigger-only SECURITY DEFINER functions are no longer callable anonymously.
+- Mutable search paths flagged by the Supabase security advisor were locked where safe.
+- High-value customer/device/lead/intake/PO/work-order/outbox foreign-key indexes were added.
+
+Remaining Supabase advisory: leaked-password protection is disabled in Auth. The connected Supabase tooling does not expose an Auth-settings write action, so this must be enabled separately if desired. Authenticated SECURITY DEFINER warnings remain for Portal RPCs that are intentionally callable by signed-in staff and enforce authorization internally.
 
 ## 2. Training Store isolation test
 
@@ -104,7 +119,7 @@ Before testing production writes:
 
 ## 7. Roles and permissions
 
-Test one account for each role:
+Test one account for each role.
 
 ### Front Desk
 Expected default access:
