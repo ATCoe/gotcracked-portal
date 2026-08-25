@@ -1,16 +1,104 @@
 const SUPABASE_URL = "https://uvpmmbioerejeyybfntb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_CmcUD2ze8lhj4HvlMfoYiQ_DGG_xabb";
+const GC_AUTH_STORAGE_KEY = "sb-uvpmmbioerejeyybfntb-auth-token";
+
+/*
+ * Never let a stalled auth refresh freeze the Portal for minutes. Normal REST
+ * requests receive a generous timeout; auth requests fail fast enough that the
+ * login screen can recover through Discord instead of appearing hung.
+ */
+function gotCrackedFetch(input, init = {}) {
+  const url = typeof input === 'string' ? input : String(input?.url || input || '');
+  const timeoutMs = url.includes('/auth/v1/') ? 10000 : 20000;
+  const controller = new AbortController();
+  const upstreamSignal = init.signal;
+
+  if (upstreamSignal) {
+    if (upstreamSignal.aborted) controller.abort(upstreamSignal.reason);
+    else upstreamSignal.addEventListener('abort', () => controller.abort(upstreamSignal.reason), { once:true });
+  }
+
+  const timer = setTimeout(() => controller.abort(new DOMException('Request timed out', 'AbortError')), timeoutMs);
+  return fetch(input, { ...init, signal:controller.signal }).finally(() => clearTimeout(timer));
+}
 
 window.supabaseClient = supabase.createClient(
   SUPABASE_URL,
-  SUPABASE_ANON_KEY
+  SUPABASE_ANON_KEY,
+  { global: { fetch: gotCrackedFetch } }
 );
 
 /*
+ * Single authoritative session restore.
+ *
+ * A still-valid persisted access token can be used immediately without waiting
+ * on the Supabase cross-tab refresh lock. Expired sessions fall through to one
+ * shared getSession() call. Every module consumes this same result.
+ */
+(() => {
+  const client = window.supabaseClient;
+  let sessionPromise = null;
+  let lastSessionResult = null;
+
+  function readPersistedSession() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(GC_AUTH_STORAGE_KEY) || 'null');
+      if (!stored?.access_token || !stored?.user?.id) return null;
+      const expiresAt = Number(stored.expires_at || 0);
+      if (!expiresAt || expiresAt * 1000 <= Date.now() + 60000) return null;
+      return stored;
+    } catch {
+      return null;
+    }
+  }
+
+  async function restoreSession() {
+    const persisted = readPersistedSession();
+    if (persisted) {
+      const result = { session:persisted, error:null, source:'persisted' };
+      lastSessionResult = result;
+      return result;
+    }
+
+    if (lastSessionResult?.session) return lastSessionResult;
+    if (sessionPromise) return sessionPromise;
+
+    sessionPromise = client.auth.getSession()
+      .then(({ data, error }) => ({
+        session:data?.session || null,
+        error:error || null,
+        source:'supabase'
+      }))
+      .catch(error => ({ session:null, error, source:'supabase' }))
+      .then(result => {
+        if (result.session) lastSessionResult = result;
+        return result;
+      })
+      .finally(() => { sessionPromise = null; });
+
+    return sessionPromise;
+  }
+
+  function clear() {
+    lastSessionResult = null;
+    sessionPromise = null;
+  }
+
+  client.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') return clear();
+    if (session && ['INITIAL_SESSION','SIGNED_IN','TOKEN_REFRESHED','USER_UPDATED'].includes(event)) {
+      lastSessionResult = { session, error:null, source:'auth-event' };
+    }
+  });
+
+  window.GotCrackedAuth = { restoreSession, readPersistedSession, clear };
+})();
+
+/*
  * Portal 1.0 bootstrap request coalescing.
- * Multiple legacy/runtime modules can initialize from the same authenticated
- * session. Identical short-lived startup reads share one request; mutations,
- * explicit-token auth calls, RLS, and permission checks are unchanged.
+ * Multiple operational modules can initialize from the same authenticated
+ * session. Identical short-lived reads share one request; mutations and RLS are
+ * unchanged.
  */
 (() => {
   const client = window.supabaseClient;
@@ -21,11 +109,10 @@ window.supabaseClient = supabase.createClient(
   let userInFlight = null;
   let userCache = null;
   let userCacheAt = 0;
-  const USER_TTL_MS = 1800;
+  const USER_TTL_MS = 3000;
 
   client.auth.getUser = (...args) => {
     if (args.length) return originalGetUser(...args);
-
     const now = Date.now();
     if (userCache && now - userCacheAt < USER_TTL_MS) return Promise.resolve(userCache);
     if (userInFlight) return userInFlight;
@@ -47,11 +134,10 @@ window.supabaseClient = supabase.createClient(
   let staffListInFlight = null;
   let staffListCache = null;
   let staffListCacheAt = 0;
-  const STAFF_LIST_TTL_MS = 1200;
+  const STAFF_LIST_TTL_MS = 2500;
 
   client.functions.invoke = (functionName, options = {}) => {
     const isStaffList = functionName === 'manage-staff' && options?.body?.action === 'list';
-
     if (!isStaffList) {
       const result = originalInvoke(functionName, options);
       if (functionName === 'manage-staff') {
@@ -79,7 +165,7 @@ window.supabaseClient = supabase.createClient(
   };
 
   client.auth.onAuthStateChange(event => {
-    if (['SIGNED_OUT', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
+    if (['SIGNED_OUT','TOKEN_REFRESHED','USER_UPDATED'].includes(event)) {
       userCache = null;
       userCacheAt = 0;
     }
@@ -91,53 +177,43 @@ window.supabaseClient = supabase.createClient(
 })();
 
 /*
- * Returning-session fast path.
+ * Returning-session shell fast path.
  *
- * workflow.js remains the authority that reloads the live profile and checks
- * active status. This only avoids holding the login screen over a previously
- * validated staff session while that small profile query completes.
- *
- * A valid Supabase session is still required, the cached staff id must match
- * that authenticated user, and all shop data remains protected by RLS.
+ * This is intentionally storage-first. It never initiates a token refresh just
+ * to decide whether the login overlay can disappear. workflow.js still reloads
+ * the live profile and RLS still protects every shop query.
  */
 (() => {
-  const client = window.supabaseClient;
-  if (!client) return;
+  const persisted = window.GotCrackedAuth?.readPersistedSession?.();
+  if (!persisted?.user?.id) return;
 
-  client.auth.getSession().then(({ data, error }) => {
-    const session = data?.session;
-    if (error || !session) return;
+  let cachedStaff = null;
+  try {
+    cachedStaff = JSON.parse(sessionStorage.getItem('gotcracked-staff') || 'null');
+  } catch {
+    cachedStaff = null;
+  }
+  if (!cachedStaff || cachedStaff.id !== persisted.user.id) return;
 
-    let cachedStaff = null;
-    try {
-      cachedStaff = JSON.parse(sessionStorage.getItem('gotcracked-staff') || 'null');
-    } catch {
-      cachedStaff = null;
-    }
+  const login = document.getElementById('login-screen');
+  if (login) login.classList.add('hidden');
 
-    if (!cachedStaff || cachedStaff.id !== session.user.id) return;
+  const name = document.getElementById('staff-name');
+  const role = document.getElementById('staff-role');
+  const initials = document.getElementById('staff-initials');
+  if (name) name.textContent = cachedStaff.name || 'Staff';
+  if (role) role.textContent = cachedStaff.role || 'Staff';
+  if (initials) {
+    initials.textContent = (cachedStaff.name || 'Staff')
+      .split(' ')
+      .filter(Boolean)
+      .map(part => part[0])
+      .join('')
+      .slice(0,2)
+      .toUpperCase();
+  }
 
-    const login = document.getElementById('login-screen');
-    if (login) login.classList.add('hidden');
-
-    const name = document.getElementById('staff-name');
-    const role = document.getElementById('staff-role');
-    const initials = document.getElementById('staff-initials');
-
-    if (name) name.textContent = cachedStaff.name || 'Staff';
-    if (role) role.textContent = cachedStaff.role || 'Staff';
-    if (initials) {
-      initials.textContent = (cachedStaff.name || 'Staff')
-        .split(' ')
-        .filter(Boolean)
-        .map(part => part[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase();
-    }
-
-    document.dispatchEvent(new CustomEvent('gc-session-shell-restored', {
-      detail: { userId: session.user.id }
-    }));
-  }).catch(() => {});
+  document.dispatchEvent(new CustomEvent('gc-session-shell-restored', {
+    detail:{ userId:persisted.user.id }
+  }));
 })();
