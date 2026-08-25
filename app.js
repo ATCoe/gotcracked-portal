@@ -243,10 +243,15 @@
     if (!window.matchMedia('(max-width: 750px)').matches) setMobileMenu(false);
   });
 
-  window.addEventListener('hashchange', () => {
-    const id = window.location.hash.slice(1).split('/')[0];
-    if (id) activateView(id, { updateHash: false });
-  });
+  const syncViewFromLocation = () => {
+    const id = window.location.hash.slice(1).split('/')[0] || 'dashboard';
+    if (document.getElementById(id)?.classList.contains('view')) {
+      activateView(id, { updateHash: false });
+    }
+  };
+
+  window.addEventListener('hashchange', syncViewFromLocation);
+  window.addEventListener('popstate', syncViewFromLocation);
 
   document.querySelector('#repair-search')?.addEventListener('input', filterRepairs);
   document.querySelector('#status-filter')?.addEventListener('change', filterRepairs);
