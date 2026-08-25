@@ -14,6 +14,7 @@
     'portal-v1-polish.js',
     'portal-v1-final.js',
     'master-directory.js',
+    'sales-ops-bootstrap.js',
     'sales-ops.js'
   ];
 
