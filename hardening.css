@@ -254,13 +254,25 @@ dialog[open] {
     box-shadow: 18px 0 50px rgba(5, 13, 25, .28);
     visibility: hidden;
     pointer-events: none;
-    z-index: 50;
+    z-index: 60 !important;
+    background: var(--navy, #111b2b) !important;
+    opacity: 1 !important;
+    filter: none !important;
   }
 
   .sidebar.open {
     transform: translateX(0);
     visibility: visible;
     pointer-events: auto;
+  }
+
+  /* The dimmer starts at the drawer edge, so it can never tint the sidebar. */
+  .sidebar-backdrop {
+    inset: 0 0 0 min(86vw, 290px) !important;
+    z-index: 59 !important;
+    background: rgba(5, 13, 25, .52) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 
   .sidebar .brand {
