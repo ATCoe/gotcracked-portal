@@ -1,0 +1,378 @@
+/* GotCracked Portal 1.0 — authoritative release layout.
+   Loaded LAST. This file owns shell geometry, responsive behavior, drawers,
+   mobile navigation and release-level conflict resolution. */
+
+:root{
+  --gc-touch:44px;
+  --gc-mobile-gutter:14px;
+  --gc-sidebar-desktop:250px;
+  --gc-sidebar-mobile:min(86vw,290px);
+  --gc-topbar:70px;
+  --gc-panel-shadow:0 10px 30px rgba(8,27,47,.07);
+  --gc-drawer-shadow:-20px 0 52px rgba(5,18,32,.2);
+}
+
+html,body{max-width:100%;overflow-x:clip}
+body{min-width:0}
+main,.view,.card,.v1-ops-card,.gc-directory{min-width:0;max-width:100%}
+button,input,select,textarea{max-width:100%}
+button,[role="button"],a,.nav-link{touch-action:manipulation}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[role="button"]:focus-visible{outline:3px solid rgba(24,119,242,.3);outline-offset:2px}
+
+/* -------------------------------------------------------------------------
+   APP SHELL / TOP BAR
+   ------------------------------------------------------------------------- */
+.app-shell{grid-template-columns:var(--gc-sidebar-desktop) minmax(0,1fr)}
+.topbar{position:sticky;top:0;z-index:30;min-width:0;background:#fff}
+.location{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.icon-button,.help{min-width:var(--gc-touch);min-height:var(--gc-touch)}
+.view{min-width:0}
+
+/* -------------------------------------------------------------------------
+   LEFT SIDEBAR — navigation only
+   Desktop can use the full navigation list. Mobile receives a compact grouped
+   nav from mobile-nav-safe.js and NEVER becomes a scrolling content panel.
+   ------------------------------------------------------------------------- */
+.sidebar{z-index:40;overflow:hidden}
+.sidebar .brand{overflow:hidden!important}
+.sidebar .brand-logo{object-fit:contain!important;transform:none!important}
+.sidebar nav{min-width:0}
+.sidebar .profile{flex:0 0 auto;min-width:0}
+.sidebar .profile>div:nth-child(2){min-width:0}
+.sidebar .profile strong,.sidebar .profile small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gc-mobile-nav{display:none}
+
+/* Drawers use their own shadow/border. The exposed application NEVER dims. */
+.sidebar-backdrop,.v1-drawer-backdrop{
+  background:transparent!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-filter:none!important;
+  filter:none!important;
+  opacity:1!important;
+}
+body.mobile-nav-open .app-shell,
+body.mobile-nav-open main,
+body.mobile-nav-open .view,
+body.mobile-nav-open .topbar{
+  -webkit-filter:none!important;
+  filter:none!important;
+  opacity:1!important;
+}
+.sidebar.open{opacity:1!important;filter:none!important;-webkit-filter:none!important}
+
+/* -------------------------------------------------------------------------
+   RIGHT OPERATIONAL DRAWERS
+   ------------------------------------------------------------------------- */
+.v1-right-drawer{
+  width:min(470px,94vw);
+  max-width:94vw;
+  background:#fff;
+  border-left:1px solid #cfdbe6;
+  box-shadow:var(--gc-drawer-shadow)!important;
+}
+.v1-right-drawer .v1-drawer-body{min-height:0;overflow-y:auto!important;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+body.v1-overlay-open,body.v1-workflow-open{overflow:hidden}
+
+/* Work-order workflow: sticky side panel on large screens, true right drawer
+   on tablets/phones. It never becomes a long inline section below the ticket. */
+.v1-workorder-layout{grid-template-columns:minmax(0,1fr) 360px;gap:16px;min-width:0}
+.v1-workorder-main{min-width:0}
+.v1-workflow-panel{
+  position:sticky;
+  top:82px;
+  display:flex;
+  flex-direction:column;
+  max-height:calc(100dvh - 98px);
+  overflow:hidden;
+  background:#fff;
+  border:1px solid #cfdae5;
+  border-radius:16px;
+  box-shadow:var(--gc-panel-shadow);
+}
+.v1-workflow-panel>.v1-drawer-body{min-height:0;overflow-y:auto!important;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.v1-workorder-layout.drawer-collapsed{grid-template-columns:minmax(0,1fr) 0;gap:0}
+.v1-workorder-layout.drawer-collapsed .v1-workflow-panel{display:none}
+
+/* -------------------------------------------------------------------------
+   DASHBOARD / DIRECTORY / TABLES
+   ------------------------------------------------------------------------- */
+.metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+.metrics article{min-width:0}
+#dashboard .metrics article[data-v1-metric-link]{cursor:pointer}
+.table-wrap,.v1-table-wrap,.audit-table-wrap,.schedule-grid,.bar-chart{max-width:100%;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}
+.v1-table-wrap{overflow-x:auto;overflow-y:visible}
+.v1-table{width:100%}
+.gc-directory{max-width:100%}
+.gc-dir-row{max-width:100%}
+
+/* -------------------------------------------------------------------------
+   FORMS / DIALOGS / CARDS
+   ------------------------------------------------------------------------- */
+.primary-button,.secondary-button,.discord-button,.search,.toolbar select,.v1-form input,.v1-form select,.v1-form textarea,.v1-form-grid input,.v1-form-grid select,.v1-form-grid textarea{min-height:var(--gc-touch)}
+.card,.v1-ops-card,.v1-device-card,.v1-workflow-panel,.v1-guide,.v1-permission-person{border-color:#dce4ec;box-shadow:var(--gc-panel-shadow)}
+dialog{max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain}
+dialog::backdrop,#v1-intake-dialog::backdrop,#v1-po-dialog::backdrop,#portal-v1-lead-dialog::backdrop{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+.modal-actions{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:#fff!important}
+.report-metrics{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))!important}
+.shelf-revenue{border-color:#7fd7ba!important;background:#f1fbf7!important}
+.shelf-revenue strong{color:#087657}
+.abandoned-policy{display:flex;justify-content:space-between;gap:14px;margin-top:14px;padding:11px 13px;border-radius:9px;background:#f4f6f8;color:#56677a;font-size:.78rem}
+
+/* -------------------------------------------------------------------------
+   TABLET / NARROW DESKTOP
+   ------------------------------------------------------------------------- */
+@media(max-width:1100px){
+  .v1-workorder-layout,
+  .v1-workorder-layout.drawer-collapsed{
+    display:block;
+    grid-template-columns:none!important;
+  }
+  .v1-workflow-panel,
+  .v1-workorder-layout.drawer-collapsed .v1-workflow-panel{
+    display:flex!important;
+    position:fixed!important;
+    inset:0 0 0 auto!important;
+    width:min(470px,94vw)!important;
+    height:100dvh!important;
+    max-height:100dvh!important;
+    border-radius:0!important;
+    border-top:0!important;
+    border-right:0!important;
+    border-bottom:0!important;
+    z-index:86!important;
+    transform:translateX(0);
+    transition:transform .2s ease,visibility .2s ease;
+    visibility:visible;
+    pointer-events:auto;
+    box-shadow:var(--gc-drawer-shadow)!important;
+  }
+  .v1-workorder-layout.drawer-collapsed .v1-workflow-panel{
+    transform:translateX(103%);
+    visibility:hidden;
+    pointer-events:none;
+  }
+  .v1-workflow-panel>.v1-drawer-head{flex:0 0 auto;position:sticky;top:0;z-index:2;background:#fff}
+  .v1-workflow-panel>.v1-drawer-body{flex:1 1 auto;max-height:none!important;overflow-y:auto!important}
+}
+
+/* -------------------------------------------------------------------------
+   PHONE
+   ------------------------------------------------------------------------- */
+@media(max-width:750px){
+  :root{--gc-topbar:62px}
+  html,body{overflow-x:hidden}
+  .app-shell{display:block;min-height:100dvh}
+
+  .sidebar{
+    display:flex!important;
+    flex-direction:column!important;
+    position:fixed!important;
+    inset:0 auto 0 0!important;
+    width:var(--gc-sidebar-mobile)!important;
+    height:100dvh!important;
+    max-height:100dvh!important;
+    padding:max(8px,env(safe-area-inset-top)) 12px max(8px,env(safe-area-inset-bottom))!important;
+    overflow:hidden!important;
+    overscroll-behavior:none!important;
+    transform:translateX(-102%);
+    transition:transform .2s ease;
+    visibility:hidden;
+    pointer-events:none;
+    z-index:60!important;
+    background:var(--navy,#111b2b)!important;
+    box-shadow:18px 0 46px rgba(4,17,31,.24)!important;
+    border-right:1px solid rgba(255,255,255,.08);
+    scrollbar-width:none!important;
+  }
+  .sidebar::-webkit-scrollbar,.sidebar nav::-webkit-scrollbar,.gc-mobile-nav::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+  .sidebar.open{transform:translateX(0);visibility:visible;pointer-events:auto}
+  .sidebar-backdrop{position:fixed!important;inset:0 0 0 var(--gc-sidebar-mobile)!important;z-index:59!important;border:0!important;padding:0!important;cursor:pointer!important;background:transparent!important}
+  .sidebar-backdrop[hidden]{display:none!important}
+
+  .sidebar>.brand{
+    flex:0 0 96px!important;
+    height:96px!important;
+    min-height:96px!important;
+    max-height:96px!important;
+    margin:0 0 2px!important;
+    padding:0!important;
+  }
+  .sidebar>.brand .brand-logo{
+    width:180px!important;
+    height:88px!important;
+    max-width:180px!important;
+    max-height:88px!important;
+    margin:0 auto!important;
+  }
+
+  /* Only hide the desktop nav after the compact replacement exists. */
+  .sidebar.gc-mobile-nav-ready>nav:not(.gc-mobile-nav){display:none!important}
+  .sidebar.gc-mobile-nav-ready>.sidebar-bottom>.nav-link[data-view="settings"]{display:none!important}
+  .sidebar>.gc-mobile-nav{
+    display:flex!important;
+    flex:1 1 auto!important;
+    flex-direction:column!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow:hidden!important;
+    overscroll-behavior:none!important;
+    gap:2px!important;
+    margin:0!important;
+    padding:2px 2px 4px!important;
+    scrollbar-width:none!important;
+  }
+  .gc-mobile-nav>.nav-link{
+    flex:0 0 38px!important;
+    height:38px!important;
+    min-height:38px!important;
+    padding:0 10px!important;
+    gap:9px!important;
+    border-radius:8px!important;
+    font-size:13px!important;
+    line-height:1!important;
+    white-space:nowrap!important;
+  }
+  .gc-mobile-nav .nav-link>span{width:18px!important;min-width:18px!important;font-size:14px!important}
+  .gc-mobile-nav .nav-link b{font-size:9px!important;padding:1px 5px!important}
+  .gc-mobile-nav .nav-link.active::before{top:7px!important;bottom:7px!important}
+
+  .gc-mobile-nav-group{flex:0 0 auto;margin:0!important;border:0!important;overflow:hidden!important}
+  .gc-mobile-nav-group>summary{
+    position:relative;
+    display:flex!important;
+    align-items:center!important;
+    height:36px!important;
+    min-height:36px!important;
+    padding:0 28px 0 36px!important;
+    border-radius:8px!important;
+    color:#aebbcf!important;
+    font-size:12.5px!important;
+    font-weight:750!important;
+    line-height:1!important;
+    cursor:pointer;
+    list-style:none!important;
+    user-select:none;
+  }
+  .gc-mobile-nav-group>summary::-webkit-details-marker{display:none!important}
+  .gc-mobile-nav-group>summary::before{position:absolute;left:10px;width:17px;text-align:center;color:#91a2b9}
+  .gc-mobile-nav-group[data-mobile-group="more"]>summary::before{content:"•••";font-size:9px;letter-spacing:1px}
+  .gc-mobile-nav-group[data-mobile-group="management"]>summary::before{content:"◇";font-size:14px}
+  .gc-mobile-nav-group>summary::after{content:"⌄";position:absolute;right:10px;color:#8292a7;transition:transform .12s ease}
+  .gc-mobile-nav-group[open]>summary::after{transform:rotate(180deg)}
+  .gc-mobile-nav-group>summary:focus-visible,.gc-mobile-nav-group:has(.nav-link.active)>summary{background:#1d2b42;color:#fff!important}
+  .gc-mobile-nav-group-links{display:grid!important;gap:1px!important;padding:1px 0 2px 10px!important}
+  .gc-mobile-nav-group-links>.nav-link{
+    height:32px!important;
+    min-height:32px!important;
+    padding:0 9px!important;
+    gap:8px!important;
+    border-radius:7px!important;
+    font-size:12px!important;
+  }
+  .gc-mobile-nav-group-links>.nav-link>span{width:16px!important;min-width:16px!important;font-size:12px!important}
+  .gc-mobile-nav .v1-hidden{display:none!important}
+
+  .sidebar>.sidebar-bottom{flex:0 0 auto!important;margin:3px 0 0!important;padding:0!important}
+  .sidebar>.sidebar-bottom .profile{
+    min-height:58px!important;
+    margin:3px 4px 0!important;
+    padding:7px 0 0!important;
+    gap:8px!important;
+  }
+  .sidebar .avatar{width:34px!important;height:34px!important;min-width:34px!important}
+  .sidebar .profile strong{font-size:12.5px!important}
+  .sidebar .profile small{font-size:10.5px!important}
+  .sidebar .profile .icon-button{min-width:36px!important;min-height:36px!important}
+
+  .topbar{height:var(--gc-topbar);padding:0 var(--gc-mobile-gutter);gap:7px}
+  .mobile-menu{display:inline-grid!important;flex:0 0 var(--gc-touch)}
+  .top-actions{gap:1px;flex:0 0 auto}
+  .location{flex:1;font-size:12px}
+  .chevron{display:none}
+
+  .view{padding:18px var(--gc-mobile-gutter) max(36px,env(safe-area-inset-bottom))!important}
+  .page-heading{align-items:stretch;gap:12px;margin-bottom:18px}
+  .page-heading>.primary-button,.page-heading>a.primary-button{width:100%;justify-content:center;text-align:center}
+  .page-heading .v1-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .page-heading .v1-actions>*{width:100%}
+  h1{font-size:clamp(24px,7vw,28px)}
+
+  /* Mobile dashboard stays compact 2×2 at every phone width. */
+  #dashboard .metrics,.metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+  #dashboard .metrics article,.metrics article{min-width:0;min-height:98px;padding:12px!important;gap:8px!important;align-items:flex-start}
+  #dashboard .metrics .metric-icon,.metric-icon{width:32px!important;height:32px!important;min-width:32px!important;font-size:15px!important}
+  #dashboard .metrics p,.metrics p{font-size:11px;line-height:1.2}
+  #dashboard .metrics strong,.metrics strong{font-size:20px;line-height:1.15}
+  #dashboard .metrics small,.metrics small{font-size:10px;line-height:1.2}
+
+  .card{padding:15px}
+  .v1-ops-card{border-radius:13px}
+  .v1-ops-card-head{padding:15px;align-items:stretch;flex-direction:column}
+  .v1-table-tools{width:100%;display:grid;grid-template-columns:1fr;gap:8px}
+  .v1-table-tools input,.v1-table-tools select{width:100%;min-width:0;font-size:16px}
+  .toolbar{flex-direction:column;align-items:stretch;gap:9px}
+  .search{width:100%;min-width:0}
+  .toolbar select{width:100%}
+
+  /* Dedicated data tables may scroll horizontally; dashboard/master directory
+     uses its own mobile card layout and never forces page-wide overflow. */
+  .table-wrap,.v1-table-wrap{max-width:100%;overflow-x:auto;overflow-y:visible}
+  table,.v1-table{max-width:none}
+  .gc-directory,.gc-dir-list,.gc-dir-row{max-width:100%;min-width:0}
+
+  .v1-right-drawer{width:min(94vw,440px)!important;max-width:94vw!important;border-left:1px solid #cfdbe6!important}
+  .v1-drawer-backdrop{cursor:pointer;background:transparent!important}
+
+  .v1-workorder-head{gap:10px;align-items:stretch;flex-direction:column}
+  .v1-workorder-head .v1-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .v1-workorder-head .v1-actions>*{width:100%}
+  .v1-workflow-panel,.v1-workorder-layout.drawer-collapsed .v1-workflow-panel{width:min(94vw,440px)!important}
+  .v1-device-card{grid-template-columns:1fr!important;padding:13px!important}
+  .v1-device-image{min-height:126px}
+  .v1-device-image img{height:132px}
+  .v1-device-meta{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .v1-suggestions{grid-template-columns:1fr}
+  .v1-line-item{grid-template-columns:minmax(0,1fr) auto!important;gap:8px}
+  .v1-line-menu{grid-column:1/-1;width:100%;display:flex}
+  .v1-line-menu button{flex:1;min-height:42px}
+
+  dialog{width:calc(100% - 16px);max-width:none;max-height:calc(100dvh - 16px);margin:auto;padding:18px;border-radius:14px}
+  .form-grid,.v1-form-grid{grid-template-columns:1fr!important;gap:11px}
+  .form-grid input,.form-grid select,.form-grid textarea,.v1-form input,.v1-form select,.v1-form textarea,.v1-form-grid input,.v1-form-grid select,.v1-form-grid textarea,.settings-list input,.settings-list select,.settings-list textarea{width:100%!important;font-size:16px}
+  .full,.v1-form-grid .full{grid-column:1!important}
+  #v1-intake-dialog,#portal-v1-lead-dialog{width:100vw!important;max-width:none!important;height:100dvh!important;max-height:100dvh!important;margin:0!important;border:0!important;border-radius:0!important}
+  #v1-intake-dialog .v1-intake-shell,#portal-v1-lead-dialog .v1-lead-dialog-shell{height:100dvh;max-height:100dvh}
+  .v1-intake-body,#portal-v1-lead-dialog .v1-lead-dialog-body{padding:14px}
+  .v1-intake-actions,#portal-v1-lead-dialog .v1-lead-dialog-actions{padding:11px 14px max(11px,env(safe-area-inset-bottom))}
+  .v1-device-types{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .v1-check-row{grid-template-columns:minmax(0,1fr) 135px;gap:8px;padding:9px 10px}
+
+  .right-column{grid-template-columns:1fr;gap:12px}
+  .labor-metrics,.report-metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .schedule-plan{grid-template-columns:1fr!important}
+  .audit-toolbar{align-items:stretch;flex-direction:column;gap:10px}
+  .audit-actions{gap:8px;flex-wrap:wrap}
+}
+
+@media(max-width:430px){
+  /* Deliberately keep 2×2 metrics; older polish CSS changed this back to one. */
+  #dashboard .metrics,.metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .v1-device-meta{grid-template-columns:1fr}
+  .page-heading .v1-actions,.v1-workorder-head .v1-actions{grid-template-columns:1fr}
+  .top-actions .help{display:none}
+}
+
+@media(max-width:750px) and (max-height:700px){
+  .sidebar>.brand{flex-basis:78px!important;height:78px!important;min-height:78px!important;max-height:78px!important}
+  .sidebar>.brand .brand-logo{width:155px!important;height:72px!important;max-height:72px!important}
+  .gc-mobile-nav>.nav-link{flex-basis:34px!important;height:34px!important;min-height:34px!important;font-size:12px!important}
+  .gc-mobile-nav-group>summary{height:32px!important;min-height:32px!important;font-size:11.5px!important}
+  .gc-mobile-nav-group-links>.nav-link{height:29px!important;min-height:29px!important;font-size:11px!important}
+  .sidebar>.sidebar-bottom .profile{min-height:50px!important;padding-top:5px!important}
+}
+
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .sidebar,.v1-right-drawer,.v1-workflow-panel,.gc-mobile-nav-group>summary::after{transition:none!important}
+}
