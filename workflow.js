@@ -3,934 +3,354 @@
 
     console.log('WORKFLOW.JS LOADED');
 
-    /*
-     * ============================================================
-     * GOTCRACKED REPAIR DATA
-     * ============================================================
-     */
+    const supabase = window.supabaseClient;
 
-    window.GotCrackedRepairs = [];
-
-    /*
-     * Compatibility alias for older portal code.
-     *
-     * portal-complete.js references "repairs".
-     */
-
-    try {
-        Object.defineProperty(
-            window,
-            'repairs',
-            {
-                configurable: true,
-                get() {
-                    return window.GotCrackedRepairs;
-                }
-            }
-        );
-    } catch (error) {
-        console.warn(
-            'Could not create repairs compatibility alias.',
-            error
-        );
+    if (!supabase) {
+        console.error('SUPABASE CLIENT NOT FOUND');
+        return;
     }
 
-    /*
-     * ============================================================
-     * LOGIN ELEMENTS
-     * ============================================================
-     *
-     * The current index.html accidentally contains TWO login
-     * screens/forms.
-     *
-     * Therefore we intentionally use querySelectorAll() and wire
-     * EVERY login form instead of assuming there is only one.
-     */
+    const loginScreen = document.querySelector('#login-screen');
+    const loginForms = document.querySelectorAll('#login-form');
 
-    const loginScreens =
-        document.querySelectorAll(
-            '#login-screen'
-        );
+    console.log('LOGIN FORMS FOUND:', loginForms.length);
 
-    const loginForms =
-        document.querySelectorAll(
-            '#login-form'
-        );
+    function getLoginErrorElement() {
+        let element = document.querySelector('#login-error');
 
-    const signOutButton =
-        document.querySelector('#sign-out');
+        if (!element && loginForms.length) {
+            element = document.createElement('div');
+            element.id = 'login-error';
+            element.setAttribute('role', 'alert');
 
-    console.log(
-        'LOGIN FORMS FOUND:',
-        loginForms.length
-    );
+            element.style.marginTop = '12px';
+            element.style.padding = '10px 12px';
+            element.style.borderRadius = '8px';
+            element.style.background = '#fee2e2';
+            element.style.color = '#991b1b';
+            element.style.fontSize = '14px';
 
-    /*
-     * ============================================================
-     * LOGIN HELPERS
-     * ============================================================
-     */
-
-    function getLoginError(form) {
-
-        let error =
-            form.querySelector(
-                '#login-error'
-            );
-
-        /*
-         * The newer visible login form currently does not
-         * contain #login-error, so create one automatically.
-         */
-
-        if (!error) {
-
-            error =
-                document.createElement('p');
-
-            error.id =
-                'login-error';
-
-            error.className =
-                'error-message';
-
-            error.setAttribute(
-                'role',
-                'alert'
-            );
-
-            form.appendChild(error);
+            loginForms[0].appendChild(element);
         }
 
-        return error;
+        return element;
     }
 
-    function showLoginError(
-        form,
-        message
-    ) {
+    function showLoginError(message) {
+        const element = getLoginErrorElement();
 
-        console.error(
-            'LOGIN ERROR:',
-            message
-        );
+        if (element) {
+            element.textContent = message;
+            element.style.display = 'block';
+        }
 
-        const error =
-            getLoginError(form);
-
-        error.textContent =
-            message;
-
-        error.style.display =
-            'block';
+        console.error('LOGIN ERROR:', message);
     }
 
-    function clearLoginError(form) {
+    function clearLoginError() {
+        const element = getLoginErrorElement();
 
-        const error =
-            getLoginError(form);
-
-        error.textContent =
-            '';
-
-        error.style.display =
-            'none';
+        if (element) {
+            element.textContent = '';
+            element.style.display = 'none';
+        }
     }
-
-    function hideLoginScreens() {
-
-        loginScreens.forEach(
-            screen => {
-                screen.classList.add(
-                    'hidden'
-                );
-            }
-        );
-    }
-
-    function showLoginScreens() {
-
-        loginScreens.forEach(
-            screen => {
-                screen.classList.remove(
-                    'hidden'
-                );
-            }
-        );
-    }
-
-    /*
-     * ============================================================
-     * STAFF PROFILE
-     * ============================================================
-     */
 
     function setStaff(staff) {
-
-        const nameElement =
-            document.querySelector(
-                '#staff-name'
-            );
-
-        const roleElement =
-            document.querySelector(
-                '#staff-role'
-            );
-
-        const initialsElement =
-            document.querySelector(
-                '#staff-initials'
-            );
+        const nameElement = document.querySelector('#staff-name');
+        const roleElement = document.querySelector('#staff-role');
+        const initialsElement = document.querySelector('#staff-initials');
 
         if (nameElement) {
-
-            nameElement.textContent =
-                staff.name ||
-                'Staff';
+            nameElement.textContent = staff.name || staff.email || 'Staff';
         }
 
         if (roleElement) {
-
-            roleElement.textContent =
-                staff.role ||
-                'Staff';
+            roleElement.textContent = staff.role || 'Staff';
         }
 
         if (initialsElement) {
+            const source = staff.name || staff.email || 'GC';
 
-            initialsElement.textContent =
-                (staff.name || 'Staff')
-                    .split(' ')
-                    .filter(Boolean)
-                    .map(
-                        part =>
-                            part[0]
-                    )
-                    .join('')
-                    .slice(0, 2)
-                    .toUpperCase();
+            initialsElement.textContent = source
+                .split(/\s+/)
+                .map(part => part[0])
+                .join('')
+                .slice(0, 2)
+                .toUpperCase();
         }
     }
 
-    async function loadProfile(
-        userId
-    ) {
-
-        console.log(
-            'LOADING STAFF PROFILE:',
-            userId
-        );
-
-        const {
-            data: profile,
-            error
-        } =
-            await window.supabaseClient
-                .from('profiles')
-                .select(
-                    'id, display_name, role, active, must_change_password'
-                )
-                .eq(
-                    'id',
-                    userId
-                )
-                .single();
-
-        if (error) {
-
-            console.error(
-                'PROFILE LOAD FAILED:',
-                error
-            );
-
-            /*
-             * This means authentication succeeded,
-             * but the staff profile is missing or
-             * inaccessible.
-             */
-
-            showLoginErrorForAllForms(
-                'Your account signed in, but your GotCracked staff profile could not be loaded.'
-            );
-
-            return false;
-        }
-
-        if (!profile) {
-
-            showLoginErrorForAllForms(
-                'Your account signed in, but no staff profile was found.'
-            );
-
-            return false;
-        }
-
-        if (profile.active === false) {
-
-            showLoginErrorForAllForms(
-                'Your GotCracked staff account is inactive.'
-            );
-
-            await window.supabaseClient
-                .auth.signOut();
-
-            return false;
-        }
-
-        const staff = {
-
-            id:
-                userId,
-
-            name:
-                profile.display_name ||
-                'Staff',
-
-            role:
-                profile.role ||
-                'Staff'
-        };
-
-        sessionStorage.setItem(
-            'gotcracked-staff',
-            JSON.stringify(staff)
-        );
-
-        setStaff(staff);
-
-        if (
-            profile.must_change_password
-        ) {
-
-            window.location.href =
-                '/setup-password.html';
-
-            return true;
-        }
-
-        hideLoginScreens();
-
-        console.log(
-            'STAFF PROFILE LOADED:',
-            staff.name
-        );
-
-        return true;
-    }
-
-    /*
-     * ============================================================
-     * LOGIN ERROR FOR ALL FORMS
-     * ============================================================
-     */
-
-    function showLoginErrorForAllForms(
-        message
-    ) {
-
-        loginForms.forEach(
-            form => {
-                showLoginError(
-                    form,
-                    message
-                );
-            }
-        );
-    }
-
-    /*
-     * ============================================================
-     * REPAIR LOADING
-     * ============================================================
-     *
-     * Repairs are ONLY loaded after authentication.
-     */
-
-    async function loadRepairs() {
-
-        if (
-            !window.supabaseClient
-        ) {
-
-            console.error(
-                'REPAIR LOAD FAILED: Supabase client unavailable.'
-            );
-
-            return;
-        }
-
-        console.log(
-            'LOADING REPAIR TICKETS...'
-        );
-
-        const {
-            data,
-            error
-        } =
-            await window.supabaseClient
-                .from('repair_tickets')
-                .select(`
-                    *,
-                    customers (
-                        first_name,
-                        last_name
-                    ),
-                    devices (
-                        model
-                    ),
-                    profiles:assigned_user_id (
-                        display_name
-                    )
-                `)
-                .order(
-                    'ticket_number',
-                    {
-                        ascending: false
-                    }
-                );
-
-        if (error) {
-
-            console.error(
-                'REPAIR LOAD FAILED:',
-                error
-            );
-
-            return;
-        }
-
-        window.GotCrackedRepairs =
-            (data || []).map(
-                ticket => {
-
-                    const firstName =
-                        ticket
-                            .customers
-                            ?.first_name ||
-                        '';
-
-                    const lastName =
-                        ticket
-                            .customers
-                            ?.last_name ||
-                        '';
-
-                    const customerName =
-                        `${firstName} ${lastName}`
-                            .trim();
-
-                    return {
-
-                        id:
-                            ticket.ticket_number,
-
-                        customer:
-                            customerName ||
-                            'Unknown customer',
-
-                        device:
-                            ticket
-                                .devices
-                                ?.model ||
-                            'Unknown device',
-
-                        service:
-                            ticket.customer_issue ||
-                            'No service listed',
-
-                        tech:
-                            ticket
-                                .profiles
-                                ?.display_name ||
-                            '—',
-
-                        status:
-                            ticket.status ||
-                            'In diagnosis',
-
-                        updated:
-                            ticket.updated_at
-                                ? new Date(
-                                    ticket.updated_at
-                                ).toLocaleString()
-                                : 'Recently updated',
-
-                        icon:
-                            '▯'
-                    };
-                }
-            );
-
-        console.log(
-            'REPAIR TICKETS LOADED:',
-            window.GotCrackedRepairs.length
-        );
-
-        renderRepairs();
-
-        /*
-         * Refresh portal-complete reports if that module
-         * has already rendered them.
-         */
-
-        if (
-            typeof window.pcRenderReports ===
-            'function'
-        ) {
-            try {
-                window.pcRenderReports();
-            } catch (error) {
-                console.warn(
-                    'REPORT REFRESH FAILED:',
-                    error
-                );
-            }
-        }
-    }
-
-    /*
-     * ============================================================
-     * APP UI BRIDGE
-     * ============================================================
-     */
-
-    function renderRepairs() {
-
-        if (
-            window.GotCrackedUI &&
-            typeof window.GotCrackedUI
-                .renderRepairs ===
-                'function'
-        ) {
-
-            window.GotCrackedUI
-                .renderRepairs(
-                    window.GotCrackedRepairs
-                );
-        }
-    }
-
-    /*
-     * ============================================================
-     * SESSION
-     * ============================================================
-     */
-
-    async function loadSession() {
-
-        if (
-            !window.supabaseClient
-        ) {
-
-            console.error(
-                'AUTH FAILED: Supabase client unavailable.'
-            );
-
-            showLoginErrorForAllForms(
-                'The portal could not connect to authentication.'
-            );
-
-            return;
-        }
-
-        console.log(
-            'AUTH STATE: INITIAL_SESSION'
-        );
-
+    async function loadProfile(userId, email) {
         try {
-
             const {
-                data,
+                data: profile,
                 error
-            } =
-                await window.supabaseClient
-                    .auth.getSession();
+            } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .maybeSingle();
 
             if (error) {
+                console.warn('PROFILE LOAD FAILED:', error);
 
-                console.error(
-                    'SESSION LOAD FAILED:',
-                    error
+                const fallbackStaff = {
+                    id: userId,
+                    name: email || 'Staff',
+                    role: 'Staff',
+                    email: email || ''
+                };
+
+                sessionStorage.setItem(
+                    'gotcracked-staff',
+                    JSON.stringify(fallbackStaff)
                 );
 
-                return;
+                setStaff(fallbackStaff);
+
+                return fallbackStaff;
             }
 
-            const session =
-                data?.session;
+            const staff = {
+                id: userId,
+                name: profile?.display_name || email || 'Staff',
+                role: profile?.role || 'Staff',
+                email: email || ''
+            };
 
-            if (!session) {
-
-                console.log(
-                    'NO ACTIVE SESSION'
-                );
-
-                showLoginScreens();
-
-                return;
-            }
-
-            console.log(
-                'EXISTING SESSION:',
-                session.user.email
+            sessionStorage.setItem(
+                'gotcracked-staff',
+                JSON.stringify(staff)
             );
 
-            const profileLoaded =
-                await loadProfile(
-                    session.user.id
-                );
+            setStaff(staff);
 
-            if (profileLoaded) {
-
-                await loadRepairs();
+            if (profile?.must_change_password) {
+                window.location.href = '/setup-password.html';
+                return staff;
             }
+
+            return staff;
 
         } catch (error) {
+            console.error('PROFILE EXCEPTION:', error);
 
-            console.error(
-                'SESSION ERROR:',
-                error
+            const fallbackStaff = {
+                id: userId,
+                name: email || 'Staff',
+                role: 'Staff',
+                email: email || ''
+            };
+
+            sessionStorage.setItem(
+                'gotcracked-staff',
+                JSON.stringify(fallbackStaff)
             );
+
+            setStaff(fallbackStaff);
+
+            return fallbackStaff;
         }
     }
 
-    /*
-     * ============================================================
-     * LOGIN
-     * ============================================================
-     */
-
-    const loginInProgress =
-        new WeakMap();
-
-    async function handleLogin(
-        event,
-        form
-    ) {
-
+    async function handleLogin(event) {
         event.preventDefault();
         event.stopPropagation();
 
-        if (
-            loginInProgress.get(form)
-        ) {
-            return;
-        }
+        console.log('LOGIN SUBMIT HANDLER FIRED');
 
-        loginInProgress.set(
-            form,
-            true
+        clearLoginError();
+
+        const form = event.currentTarget;
+
+        const emailInput = form.querySelector(
+            '#login-email, [name="email"], input[type="email"]'
         );
 
-        console.log(
-            'LOGIN SUBMIT FIRED'
+        const passwordInput = form.querySelector(
+            '#login-password, [name="password"], input[type="password"]'
         );
 
-        clearLoginError(form);
-
-        if (
-            !window.supabaseClient
-        ) {
-
-            showLoginError(
-                form,
-                'Authentication is not available. Please refresh the portal.'
-            );
-
-            loginInProgress.set(
-                form,
-                false
-            );
-
-            return;
+        if (!emailInput || !passwordInput) {
+            showLoginError('Login form fields could not be found.');
+            return false;
         }
 
-        const emailInput =
-            form.querySelector(
-                '#login-email'
-            );
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
 
-        const passwordInput =
-            form.querySelector(
-                '#login-password'
-            );
-
-        const email =
-            emailInput?.value
-                ?.trim() ||
-            '';
-
-        const password =
-            passwordInput?.value ||
-            '';
-
-        if (!email) {
-
-            showLoginError(
-                form,
-                'Please enter your work email.'
-            );
-
-            emailInput?.focus();
-
-            loginInProgress.set(
-                form,
-                false
-            );
-
-            return;
-        }
-
-        if (!password) {
-
-            showLoginError(
-                form,
-                'Please enter your password.'
-            );
-
-            passwordInput?.focus();
-
-            loginInProgress.set(
-                form,
-                false
-            );
-
-            return;
+        if (!email || !password) {
+            showLoginError('Please enter your email and password.');
+            return false;
         }
 
         const submitButton =
-            form.querySelector(
-                'button[type="submit"]'
-            );
+            form.querySelector('button[type="submit"], input[type="submit"]');
 
         if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.dataset.originalText =
+                submitButton.textContent || submitButton.value || '';
 
-            submitButton.disabled =
-                true;
-
-            submitButton.textContent =
-                'Signing in...';
+            if (submitButton.tagName === 'BUTTON') {
+                submitButton.textContent = 'Signing in...';
+            } else {
+                submitButton.value = 'Signing in...';
+            }
         }
 
-        console.log(
-            'AUTH REQUEST:',
-            email
-        );
+        console.log('ATTEMPTING SUPABASE LOGIN:', email);
 
         try {
-
             const {
                 data,
                 error
-            } =
-                await window.supabaseClient
-                    .auth.signInWithPassword({
-                        email,
-                        password
-                    });
+            } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            });
 
-            console.log(
-                'AUTH RESPONSE:',
-                {
-                    user:
-                        data?.user?.id ||
-                        null,
-
-                    error:
-                        error?.message ||
-                        null
-                }
-            );
+            console.log('SUPABASE LOGIN RESULT:', {
+                success: !error,
+                userId: data?.user?.id || null,
+                error: error?.message || null
+            });
 
             if (error) {
-
-                showLoginError(
-                    form,
-                    error.message ||
-                    'Unable to sign in.'
-                );
-
-                return;
+                showLoginError(error.message || 'Unable to sign in.');
+                return false;
             }
 
             if (!data?.user) {
-
-                showLoginError(
-                    form,
-                    'Sign-in completed without a user account.'
-                );
-
-                return;
+                showLoginError('Login succeeded but no user session was returned.');
+                return false;
             }
 
-            console.log(
-                'LOGIN SUCCESS:',
-                data.user.email
+            console.log('LOGIN SUCCESS:', data.user.id);
+
+            await loadProfile(
+                data.user.id,
+                data.user.email || email
             );
 
-            const profileLoaded =
-                await loadProfile(
-                    data.user.id
-                );
-
-            if (!profileLoaded) {
-                return;
+            if (loginScreen) {
+                loginScreen.classList.add('hidden');
             }
 
-            await loadRepairs();
+            form.reset();
+
+            console.log('LOGIN COMPLETE');
+
+            return false;
 
         } catch (error) {
-
-            console.error(
-                'LOGIN EXCEPTION:',
-                error
-            );
+            console.error('LOGIN EXCEPTION:', error);
 
             showLoginError(
-                form,
                 error?.message ||
                 'An unexpected error occurred while signing in.'
             );
 
+            return false;
+
         } finally {
-
             if (submitButton) {
+                submitButton.disabled = false;
 
-                submitButton.disabled =
-                    false;
+                const originalText =
+                    submitButton.dataset.originalText || 'Sign in';
 
-                submitButton.textContent =
-                    'Sign in to portal';
+                if (submitButton.tagName === 'BUTTON') {
+                    submitButton.textContent = originalText;
+                } else {
+                    submitButton.value = originalText;
+                }
             }
-
-            loginInProgress.set(
-                form,
-                false
-            );
         }
     }
 
-    /*
-     * ============================================================
-     * LOGIN FORM WIRING
-     * ============================================================
-     *
-     * IMPORTANT:
-     * There are currently two login forms in index.html.
-     * Wire both so either one works.
-     */
+    loginForms.forEach(form => {
+        form.addEventListener('submit', handleLogin, true);
+    });
 
-    loginForms.forEach(
-        form => {
+    console.log('LOGIN HANDLER LOADED');
+
+    async function loadSession() {
+        console.log('AUTH STATE: CHECKING SESSION');
+
+        try {
+            const {
+                data,
+                error
+            } = await supabase.auth.getSession();
+
+            if (error) {
+                console.error('SESSION ERROR:', error);
+                return;
+            }
+
+            const session = data?.session;
+
+            if (!session) {
+                console.log('NO ACTIVE SESSION');
+
+                if (loginScreen) {
+                    loginScreen.classList.remove('hidden');
+                }
+
+                return;
+            }
 
             console.log(
-                'LOGIN FORM FOUND:',
-                form
+                'ACTIVE SESSION:',
+                session.user.email
             );
 
-            getLoginError(form);
-
-            form.addEventListener(
-                'submit',
-                event => {
-                    handleLogin(
-                        event,
-                        form
-                    );
-                }
+            await loadProfile(
+                session.user.id,
+                session.user.email
             );
 
-            const button =
-                form.querySelector(
-                    'button[type="submit"]'
-                );
-
-            if (button) {
-
-                button.addEventListener(
-                    'click',
-                    event => {
-
-                        /*
-                         * Prevent the browser from performing
-                         * the native form submission.
-                         */
-
-                        event.preventDefault();
-
-                        handleLogin(
-                            event,
-                            form
-                        );
-                    }
-                );
+            if (loginScreen) {
+                loginScreen.classList.add('hidden');
             }
+
+        } catch (error) {
+            console.error('SESSION EXCEPTION:', error);
         }
-    );
-
-    if (
-        loginForms.length === 0
-    ) {
-
-        console.error(
-            'LOGIN FORM NOT FOUND: #login-form'
-        );
-
-    } else {
-
-        console.log(
-            'LOGIN HANDLER LOADED'
-        );
     }
 
-    /*
-     * ============================================================
-     * SIGN OUT
-     * ============================================================
-     */
+    supabase.auth.onAuthStateChange((event, session) => {
+        console.log(
+            'AUTH EVENT:',
+            event,
+            session?.user?.email || 'NO USER'
+        );
+    });
+
+    const signOutButton = document.querySelector('#sign-out');
 
     if (signOutButton) {
+        signOutButton.addEventListener('click', async event => {
+            event.preventDefault();
 
-        signOutButton.addEventListener(
-            'click',
-            async event => {
+            try {
+                await supabase.auth.signOut();
 
-                event.preventDefault();
+                sessionStorage.removeItem('gotcracked-staff');
 
-                try {
-
-                    await window
-                        .supabaseClient
-                        .auth.signOut();
-
-                } catch (error) {
-
-                    console.error(
-                        'SIGN OUT FAILED:',
-                        error
-                    );
+                if (loginScreen) {
+                    loginScreen.classList.remove('hidden');
                 }
 
-                sessionStorage.removeItem(
-                    'gotcracked-staff'
-                );
+                console.log('SIGNED OUT');
 
-                window.GotCrackedRepairs =
-                    [];
-
-                showLoginScreens();
-
-                renderRepairs();
-
+            } catch (error) {
+                console.error('SIGN OUT ERROR:', error);
             }
-        );
+        });
     }
-
-    /*
-     * ============================================================
-     * STARTUP
-     * ============================================================
-     */
 
     loadSession();
 
