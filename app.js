@@ -1,3 +1,7 @@
+// GotCracked Portal - Repair Workflow
+// app.js owns repair data and repair UI only.
+// Authentication is handled by workflow.js.
+
 window.repairs = [];
 
 const statusClass = value => ({
@@ -9,11 +13,18 @@ const statusClass = value => ({
 
 const list = document.querySelector('#repair-list');
 const table = document.querySelector('#repair-table');
+const modal = document.querySelector('#new-ticket');
+const ticketForm = document.querySelector('#ticket-form');
+
+
+// ------------------------------------------------------------
+// LOAD REPAIRS FROM SUPABASE
+// ------------------------------------------------------------
 
 async function loadRepairs() {
 
     if (!window.supabaseClient) {
-        console.error('Supabase client not initialized');
+        console.error('Supabase client is not available.');
         return;
     }
 
@@ -26,7 +37,9 @@ async function loadRepairs() {
             *,
             customers (
                 first_name,
-                last_name
+                last_name,
+                phone,
+                email
             ),
             devices (
                 model
@@ -41,45 +54,87 @@ async function loadRepairs() {
 
 
     if (error) {
-        console.error('Repair load failed:', error);
+
+        console.error(
+            'Repair load failed:',
+            error
+        );
+
         return;
     }
 
 
-    window.repairs = (data || []).map(ticket => ({
+    window.repairs = (data || []).map(ticket => {
 
-        id: ticket.ticket_number,
+        const customer = ticket.customers;
 
-        customer: ticket.customers
-            ? `${ticket.customers.first_name || ''} ${ticket.customers.last_name || ''}`.trim()
-            : 'Unknown',
+        const customerName = customer
+            ? [
+                customer.first_name,
+                customer.last_name
+            ]
+                .filter(Boolean)
+                .join(' ')
+            : 'Unknown';
 
-        device:
-            ticket.devices?.model || 'Unknown device',
 
-        service:
-            ticket.customer_issue || 'No service listed',
+        return {
 
-        tech:
-            ticket.profiles?.display_name || '—',
+            id:
+                ticket.ticket_number,
 
-        status:
-            ticket.status || 'In diagnosis',
+            customer:
+                customerName || 'Unknown',
 
-        updated:
-            ticket.updated_at
-                ? new Date(ticket.updated_at).toLocaleString()
-                : 'Recently updated',
+            phone:
+                customer?.phone || '',
 
-        icon:
-            '▯'
-    }));
+            email:
+                customer?.email || '',
+
+            device:
+                ticket.devices?.model ||
+                'Unknown device',
+
+            service:
+                ticket.customer_issue ||
+                'No service listed',
+
+            issue:
+                ticket.customer_issue ||
+                '',
+
+            tech:
+                ticket.profiles?.display_name ||
+                '—',
+
+            status:
+                ticket.status ||
+                'In diagnosis',
+
+            updated:
+                ticket.updated_at
+                    ? new Date(
+                        ticket.updated_at
+                    ).toLocaleString()
+                    : 'Recently updated',
+
+            icon:
+                '▯'
+
+        };
+
+    });
 
 
     renderRepairs();
+
 }
 
 
+// ------------------------------------------------------------
+// RENDER REPAIRS
+// ------------------------------------------------------------
 
 function renderRepairs(items = window.repairs) {
 
@@ -92,11 +147,15 @@ function renderRepairs(items = window.repairs) {
 
         list.innerHTML = items.map(r => `
 
-            <div class="repair-row" data-ticket="${r.id}">
+            <div
+                class="repair-row"
+                data-ticket="${r.id}"
+            >
 
                 <div class="device-icon">
                     ${r.icon}
                 </div>
+
 
                 <div class="repair-customer">
 
@@ -105,24 +164,34 @@ function renderRepairs(items = window.repairs) {
                     </strong>
 
                     <small>
-                        ${r.device} · ${r.service}
+                        ${r.device}
+                        ·
+                        ${r.service}
                     </small>
 
                 </div>
+
 
                 <div class="repair-tech">
                     ${r.tech}
                 </div>
 
 
-                <span class="status ${statusClass(r.status)}">
+                <span
+                    class="status ${statusClass(r.status)}"
+                >
                     ${r.status}
                 </span>
 
 
                 <div class="ticket-id">
-                    ${r.id}<br>
+
+                    ${r.id}
+
+                    <br>
+
                     ${r.updated}
+
                 </div>
 
             </div>
@@ -132,22 +201,37 @@ function renderRepairs(items = window.repairs) {
     }
 
 
-
     if (table) {
 
         table.innerHTML = items.map(r => `
 
-            <tr data-ticket="${r.id}">
+            <tr
+                data-ticket="${r.id}"
+            >
 
                 <td>
-                    <strong>${r.id}</strong>
-                    <small>${r.updated}</small>
+
+                    <strong>
+                        ${r.id}
+                    </strong>
+
+                    <small>
+                        ${r.updated}
+                    </small>
+
                 </td>
 
 
                 <td>
-                    <strong>${r.customer}</strong>
-                    <small>${r.device}</small>
+
+                    <strong>
+                        ${r.customer}
+                    </strong>
+
+                    <small>
+                        ${r.device}
+                    </small>
+
                 </td>
 
 
@@ -162,9 +246,13 @@ function renderRepairs(items = window.repairs) {
 
 
                 <td>
-                    <span class="status ${statusClass(r.status)}">
+
+                    <span
+                        class="status ${statusClass(r.status)}"
+                    >
                         ${r.status}
                     </span>
+
                 </td>
 
 
@@ -179,13 +267,17 @@ function renderRepairs(items = window.repairs) {
     }
 
 
-    const count = document.querySelector('#repair-count');
+    const count =
+        document.querySelector('#repair-count');
+
 
     if (count) {
 
         count.textContent =
             window.repairs.filter(
-                r => r.status !== 'Ready for pickup'
+                r =>
+                    r.status !==
+                    'Ready for pickup'
             ).length;
 
     }
@@ -193,123 +285,366 @@ function renderRepairs(items = window.repairs) {
 }
 
 
+// ------------------------------------------------------------
+// FILTER REPAIRS
+// ------------------------------------------------------------
 
 function filterRepairs() {
 
-    const search =
-        document.querySelector('#repair-search')?.value
-        .toLowerCase() || '';
+    const searchInput =
+        document.querySelector('#repair-search');
+
+    const statusFilter =
+        document.querySelector('#status-filter');
 
 
-    const status =
-        document.querySelector('#status-filter')?.value || 'all';
+    const q =
+        searchInput?.value
+            ?.toLowerCase()
+            .trim() || '';
 
 
-    renderRepairs(
+    const s =
+        statusFilter?.value ||
+        'all';
 
-        window.repairs.filter(r =>
 
-            (status === 'all' || r.status === status)
+    const filtered =
+        window.repairs.filter(r => {
 
-            &&
+            const matchesStatus =
+                s === 'all' ||
+                r.status === s;
 
-            Object.values(r)
-                .join(' ')
-                .toLowerCase()
-                .includes(search)
 
-        )
+            const searchable =
+                Object.values(r)
+                    .join(' ')
+                    .toLowerCase();
 
+
+            const matchesSearch =
+                !q ||
+                searchable.includes(q);
+
+
+            return (
+                matchesStatus &&
+                matchesSearch
+            );
+
+        });
+
+
+    renderRepairs(filtered);
+
+}
+
+
+// ------------------------------------------------------------
+// NAVIGATION
+// ------------------------------------------------------------
+
+document
+    .querySelectorAll('[data-view]')
+    .forEach(link => {
+
+        link.addEventListener(
+            'click',
+            event => {
+
+                event.preventDefault();
+
+
+                const id =
+                    link.dataset.view;
+
+
+                document
+                    .querySelectorAll('.view')
+                    .forEach(view => {
+
+                        view.classList.toggle(
+                            'active-view',
+                            view.id === id
+                        );
+
+                    });
+
+
+                document
+                    .querySelectorAll('.nav-link')
+                    .forEach(nav => {
+
+                        nav.classList.toggle(
+                            'active',
+                            nav.dataset.view === id
+                        );
+
+                    });
+
+
+                window.location.hash =
+                    id;
+
+            }
+
+        );
+
+    });
+
+
+// ------------------------------------------------------------
+// SEARCH
+// ------------------------------------------------------------
+
+const search =
+    document.querySelector(
+        '#repair-search'
+    );
+
+
+if (search) {
+
+    search.addEventListener(
+        'input',
+        filterRepairs
     );
 
 }
 
 
+// ------------------------------------------------------------
+// STATUS FILTER
+// ------------------------------------------------------------
 
-document.querySelectorAll('[data-view]')
-.forEach(link => {
-
-    link.addEventListener('click', event => {
-
-        event.preventDefault();
-
-        const id = link.dataset.view;
-
-
-        document.querySelectorAll('.view')
-            .forEach(view => {
-
-                view.classList.toggle(
-                    'active-view',
-                    view.id === id
-                );
-
-            });
+const filter =
+    document.querySelector(
+        '#status-filter'
+    );
 
 
+if (filter) {
 
-        document.querySelectorAll('.nav-link')
-            .forEach(nav => {
+    filter.addEventListener(
+        'change',
+        filterRepairs
+    );
 
-                nav.classList.toggle(
-                    'active',
-                    nav.dataset.view === id
-                );
-
-            });
+}
 
 
+// ------------------------------------------------------------
+// NEW TICKET MODAL
+// ------------------------------------------------------------
 
-        window.location.hash = id;
+document
+    .querySelectorAll('[data-open-ticket]')
+    .forEach(button => {
+
+        button.addEventListener(
+            'click',
+            () => {
+
+                if (modal) {
+                    modal.showModal();
+                }
+
+            }
+        );
 
     });
 
-});
 
+// ------------------------------------------------------------
+// TICKET DETAILS
+// ------------------------------------------------------------
 
-
-document.querySelector('#repair-search')
-?.addEventListener(
-    'input',
-    filterRepairs
-);
-
-
-
-document.querySelector('#status-filter')
-?.addEventListener(
-    'change',
-    filterRepairs
-);
-
-
-
-const modal =
-document.querySelector('#new-ticket');
-
-
-
-document.querySelectorAll('[data-open-ticket]')
-.forEach(button => {
-
-    button.addEventListener(
-        'click',
-        () => {
-
-            if (modal) {
-                modal.showModal();
-            }
-
-        }
+const detailModal =
+    document.querySelector(
+        '#ticket-detail'
     );
 
-});
+
+function showTicket(ticketId) {
+
+    const ticket =
+        window.repairs.find(
+            r =>
+                String(r.id) ===
+                String(ticketId)
+        );
 
 
+    if (!ticket) {
+        return;
+    }
 
-const ticketForm =
-document.querySelector('#ticket-form');
 
+    const content =
+        document.querySelector(
+            '#ticket-detail-content'
+        );
+
+
+    if (!content || !detailModal) {
+        return;
+    }
+
+
+    content.innerHTML = `
+
+        <div class="modal-head">
+
+            <div>
+
+                <p class="eyebrow">
+                    ${ticket.id}
+                </p>
+
+                <h2>
+                    ${ticket.customer}'s repair
+                </h2>
+
+            </div>
+
+
+            <button
+                class="icon-button"
+                id="close-ticket"
+                aria-label="Close"
+                type="button"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <span
+            class="status ${statusClass(ticket.status)}"
+        >
+            ${ticket.status}
+        </span>
+
+
+        <div class="ticket-detail">
+
+            <div class="detail-row">
+
+                <span>
+                    Device
+                </span>
+
+                <strong>
+                    ${ticket.device}
+                </strong>
+
+            </div>
+
+
+            <div class="detail-row">
+
+                <span>
+                    Requested service
+                </span>
+
+                <strong>
+                    ${ticket.service}
+                </strong>
+
+            </div>
+
+
+            <div class="detail-row">
+
+                <span>
+                    Assigned technician
+                </span>
+
+                <strong>
+                    ${ticket.tech}
+                </strong>
+
+            </div>
+
+
+            <div class="detail-row">
+
+                <span>
+                    Customer contact
+                </span>
+
+                <strong>
+                    ${ticket.phone ||
+                    ticket.email ||
+                    'Not yet recorded'}
+                </strong>
+
+            </div>
+
+
+            <div class="detail-row">
+
+                <span>
+                    Reported issue
+                </span>
+
+                <strong>
+                    ${ticket.issue ||
+                    'No notes recorded'}
+                </strong>
+
+            </div>
+
+        </div>
+
+    `;
+
+
+    detailModal.showModal();
+
+
+    document
+        .querySelector('#close-ticket')
+        ?.addEventListener(
+            'click',
+            () => detailModal.close()
+        );
+
+}
+
+
+// ------------------------------------------------------------
+// TICKET CLICK HANDLER
+// ------------------------------------------------------------
+
+document.addEventListener(
+    'click',
+    event => {
+
+        const row =
+            event.target.closest(
+                '[data-ticket]'
+            );
+
+
+        if (!row) {
+            return;
+        }
+
+
+        showTicket(
+            row.dataset.ticket
+        );
+
+    }
+);
+
+
+// ------------------------------------------------------------
+// NEW TICKET FORM
+// ------------------------------------------------------------
 
 if (ticketForm) {
 
@@ -319,8 +654,9 @@ if (ticketForm) {
 
             event.preventDefault();
 
+
             console.log(
-                'Ticket creation wiring coming next.'
+                'Ticket creation will be connected next.'
             );
 
         }
@@ -329,19 +665,36 @@ if (ticketForm) {
 }
 
 
+// ------------------------------------------------------------
+// MOBILE MENU
+// ------------------------------------------------------------
 
-document.querySelector('.mobile-menu')
-?.addEventListener(
-    'click',
-    () => {
-
-        document
-        .querySelector('.sidebar')
-        ?.classList.toggle('open');
-
-    }
-);
+const mobileMenu =
+    document.querySelector(
+        '.mobile-menu'
+    );
 
 
+if (mobileMenu) {
+
+    mobileMenu.addEventListener(
+        'click',
+        () => {
+
+            document
+                .querySelector('.sidebar')
+                ?.classList.toggle(
+                    'open'
+                );
+
+        }
+    );
+
+}
+
+
+// ------------------------------------------------------------
+// INITIAL LOAD
+// ------------------------------------------------------------
 
 loadRepairs();
