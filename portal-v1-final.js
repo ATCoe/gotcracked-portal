@@ -65,10 +65,14 @@
     if (!sidebar || !desktopNav) return;
 
     const signature = currentMobileNavSignature();
-    if (signature === mobileNavSignature && sidebar.querySelector(':scope > .v1-mobile-nav')) return;
+    if (signature === mobileNavSignature && sidebar.querySelector(':scope > .v1-mobile-nav')) {
+      sidebar.classList.add('v1-mobile-nav-ready');
+      return;
+    }
     mobileNavSignature = signature;
 
     sidebar.querySelector(':scope > .v1-mobile-nav')?.remove();
+    sidebar.classList.remove('v1-mobile-nav-ready');
     const mobileNav = document.createElement('nav');
     mobileNav.className = 'v1-mobile-nav';
     mobileNav.setAttribute('aria-label', 'Mobile navigation');
@@ -81,7 +85,9 @@
     if (more) mobileNav.appendChild(more);
     if (management) mobileNav.appendChild(management);
 
+    if (!mobileNav.children.length) return;
     desktopNav.insertAdjacentElement('afterend', mobileNav);
+    sidebar.classList.add('v1-mobile-nav-ready');
   }
 
   function syncMobileNavActive() {
@@ -171,5 +177,6 @@
   window.addEventListener('gc-view-changed', () => requestAnimationFrame(decorate));
   window.addEventListener('hashchange', () => requestAnimationFrame(syncMobileNavActive));
   window.addEventListener('load', decorate, { once: true });
+  setTimeout(decorate, 250);
   setTimeout(decorate, 1700);
 })();
