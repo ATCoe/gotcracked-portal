@@ -5,6 +5,7 @@
   const activate = view => window.GotCrackedUI?.activateView?.(view);
   const metricViews = ['repairs', 'appointments', 'ready-pickup', 'reports'];
   const workflowMedia = window.matchMedia('(max-width: 1100px)');
+  let decorateFrame = 0;
 
   function normalizeWorkOrderDrawer() {
     const layout = document.getElementById('v1-workorder-layout');
@@ -42,6 +43,8 @@
   }
 
   function decorate() {
+    decorateFrame = 0;
+
     document.querySelectorAll('.sidebar-backdrop,.v1-drawer-backdrop').forEach(backdrop => {
       backdrop.style.backdropFilter = 'none';
       backdrop.style.webkitBackdropFilter = 'none';
@@ -68,6 +71,11 @@
     normalizeWorkOrderDrawer();
   }
 
+  function scheduleDecorate() {
+    if (decorateFrame) return;
+    decorateFrame = requestAnimationFrame(decorate);
+  }
+
   function openMetric(card) {
     const view = card?.dataset.v1MetricLink;
     if (view) activate(view);
@@ -89,10 +97,11 @@
       event.preventDefault();
       event.stopPropagation();
       ops().openIntake();
+      return;
     }
 
-    if (target.closest('[data-v1-toggle-workflow]')) {
-      requestAnimationFrame(normalizeWorkOrderDrawer);
+    if (target.closest('[data-v1-toggle-workflow], [data-v1-close-drawer], [data-v1-lead]')) {
+      setTimeout(scheduleDecorate, 0);
     }
   }, true);
 
@@ -105,17 +114,22 @@
     }
   });
 
-  const observer = new MutationObserver(decorate);
-  observer.observe(document.documentElement, {
-    subtree: true,
-    childList: true,
-    attributes: true,
-    attributeFilter: ['class', 'hidden']
-  });
+  /*
+   * Dynamic operational views still insert DOM after authentication, but class
+   * changes (including the mobile hamburger's .open state) must never trigger a
+   * global layout pass. Observe inserted/removed nodes only and coalesce them to
+   * one animation-frame decoration.
+   */
+  const main = document.querySelector('main');
+  if (main) {
+    const observer = new MutationObserver(scheduleDecorate);
+    observer.observe(main, { subtree: true, childList: true });
+  }
 
-  workflowMedia.addEventListener?.('change', () => requestAnimationFrame(normalizeWorkOrderDrawer));
-  window.addEventListener('resize', () => requestAnimationFrame(normalizeWorkOrderDrawer));
-  window.addEventListener('gc-view-changed', () => requestAnimationFrame(decorate));
-  window.addEventListener('load', decorate, { once: true });
-  setTimeout(decorate, 1700);
+  workflowMedia.addEventListener?.('change', scheduleDecorate);
+  window.addEventListener('resize', scheduleDecorate, { passive: true });
+  document.addEventListener('gc-view-changed', scheduleDecorate);
+  document.addEventListener('gc-portal-runtime-ready', scheduleDecorate);
+  window.addEventListener('load', scheduleDecorate, { once: true });
+  setTimeout(scheduleDecorate, 1200);
 })();
