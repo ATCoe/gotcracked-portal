@@ -50,7 +50,7 @@ jobs:
           if missing:
               raise SystemExit('Missing local references: ' + ', '.join(sorted(set(missing))))
 
-      - name: Portal 1.0 CSS architecture invariants
+      - name: Portal 1.0 architecture invariants
         shell: python
         run: |
           from pathlib import Path
@@ -60,6 +60,8 @@ jobs:
           release = Path('portal-v1-release.css').read_text(encoding='utf-8')
           mobile = Path('mobile-nav-safe.js').read_text(encoding='utf-8')
           app = Path('app.js').read_text(encoding='utf-8')
+          final_js = Path('portal-v1-final.js').read_text(encoding='utf-8')
+          runtime = Path('portal-runtime-loader.js').read_text(encoding='utf-8')
 
           if re.search(r'<style(?:\s|>)', html, re.I):
               raise SystemExit('Inline <style> blocks are forbidden in index.html; use the release cascade.')
@@ -86,10 +88,41 @@ jobs:
               raise SystemExit('Mobile left navigation must not be vertically scrollable.')
           if "createElement('style')" in mobile or 'createElement("style")' in mobile:
               raise SystemExit('mobile-nav-safe.js must not inject CSS.')
+          if 'MutationObserver' in mobile:
+              raise SystemExit('Mobile hamburger controller must not use MutationObserver.')
+          if 'mobileMenu?.addEventListener' in app or "document.querySelector('.mobile-menu')" in app:
+              raise SystemExit('app.js must not own the hamburger; mobile-nav-safe.js is the sole controller.')
+          if "classList.toggle('mobile-nav-open'" in app or 'classList.toggle("mobile-nav-open"' in app:
+              raise SystemExit('app.js must not restore the legacy body-lock mobile state.')
           if 'sidebarBackdrop' in app or "createElement('button')" in app and 'sidebar-backdrop' in app:
               raise SystemExit('app.js must not recreate the retired full-screen mobile backdrop.')
           if 'hardening.css' in app:
               raise SystemExit('app.js must not dynamically inject hardening.css.')
+
+          if 'attributes: true' in final_js or "attributeFilter: ['class'" in final_js:
+              raise SystemExit('portal-v1-final.js must not globally observe class/attribute mutations.')
+          if 'childList: true' not in final_js:
+              raise SystemExit('portal-v1-final.js should observe inserted operational DOM only.')
+
+          script_refs = re.findall(r'<script[^>]+src=["\']([^"\']+)', html, re.I)
+          script_files = [ref.split('?',1)[0] for ref in script_refs]
+          critical = ['supabase.js','discord-integration.js','workflow.js','app.js','mobile-nav-safe.js','portal-runtime-loader.js']
+          for name in critical:
+              if name not in script_files:
+                  raise SystemExit(f'Missing critical shell script: {name}')
+          heavy = ['leads.js','portal-live.js','workforce.js','analytics.js','shipping.js','inventory-audit.js','operations-v1-core.js']
+          leaked = [name for name in heavy if name in script_files]
+          if leaked:
+              raise SystemExit('Heavy operational scripts must load after authentication: ' + ', '.join(leaked))
+
+          required_runtime = [
+              'leads.js','portal-live.js','workforce.js','analytics.js','shipping.js','inventory-audit.js',
+              'operations-v1-core.js','training-store-guard.js','operations-v1-arrival.js',
+              'portal-v1-polish.js','portal-v1-final.js','master-directory.js'
+          ]
+          for name in required_runtime:
+              if name not in runtime:
+                  raise SystemExit(f'Authenticated runtime loader missing: {name}')
 
           required_release_fragments = [
               '.sidebar.gc-mobile-nav-ready>nav:not(.gc-mobile-nav)',
@@ -107,4 +140,4 @@ jobs:
               if fragment not in release:
                   raise SystemExit(f'Release CSS invariant missing: {fragment}')
 
-          print('Portal 1.0 CSS architecture checks passed.')
+          print('Portal 1.0 architecture checks passed.')
