@@ -6,7 +6,16 @@
   const metricViews = ['repairs', 'appointments', 'ready-pickup', 'reports'];
 
   function decorate() {
-    document.querySelectorAll('.sidebar-backdrop,.v1-drawer-backdrop').forEach(backdrop => {
+    const sidebarBackdrop = document.querySelector('.sidebar-backdrop');
+    if (sidebarBackdrop) {
+      sidebarBackdrop.style.backdropFilter = 'none';
+      sidebarBackdrop.style.webkitBackdropFilter = 'none';
+      sidebarBackdrop.style.filter = 'none';
+      sidebarBackdrop.style.webkitFilter = 'none';
+      sidebarBackdrop.style.background = 'rgba(5,13,25,.46)';
+    }
+
+    document.querySelectorAll('.v1-drawer-backdrop').forEach(backdrop => {
       backdrop.style.backdropFilter = 'none';
       backdrop.style.webkitBackdropFilter = 'none';
       backdrop.style.filter = 'none';
