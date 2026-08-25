@@ -182,7 +182,8 @@ dialog[open] {
   border: 0;
   padding: 0;
   background: rgba(5, 13, 25, .52);
-  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   cursor: default;
 }
 
