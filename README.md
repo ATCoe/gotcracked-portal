@@ -14,6 +14,9 @@ This is an original operations portal informed by common repair-shop workflows: 
 - Placeholder modules that establish the information architecture for appointments, customer history, inventory, and reports.
 - A deliberate data vocabulary for the next build phase: `Customer`, `Device`, `RepairTicket`, `Appointment`, `InventoryItem`, `Supplier`, `User`, `Location`, and `Payment`.
 - Mandatory first-login password creation for new staff profiles, enforced before the dashboard loads.
+- Owner-only staff account management with generated temporary passwords, role changes, and account disabling.
+- Email-free onboarding and recovery for GotCracked login aliases that do not have inboxes.
+- Printable work-order labels with customer, device, and scannable portal QR code.
 
 ## Proposed production stack
 
@@ -32,6 +35,6 @@ When we turn this interactive prototype into the live system, use:
 3. Appointment calendar, inventory, vendors, and parts reservations.
 4. Payments, invoices, warranty records, reporting, and customer repair tracking.
 
-## Running the prototype
+## Deployment
 
-Open `index.html` in a browser. No development server or dependencies are required for this initial interface foundation.
+Start with `DEPLOYMENT.md`. The static portal is deployed through Cloudflare Pages, while authentication, data, and protected account actions run through Supabase.

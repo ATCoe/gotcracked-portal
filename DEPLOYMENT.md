@@ -1,30 +1,48 @@
-# Deploying the password reset update
+# GotCracked Portal deployment
 
-## Required database update before this portal release
+## Get the first owner logged in
 
-Deploy the updated portal files first. Immediately afterward, run `supabase/migrations/0002_staff_first_login_password.sql` once in the Supabase SQL Editor. It adds the first-login flag, marks every existing staff profile (including owners) for mandatory setup, and adds the narrowly scoped function that clears the flag only after Supabase accepts the staff member's new password.
+This process does not send email.
 
-Every existing profile and every new profile is required to create a private password before the dashboard loads. Deploying the code before running the migration prevents existing users from being sent into an unsupported setup flow during the release window.
+1. Upload this portal release to the `gotcracked-portal` GitHub repository and wait for Cloudflare Pages to finish deploying it.
+2. In Supabase, open **SQL Editor** and run `supabase/migrations/0002_staff_first_login_password.sql` once.
+3. Visit `https://portal.gotcracked.co`.
+4. Sign in with your existing GotCracked login email and the shared temporary password already stored in Supabase.
+5. The portal will immediately require a new password and confirmation. Save it to enter the dashboard.
 
-1. Replace the matching files in your Cloudflare Pages project with this folder's contents, including the `assets` folder.
-2. Deploy the update and note the exact production address, for example `https://portal.gotcracked.co`.
-3. In Supabase, open **Authentication → URL Configuration**:
-   - Set **Site URL** to that exact Portal address.
-   - Add the same address to **Redirect URLs**. The reset flow returns to the Portal root, so do not add a separate reset page path.
-4. In Supabase, open **Authentication → Email Templates → Reset Password** and make sure the template uses `{{ .ConfirmationURL }}`. The default template does.
-5. Test using a real staff account: select **Forgot password**, submit the account email, follow the email link, set a new password, then sign in.
+Deploy the website files before running migration 0002. That migration marks every existing profile, including owners, as requiring a password change.
 
-## Important email note
+If the shared temporary password is unknown, another signed-in owner must issue a new one after the staff manager is deployed. Standard Supabase email recovery cannot deliver an Austin account recovery token to the support account; the token belongs to the exact Auth email.
 
-Cloudflare Email Routing forwards mail *received* by `support@gotcracked.co`; it is not an outbound SMTP service. Supabase can send reset messages using its default email service. If you want reset messages to appear as `support@gotcracked.co`, configure a separate authenticated outbound SMTP provider in Supabase before enabling this for staff.
+## Enable Staff accounts
 
-## Route every staff reset to the monitored inbox
+1. In Supabase **SQL Editor**, run `supabase/migrations/0003_owner_staff_management.sql` once.
+2. In Supabase, open **Edge Functions** and create a function named `manage-staff`.
+3. Replace the function editor contents with `supabase/functions/manage-staff/index.ts` and deploy it.
+4. Keep JWT verification enabled. Do not make this function public.
+5. Sign in to the portal as an owner and open **Staff accounts** in the lower-left menu.
 
-Supabase reset tokens are account-specific and must be sent to the email address used by that staff account. Do not replace the submitted staff email with `support@gotcracked.co`; that would reset only the support account.
+Supabase automatically provides the function with its project URL and server secret. Never place the server secret in `supabase.js`, GitHub Pages files, or Cloudflare browser variables.
 
-Instead, in Cloudflare open **Compute → Email Service → Email Routing → Routing Rules**, enable the **Catch-all** rule, and forward it to the verified Gmail destination already used by `support@gotcracked.co`. Then reset mail for `austin@gotcracked.co`, `tech@gotcracked.co`, and every other staff alias arrives in the same monitored Gmail inbox while the reset token remains tied to the correct login.
+Owners can:
 
-Test the catch-all with an external sender before relying on it for account recovery.
+- create a staff login and receive a generated one-time password;
+- issue a replacement temporary password;
+- require the user to create a private password at next login;
+- enable or disable another account;
+- change another account's role; and
+- change their own password while signed in.
+
+An owner cannot disable their own account, change their own role, or issue their own temporary password from the owner controls. This prevents an accidental lockout.
+
+## Portal URL settings
+
+In Supabase, open **Authentication → URL Configuration**:
+
+- Set **Site URL** to `https://portal.gotcracked.co`.
+- Add `https://portal.gotcracked.co` to **Redirect URLs**.
+
+The portal's primary onboarding and owner-assisted recovery do not use email links, but these values should remain correct for any future email-based Auth features.
 
 ## Work-order label printing
 

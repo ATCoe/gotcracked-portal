@@ -39,9 +39,6 @@
     const newPasswordPanel =
         document.querySelector('#new-password-panel');
 
-    const forgotPasswordForm =
-        document.querySelector('#forgot-password-form');
-
     const newPasswordForm =
         document.querySelector('#new-password-form');
 
@@ -227,15 +224,27 @@
             return false;
         }
 
+        if (!profile.active) {
+            await window.supabaseClient.auth.signOut();
+            showLoginError(
+                'This staff account is disabled. Ask a GotCracked owner to restore access.'
+            );
+            return false;
+        }
+
         const staff = {
             id: userId,
+            email: profile.email || '',
             name:
                 profile.display_name ||
                 'Staff',
             role:
                 profile.role ||
-                'Staff'
+                'Staff',
+            locationId: profile.location_id
         };
+
+        window.GotCrackedStaff = staff;
 
         sessionStorage.setItem(
             'gotcracked-staff',
@@ -243,6 +252,10 @@
         );
 
         setStaff(staff);
+
+        window.dispatchEvent(
+            new CustomEvent('gotcracked:staff-ready', { detail: staff })
+        );
 
         if (profile.must_change_password) {
             showInitialPasswordPanel();
@@ -490,7 +503,6 @@
                 ''
             );
             showAuthPanel(forgotPasswordPanel);
-            document.querySelector('#reset-email')?.focus();
         });
 
     document
@@ -499,68 +511,6 @@
             showAuthPanel(signInPanel);
             loginEmail?.focus();
         });
-
-    forgotPasswordForm?.addEventListener(
-        'submit',
-        async event => {
-            event.preventDefault();
-
-            const message =
-                document.querySelector('#forgot-password-message');
-
-            const email =
-                document.querySelector('#reset-email')?.value?.trim();
-
-            if (!email) {
-                setMessage(message, 'Enter your work email.', true);
-                return;
-            }
-
-            if (!window.supabaseClient) {
-                setMessage(
-                    message,
-                    'The portal could not connect to authentication. Please refresh and try again.',
-                    true
-                );
-                return;
-            }
-
-            const button =
-                forgotPasswordForm.querySelector('button[type="submit"]');
-
-            button.disabled = true;
-            button.textContent = 'Sending…';
-            setMessage(message, '');
-
-            try {
-                const { error } = await window.supabaseClient
-                    .auth.resetPasswordForEmail(email, {
-                        redirectTo:
-                            window.location.origin +
-                            window.location.pathname
-                    });
-
-                if (error) {
-                    throw error;
-                }
-
-                setMessage(
-                    message,
-                    'If this email belongs to a staff account, a reset link has been sent.'
-                );
-            } catch (error) {
-                console.error('PASSWORD RESET REQUEST FAILED:', error);
-                setMessage(
-                    message,
-                    error?.message || 'Unable to send the reset link. Please try again.',
-                    true
-                );
-            } finally {
-                button.disabled = false;
-                button.textContent = 'Send reset link';
-            }
-        }
-    );
 
     newPasswordForm?.addEventListener(
         'submit',
@@ -902,6 +852,9 @@
                 sessionStorage.removeItem(
                     'gotcracked-staff'
                 );
+
+                window.GotCrackedStaff = null;
+                window.dispatchEvent(new CustomEvent('gotcracked:staff-signed-out'));
 
                 window.GotCrackedRepairs = [];
 
