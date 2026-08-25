@@ -5,7 +5,16 @@
   const PRIMARY = ['dashboard', 'repairs', 'ready-pickup', 'leads', 'appointments', 'customers'];
   const MORE = ['shipping', 'inventory', 'repair-reference', 'purchasing'];
   const MANAGEMENT = ['reports', 'staff', 'settings'];
+  const mobileQuery = window.matchMedia('(max-width: 750px)');
   let lastSignature = '';
+
+  function sidebar() {
+    return document.querySelector('.sidebar');
+  }
+
+  function menuButton() {
+    return document.querySelector('.mobile-menu');
+  }
 
   function desktopNav() {
     return document.querySelector(`.sidebar > nav:not(.${NAV_CLASS})`);
@@ -37,6 +46,23 @@
       if (!link) return `${view}:missing`;
       return `${view}:${isAvailable(link) ? '1' : '0'}:${link.className}:${link.textContent.trim()}`;
     }).join('|');
+  }
+
+  function setOpen(open) {
+    const panel = sidebar();
+    const button = menuButton();
+    if (!panel || !button) return;
+
+    const shouldOpen = Boolean(open) && mobileQuery.matches;
+    panel.classList.toggle('open', shouldOpen);
+    panel.dataset.mobileOpen = shouldOpen ? 'true' : 'false';
+    button.setAttribute('aria-expanded', String(shouldOpen));
+    button.setAttribute('aria-controls', panel.id || 'portal-sidebar');
+    button.setAttribute('aria-label', shouldOpen ? 'Close menu' : 'Open menu');
+
+    // The navigation drawer must never lock, dim, blur or otherwise disable the
+    // page beneath it. Older controllers used this class to freeze body scroll.
+    document.body.classList.remove('mobile-nav-open');
   }
 
   function makeGroup(label, key, views, current) {
@@ -78,18 +104,21 @@
   }
 
   function build() {
-    const sidebar = document.querySelector('.sidebar');
+    const panel = sidebar();
     const source = desktopNav();
-    if (!sidebar || !source) return;
+    if (!panel || !source) return;
+
+    if (!panel.id) panel.id = 'portal-sidebar';
+    menuButton()?.setAttribute('aria-controls', panel.id);
 
     const nextSignature = signature();
-    if (nextSignature === lastSignature && sidebar.querySelector(`:scope > .${NAV_CLASS}`)) {
+    if (nextSignature === lastSignature && panel.querySelector(`:scope > .${NAV_CLASS}`)) {
       syncActive();
       return;
     }
     lastSignature = nextSignature;
 
-    sidebar.querySelector(`:scope > .${NAV_CLASS}`)?.remove();
+    panel.querySelector(`:scope > .${NAV_CLASS}`)?.remove();
     const nav = document.createElement('nav');
     nav.className = NAV_CLASS;
     nav.setAttribute('aria-label', 'Mobile navigation');
@@ -103,12 +132,13 @@
     if (management) nav.appendChild(management);
 
     source.insertAdjacentElement('afterend', nav);
-    sidebar.classList.add('gc-mobile-nav-ready');
+    panel.classList.add('gc-mobile-nav-ready');
     syncActive();
   }
 
   function init() {
     build();
+    setOpen(false);
 
     const source = desktopNav();
     const bottom = document.querySelector('.sidebar-bottom');
@@ -116,11 +146,46 @@
     if (source) observer.observe(source, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'hidden'] });
     if (bottom) observer.observe(bottom, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'hidden'] });
 
-    window.addEventListener('hashchange', () => requestAnimationFrame(syncActive));
-    document.addEventListener('gc-view-changed', () => requestAnimationFrame(syncActive));
+    // Own the hamburger before any legacy target/bubble listeners can run.
+    document.addEventListener('click', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      const button = target?.closest('.mobile-menu');
+      if (!button || !mobileQuery.matches) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setOpen(sidebar()?.dataset.mobileOpen !== 'true');
+    }, true);
+
+    // Outside taps close navigation without an overlay/backdrop element.
+    document.addEventListener('pointerdown', event => {
+      const panel = sidebar();
+      if (!mobileQuery.matches || panel?.dataset.mobileOpen !== 'true') return;
+      const target = event.target instanceof Node ? event.target : null;
+      if (!target || panel.contains(target) || menuButton()?.contains(target)) return;
+      setOpen(false);
+    }, true);
+
+    window.addEventListener('hashchange', () => {
+      setOpen(false);
+      requestAnimationFrame(syncActive);
+    });
+    document.addEventListener('gc-view-changed', () => {
+      setOpen(false);
+      requestAnimationFrame(syncActive);
+    });
+    mobileQuery.addEventListener?.('change', event => {
+      if (!event.matches) setOpen(false);
+    });
+    window.addEventListener('orientationchange', () => setOpen(false));
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) setOpen(false);
+    });
+
     setTimeout(build, 1700);
     setTimeout(build, 2800);
   }
+
+  window.GotCrackedMobileNav = { build, setOpen };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
