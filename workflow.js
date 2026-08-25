@@ -205,6 +205,27 @@
             return false;
         }
 
+        if (!profile.active) {
+
+            sessionStorage.removeItem('gotcracked-staff');
+            sessionStorage.setItem(
+                'gc-auth-error',
+                'Your GotCracked staff access is inactive. Contact an owner or manager.'
+            );
+
+            await window.supabaseClient.auth.signOut();
+
+            if (loginScreen) {
+                loginScreen.classList.remove('hidden');
+            }
+
+            showLoginError(
+                'Your GotCracked staff access is inactive. Contact an owner or manager.'
+            );
+
+            return false;
+        }
+
         const staff = {
             id: userId,
             name:
