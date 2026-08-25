@@ -289,6 +289,7 @@
                         });
 
                     window.location.hash = id;
+                    document.dispatchEvent(new CustomEvent('gc-view-changed', { detail: id }));
                 }
             );
         });
