@@ -34,7 +34,6 @@ function setStaff(staff) {
 }
 
 
-
 async function loadSession() {
 
     if (!window.supabaseClient) {
@@ -55,39 +54,26 @@ async function loadSession() {
     } = await window.supabaseClient.auth.getSession();
 
 
-
     if (!session) {
-
         return;
-
     }
 
 
-    await loadProfile(
-        session.user.id
-    );
+    await loadProfile(session.user.id);
 
 }
 
 
-
-
 async function loadProfile(userId) {
-
 
     const {
         data: profile,
         error
     } = await window.supabaseClient
-
         .from('profiles')
-
         .select('*')
-
         .eq('id', userId)
-
         .single();
-
 
 
     if (error) {
@@ -102,33 +88,28 @@ async function loadProfile(userId) {
     }
 
 
-
     const staff = {
 
         id: userId,
 
         name:
-            profile.display_name || 'Staff',
+            profile.display_name ||
+            'Staff',
 
         role:
-            profile.role || 'Technician'
+            profile.role ||
+            'Technician'
 
     };
 
 
-
     sessionStorage.setItem(
-
         'gotcracked-staff',
-
         JSON.stringify(staff)
-
     );
 
 
-
     setStaff(staff);
-
 
 
     if (profile.must_change_password) {
@@ -141,14 +122,23 @@ async function loadProfile(userId) {
     }
 
 
-
     loginScreen?.classList.add(
         'hidden'
     );
 
+
+    // Tell the repair application that
+    // authentication is confirmed.
+    if (
+        typeof window.loadRepairs ===
+        'function'
+    ) {
+
+        await window.loadRepairs();
+
+    }
+
 }
-
-
 
 
 console.log(
@@ -156,116 +146,133 @@ console.log(
 );
 
 
-
 document
-.querySelector('#login-form')
-?.addEventListener(
-    'submit',
-    async event => {
+    .querySelector('#login-form')
+    ?.addEventListener(
+        'submit',
+        async event => {
+
+            event.preventDefault();
 
 
-        console.log(
-            'LOGIN SUBMIT FIRED'
-        );
+            const email =
+                document.querySelector(
+                    '#login-email'
+                )?.value?.trim();
 
 
-        event.preventDefault();
-
-
-
-        const email =
-            document.querySelector('#login-email')
-            ?.value;
-
-
-
-        const password =
-            document.querySelector('#login-password')
-            ?.value;
-
-
-
-        const {
-            data,
-            error
-        } =
-        await window.supabaseClient.auth
-        .signInWithPassword({
-
-            email,
-
-            password
-
-        });
-
-
-
-        if (error) {
+            const password =
+                document.querySelector(
+                    '#login-password'
+                )?.value;
 
 
             const message =
-                document.querySelector('#login-error');
-
+                document.querySelector(
+                    '#login-error'
+                );
 
 
             if (message) {
+                message.textContent = '';
+            }
 
-                message.textContent =
-                    error.message;
+
+            if (!email || !password) {
+
+                if (message) {
+                    message.textContent =
+                        'Please enter your email and password.';
+                }
+
+                return;
 
             }
-            else {
+
+
+            const {
+                data,
+                error
+            } =
+                await window.supabaseClient.auth
+                    .signInWithPassword({
+
+                        email,
+
+                        password
+
+                    });
+
+
+            if (error) {
 
                 console.error(
-                    error.message
+                    'Login failed:',
+                    error
                 );
+
+
+                if (message) {
+
+                    message.textContent =
+                        error.message;
+
+                }
+
+                return;
 
             }
 
 
-            return;
+            await loadProfile(
+                data.user.id
+            );
 
         }
-
-
-
-        await loadProfile(
-            data.user.id
-        );
-
-
-    }
-);
-
-
+    );
 
 
 document
-.querySelector('#sign-out')
-?.addEventListener(
-    'click',
-    async () => {
+    .querySelector('#sign-out')
+    ?.addEventListener(
+        'click',
+        async () => {
+
+            await window.supabaseClient.auth.signOut();
 
 
-        await window.supabaseClient.auth.signOut();
+            sessionStorage.removeItem(
+                'gotcracked-staff'
+            );
 
 
+            if (
+                Array.isArray(
+                    window.repairs
+                )
+            ) {
 
-        sessionStorage.removeItem(
-            'gotcracked-staff'
-        );
+                window.repairs = [];
 
-
-
-        loginScreen?.classList.remove(
-            'hidden'
-        );
-
-
-    }
-);
+            }
 
 
+            if (
+                typeof window.renderRepairs ===
+                'function'
+            ) {
+
+                window.renderRepairs([]);
+
+            }
+
+
+            loginScreen?.classList.remove(
+                'hidden'
+            );
+
+        }
+    );
 
 
 loadSession();
