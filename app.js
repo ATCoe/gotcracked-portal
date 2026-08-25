@@ -7,7 +7,7 @@
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = hardeningHref;
-    document.head.appendChild(link);
+    document.body.appendChild(link);
   }
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({
