@@ -1,0 +1,127 @@
+.v1-mobile-nav{display:none}
+
+@media(max-width:750px){
+  /* Mobile left drawer is navigation only. The original long desktop nav is
+     replaced by this fixed, grouped menu so the drawer never needs scrolling. */
+  .sidebar>nav:not(.v1-mobile-nav){display:none!important}
+  .sidebar-bottom>.nav-link[data-view="settings"]{display:none!important}
+
+  .sidebar>.v1-mobile-nav{
+    display:flex!important;
+    flex:1 1 auto!important;
+    flex-direction:column!important;
+    min-height:0!important;
+    overflow:hidden!important;
+    gap:3px!important;
+    padding:0!important;
+    scrollbar-width:none!important;
+  }
+  .sidebar>.v1-mobile-nav::-webkit-scrollbar{display:none!important}
+
+  .sidebar .v1-mobile-nav>.nav-link{
+    flex:0 0 auto!important;
+    height:40px!important;
+    min-height:40px!important;
+    padding:0 10px!important;
+    font-size:13.5px!important;
+  }
+
+  .v1-mobile-nav-group{
+    flex:0 0 auto;
+    margin:0;
+    border:0;
+    border-radius:8px;
+    overflow:hidden;
+  }
+  .v1-mobile-nav-group>summary{
+    position:relative;
+    display:flex;
+    align-items:center;
+    height:38px;
+    padding:0 30px 0 36px;
+    border-radius:8px;
+    color:#aebbcf;
+    font-size:13px;
+    font-weight:700;
+    line-height:1;
+    cursor:pointer;
+    list-style:none;
+    user-select:none;
+  }
+  .v1-mobile-nav-group>summary::-webkit-details-marker{display:none}
+  .v1-mobile-nav-group>summary::before{
+    position:absolute;
+    left:10px;
+    width:17px;
+    text-align:center;
+    color:#91a2b9;
+    font-size:14px;
+  }
+  .v1-mobile-nav-group[data-mobile-nav-group="more"]>summary::before{content:"•••";font-size:10px;letter-spacing:1px}
+  .v1-mobile-nav-group[data-mobile-nav-group="management"]>summary::before{content:"◇"}
+  .v1-mobile-nav-group>summary::after{
+    content:"⌄";
+    position:absolute;
+    right:11px;
+    color:#8192aa;
+    transition:transform .14s ease;
+  }
+  .v1-mobile-nav-group[open]>summary::after{transform:rotate(180deg)}
+  .v1-mobile-nav-group>summary:hover,
+  .v1-mobile-nav-group>summary:focus-visible,
+  .v1-mobile-nav-group:has(.nav-link.active)>summary{
+    color:#fff;
+    background:#1d2b42;
+  }
+
+  .v1-mobile-nav-group-links{
+    display:grid;
+    gap:1px;
+    padding:2px 0 3px 12px;
+  }
+  .sidebar .v1-mobile-nav-group-links .nav-link{
+    height:34px!important;
+    min-height:34px!important;
+    padding:0 9px!important;
+    font-size:12.5px!important;
+    border-radius:7px!important;
+  }
+  .sidebar .v1-mobile-nav-group-links .nav-link span{
+    width:16px!important;
+    font-size:13px!important;
+  }
+
+  /* Profile remains pinned; it is not part of the navigation scroll area. */
+  .sidebar-bottom{
+    flex:0 0 auto!important;
+    margin-top:4px!important;
+  }
+  .sidebar .profile{
+    margin-top:4px!important;
+    padding-top:8px!important;
+  }
+
+  @media(max-height:700px){
+    .sidebar .brand{
+      height:72px!important;
+      min-height:72px!important;
+      max-height:72px!important;
+    }
+    .sidebar .brand-logo{
+      width:150px!important;
+      height:66px!important;
+    }
+    .sidebar .v1-mobile-nav>.nav-link{
+      height:36px!important;
+      min-height:36px!important;
+      font-size:12.5px!important;
+    }
+    .v1-mobile-nav-group>summary{height:35px;font-size:12.5px}
+    .sidebar .v1-mobile-nav-group-links .nav-link{
+      height:31px!important;
+      min-height:31px!important;
+      font-size:12px!important;
+    }
+    .sidebar .profile{padding-top:6px!important}
+  }
+}
