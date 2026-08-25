@@ -1,238 +1,127 @@
 (() => {
   'use strict';
 
-  const STYLE_ID = 'gc-mobile-nav-safe-style';
   const NAV_CLASS = 'gc-mobile-nav';
+  const PRIMARY = ['dashboard', 'repairs', 'ready-pickup', 'leads', 'appointments', 'customers'];
+  const MORE = ['shipping', 'inventory', 'repair-reference', 'purchasing'];
+  const MANAGEMENT = ['reports', 'staff', 'settings'];
+  let lastSignature = '';
 
-  const link = (view, icon, label) =>
-    `<a class="nav-link" href="#${view}" data-view="${view}"><span>${icon}</span>${label}</a>`;
-
-  function installStyles() {
-    if (document.getElementById(STYLE_ID)) return;
-    const style = document.createElement('style');
-    style.id = STYLE_ID;
-    style.textContent = `
-      .${NAV_CLASS}{display:none}
-
-      @media(max-width:750px){
-        .sidebar{
-          display:flex!important;
-          flex-direction:column!important;
-          overflow:hidden!important;
-        }
-
-        .sidebar>.brand{
-          flex:0 0 auto!important;
-          height:136px!important;
-          min-height:136px!important;
-          margin:0!important;
-          padding:12px 18px 4px!important;
-        }
-
-        .sidebar>.brand .brand-logo{
-          width:min(220px,82%)!important;
-          height:116px!important;
-          max-height:116px!important;
-          object-fit:contain!important;
-        }
-
-        .sidebar>nav:not(.${NAV_CLASS}){display:none!important}
-        .sidebar-bottom>.nav-link[data-view="settings"]{display:none!important}
-
-        .sidebar>.${NAV_CLASS}{
-          display:flex!important;
-          flex:1 1 auto!important;
-          min-height:0!important;
-          flex-direction:column!important;
-          gap:3px!important;
-          padding:4px 16px 8px!important;
-          overflow-y:auto!important;
-          overscroll-behavior:contain;
-          scrollbar-width:none;
-        }
-        .sidebar>.${NAV_CLASS}::-webkit-scrollbar{display:none}
-
-        .${NAV_CLASS}>.nav-link,
-        .${NAV_CLASS} .gc-mobile-nav-group-links>.nav-link{
-          display:grid!important;
-          grid-template-columns:34px minmax(0,1fr)!important;
-          align-items:center!important;
-          gap:10px!important;
-          width:100%!important;
-          min-height:44px!important;
-          margin:0!important;
-          padding:8px 12px!important;
-          border-radius:8px!important;
-          line-height:1.15!important;
-        }
-
-        .${NAV_CLASS} .nav-link>span{
-          display:grid!important;
-          place-items:center!important;
-          width:34px!important;
-          min-width:34px!important;
-          margin:0!important;
-        }
-
-        .${NAV_CLASS} .nav-link.active{
-          background:rgba(93,167,238,.18)!important;
-        }
-
-        .${NAV_CLASS} .gc-mobile-nav-group{
-          margin:1px 0!important;
-          padding:0!important;
-          border:0!important;
-        }
-
-        .${NAV_CLASS} .gc-mobile-nav-group>summary{
-          position:relative;
-          display:flex!important;
-          align-items:center!important;
-          min-height:42px!important;
-          padding:8px 12px!important;
-          border-radius:8px!important;
-          color:#aebbd0!important;
-          cursor:pointer;
-          font-size:.76rem!important;
-          font-weight:800!important;
-          letter-spacing:.08em!important;
-          text-transform:uppercase!important;
-          list-style:none!important;
-          user-select:none;
-        }
-        .${NAV_CLASS} .gc-mobile-nav-group>summary::-webkit-details-marker{display:none}
-        .${NAV_CLASS} .gc-mobile-nav-group>summary::after{
-          content:'›';
-          margin-left:auto;
-          font-size:22px;
-          font-weight:500;
-          line-height:1;
-          transform:rotate(90deg);
-          transition:transform .12s ease;
-        }
-        .${NAV_CLASS} .gc-mobile-nav-group[open]>summary::after{transform:rotate(-90deg)}
-        .${NAV_CLASS} .gc-mobile-nav-group>summary:active{background:rgba(255,255,255,.04)}
-
-        .${NAV_CLASS} .gc-mobile-nav-group-links{
-          display:grid!important;
-          gap:2px!important;
-          padding:2px 0 5px 12px!important;
-        }
-        .${NAV_CLASS} .gc-mobile-nav-group-links>.nav-link{
-          min-height:40px!important;
-          font-size:.92rem!important;
-        }
-
-        .sidebar>.sidebar-bottom{
-          flex:0 0 auto!important;
-          margin-top:0!important;
-          padding-top:8px!important;
-          padding-bottom:max(12px,env(safe-area-inset-bottom))!important;
-        }
-
-        .sidebar>.sidebar-bottom .profile{
-          min-height:72px!important;
-          padding-top:10px!important;
-          padding-bottom:10px!important;
-        }
-      }
-
-      @media(max-width:750px) and (max-height:720px){
-        .sidebar>.brand{
-          height:104px!important;
-          min-height:104px!important;
-          padding-top:6px!important;
-        }
-        .sidebar>.brand .brand-logo{
-          height:92px!important;
-          max-height:92px!important;
-        }
-        .${NAV_CLASS}>.nav-link,
-        .${NAV_CLASS} .gc-mobile-nav-group-links>.nav-link{
-          min-height:40px!important;
-          padding-top:6px!important;
-          padding-bottom:6px!important;
-        }
-        .${NAV_CLASS} .gc-mobile-nav-group>summary{min-height:38px!important}
-        .sidebar>.sidebar-bottom .profile{min-height:64px!important}
-      }
-    `;
-    document.head.appendChild(style);
+  function desktopNav() {
+    return document.querySelector(`.sidebar > nav:not(.${NAV_CLASS})`);
   }
 
-  function installNav() {
+  function sourceLink(view) {
+    return desktopNav()?.querySelector(`.nav-link[data-view="${CSS.escape(view)}"]`)
+      || document.querySelector(`.sidebar-bottom > .nav-link[data-view="${CSS.escape(view)}"]`);
+  }
+
+  function isAvailable(link) {
+    if (!link) return false;
+    return !link.classList.contains('v1-hidden') && !link.hidden;
+  }
+
+  function labelFor(link) {
+    const clone = link.cloneNode(true);
+    clone.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+    clone.removeAttribute('id');
+    clone.querySelectorAll('b').forEach(node => node.remove());
+    clone.classList.remove('active');
+    clone.dataset.mobileNavClone = 'true';
+    return clone;
+  }
+
+  function signature() {
+    return [...PRIMARY, ...MORE, ...MANAGEMENT].map(view => {
+      const link = sourceLink(view);
+      if (!link) return `${view}:missing`;
+      return `${view}:${isAvailable(link) ? '1' : '0'}:${link.className}:${link.textContent.trim()}`;
+    }).join('|');
+  }
+
+  function makeGroup(label, key, views, current) {
+    const links = views.map(view => sourceLink(view)).filter(isAvailable).map(labelFor);
+    if (!links.length) return null;
+
+    const details = document.createElement('details');
+    details.className = 'gc-mobile-nav-group';
+    details.dataset.mobileGroup = key;
+    details.open = links.some(link => link.dataset.view === current);
+
+    const summary = document.createElement('summary');
+    summary.textContent = label;
+
+    const body = document.createElement('div');
+    body.className = 'gc-mobile-nav-group-links';
+    links.forEach(link => body.appendChild(link));
+    details.append(summary, body);
+
+    details.addEventListener('toggle', () => {
+      if (!details.open) return;
+      details.parentElement?.querySelectorAll('.gc-mobile-nav-group[open]').forEach(other => {
+        if (other !== details) other.open = false;
+      });
+    });
+    return details;
+  }
+
+  function syncActive() {
+    const nav = document.querySelector(`.sidebar > .${NAV_CLASS}`);
+    if (!nav) return;
+    const current = window.location.hash.slice(1).split('/')[0] || 'dashboard';
+    nav.querySelectorAll('.nav-link[data-view]').forEach(link => {
+      link.classList.toggle('active', link.dataset.view === current);
+    });
+    nav.querySelectorAll('.gc-mobile-nav-group').forEach(group => {
+      if (group.querySelector(`.nav-link[data-view="${CSS.escape(current)}"]`)) group.open = true;
+    });
+  }
+
+  function build() {
     const sidebar = document.querySelector('.sidebar');
-    if (!sidebar || sidebar.querySelector(`:scope>.${NAV_CLASS}`)) return;
+    const source = desktopNav();
+    if (!sidebar || !source) return;
 
-    const desktopNav = sidebar.querySelector(':scope>nav');
-    if (!desktopNav) return;
+    const nextSignature = signature();
+    if (nextSignature === lastSignature && sidebar.querySelector(`:scope > .${NAV_CLASS}`)) {
+      syncActive();
+      return;
+    }
+    lastSignature = nextSignature;
 
+    sidebar.querySelector(`:scope > .${NAV_CLASS}`)?.remove();
     const nav = document.createElement('nav');
     nav.className = NAV_CLASS;
     nav.setAttribute('aria-label', 'Mobile navigation');
-    nav.innerHTML = `
-      ${link('dashboard', '▦', 'Dashboard')}
-      ${link('repairs', '⌁', 'Repairs')}
-      ${link('ready-pickup', '✓', 'Ready for Pickup')}
-      ${link('leads', '⌁', 'Leads')}
-      ${link('appointments', '◷', 'Appointments')}
-      ${link('customers', '♙', 'Customers')}
 
-      <details class="gc-mobile-nav-group" data-mobile-group="more">
-        <summary>More</summary>
-        <div class="gc-mobile-nav-group-links">
-          ${link('shipping', '▰', 'Mail-in & Shipping')}
-          ${link('inventory', '▤', 'Inventory')}
-          ${link('repair-reference', '⌕', 'Repair Reference')}
-          ${link('purchasing', '▣', 'Purchasing')}
-        </div>
-      </details>
+    PRIMARY.map(view => sourceLink(view)).filter(isAvailable).map(labelFor).forEach(link => nav.appendChild(link));
 
-      <details class="gc-mobile-nav-group" data-mobile-group="management">
-        <summary>Management</summary>
-        <div class="gc-mobile-nav-group-links">
-          ${link('reports', '◫', 'Reports')}
-          ${link('staff', '♟', 'Staff')}
-          ${link('settings', '⚙', 'Settings')}
-        </div>
-      </details>
-    `;
-
-    desktopNav.insertAdjacentElement('afterend', nav);
-
-    nav.querySelectorAll('.gc-mobile-nav-group').forEach(group => {
-      group.addEventListener('toggle', () => {
-        if (!group.open) return;
-        nav.querySelectorAll('.gc-mobile-nav-group[open]').forEach(other => {
-          if (other !== group) other.open = false;
-        });
-      });
-    });
-
-    syncGroupForCurrentView();
-  }
-
-  function syncGroupForCurrentView() {
-    const nav = document.querySelector(`.${NAV_CLASS}`);
-    if (!nav) return;
     const current = window.location.hash.slice(1).split('/')[0] || 'dashboard';
-    const active = nav.querySelector(`.nav-link[data-view="${CSS.escape(current)}"]`);
-    const group = active?.closest('.gc-mobile-nav-group');
-    if (group) group.open = true;
+    const more = makeGroup('More', 'more', MORE, current);
+    const management = makeGroup('Management', 'management', MANAGEMENT, current);
+    if (more) nav.appendChild(more);
+    if (management) nav.appendChild(management);
+
+    source.insertAdjacentElement('afterend', nav);
+    sidebar.classList.add('gc-mobile-nav-ready');
+    syncActive();
   }
 
   function init() {
-    installStyles();
-    installNav();
-    syncGroupForCurrentView();
+    build();
+
+    const source = desktopNav();
+    const bottom = document.querySelector('.sidebar-bottom');
+    const observer = new MutationObserver(() => requestAnimationFrame(build));
+    if (source) observer.observe(source, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'hidden'] });
+    if (bottom) observer.observe(bottom, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'hidden'] });
+
+    window.addEventListener('hashchange', () => requestAnimationFrame(syncActive));
+    document.addEventListener('gc-view-changed', () => requestAnimationFrame(syncActive));
+    setTimeout(build, 1700);
+    setTimeout(build, 2800);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init, { once: true });
-  } else {
-    init();
-  }
-
-  window.addEventListener('hashchange', syncGroupForCurrentView);
-  document.addEventListener('gc-view-changed', syncGroupForCurrentView);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+  else init();
 })();
