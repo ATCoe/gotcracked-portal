@@ -25,7 +25,7 @@
 .login-panel label { color: #dbe8f8; }
 .login-panel input { min-height: 46px; border-color: #294869; background: #071425; }
 .login-panel input:focus { border-color: #1ca8ff; outline: 2px solid rgba(28,168,255,.2); }
-.login-panel .demo-note { margin: 20px 0 0; color: #7388a2; text-align: center; }
+.login-panel .demo-note, .login-panel .access-note { margin: 20px 0 0; color: #7388a2; text-align: center; }
 .login-panel .error-message { margin: 18px 0 0; line-height: 1.45; text-align: center; }
 @media (max-width:540px) {
   .login-screen { place-items: start center; padding: 18px 12px; }

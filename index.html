@@ -21,7 +21,7 @@
           <form id="login-form"><label>Work email<input id="login-email" type="email" required autocomplete="email" placeholder="name@gotcracked.co"></label><label>Password<input id="login-password" type="password" required autocomplete="current-password" placeholder="Password"></label><button class="primary-button" type="submit">Sign in to portal</button></form>
           <button id="forgot-password" class="text-button" type="button">Forgot password?</button></details>
           <p id="login-error" class="error-message" role="alert"></p>
-          <p class="demo-note">Invite-only. You must also belong to the GotCracked staff Discord.</p>
+          <p class="access-note">Invite-only. You must also belong to the GotCracked staff Discord.</p>
         </div>
         <div id="forgot-password-panel" class="auth-panel hidden" aria-hidden="true">
           <p class="eyebrow">Account recovery</p><h1>Reset your password</h1><p class="subtle">Enter your work email and we’ll send a secure reset link.</p>
@@ -63,14 +63,14 @@
         <section id="dashboard" class="view active-view">
           <div class="page-heading"><div><p class="eyebrow">Monday, August 23</p><h1>Good morning, Austin.</h1><p class="subtle">Here’s what needs attention at GotCracked today.</p></div><button class="primary-button" data-open-ticket>+ New repair</button></div>
           <section class="metrics" aria-label="Today at a glance">
-            <article><span class="metric-icon blue">⌁</span><div><p>Open repairs</p><strong>18</strong><small class="up">↑ 3 since yesterday</small></div></article>
-            <article><span class="metric-icon amber">◷</span><div><p>Today’s appointments</p><strong>7</strong><small>2 arriving in the next hour</small></div></article>
-            <article><span class="metric-icon green">✓</span><div><p>Ready for pickup</p><strong>4</strong><small>Send pickup reminders</small></div></article>
-            <article><span class="metric-icon violet">$</span><div><p>Today’s sales</p><strong>$1,284</strong><small class="up">↑ 12% vs. last Monday</small></div></article>
+            <article><span class="metric-icon blue">⌁</span><div><p>Open repairs</p><strong>0</strong><small>Live shop data</small></div></article>
+            <article><span class="metric-icon amber">◷</span><div><p>Today’s appointments</p><strong>0</strong><small>Live shop data</small></div></article>
+            <article><span class="metric-icon green">✓</span><div><p>Ready for pickup</p><strong>0</strong><small>Live shop data</small></div></article>
+            <article><span class="metric-icon violet">$</span><div><p>Today’s sales</p><strong>$0</strong><small>Live shop data</small></div></article>
           </section>
           <section class="content-grid">
             <article class="card work-queue"><div class="card-title"><div><h2>Repair work queue</h2><p>Active tickets by current stage</p></div><a href="#repairs" data-view="repairs">View all →</a></div><div id="repair-list" class="repair-list"></div></article>
-            <aside class="right-column"><article class="card"><div class="card-title"><div><h2>Today’s schedule</h2><p>Next appointments</p></div><a href="#appointments" data-view="appointments">Calendar →</a></div><div class="schedule-item"><time>10:30 <small>AM</small></time><div><strong>Maria Thompson</strong><p>iPhone 14 Pro · Screen repair</p></div><span class="tag confirmed">Confirmed</span></div><div class="schedule-item"><time>11:15 <small>AM</small></time><div><strong>Jordan Lee</strong><p>PS5 · HDMI diagnosis</p></div><span class="tag walkin">Walk-in</span></div><div class="schedule-item"><time>1:00 <small>PM</small></time><div><strong>David Miller</strong><p>MacBook Air · Battery service</p></div><span class="tag confirmed">Confirmed</span></div></article><article class="card attention"><div class="card-title"><div><h2>Needs attention</h2><p>Keep these repairs moving</p></div></div><button class="attention-item"><span class="warning">!</span><span><strong>2 parts are below reorder level</strong><small>iPhone 13 batteries · USB-C ports</small></span><em>›</em></button><button class="attention-item"><span class="warning">!</span><span><strong>3 estimates need approval</strong><small>Waiting on customer response</small></span><em>›</em></button></article></aside>
+            <aside class="right-column"><article class="card"><div class="card-title"><div><h2>Today’s schedule</h2><p>Next appointments</p></div><a href="#appointments" data-view="appointments">Calendar →</a></div><p class="empty-state">Loading live appointments…</p></article><article class="card attention"><div class="card-title"><div><h2>Needs attention</h2><p>Keep repairs moving</p></div></div><p class="empty-state">Loading live operating alerts…</p></article></aside>
           </section>
         </section>
 
@@ -86,12 +86,13 @@
     </div>
     <dialog id="new-ticket"><form method="dialog" id="ticket-form"><div class="modal-head"><div><p class="eyebrow">New intake</p><h2>Create repair ticket</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><div class="form-grid"><label>Customer name<input required name="customer" placeholder="e.g. Taylor Morgan" /></label><label>Phone number<input required name="phone" placeholder="(555) 555-5555" /></label><label>Device<input required name="device" placeholder="e.g. iPhone 15 Pro" /></label><label>Repair type<select name="service"><option>Screen repair</option><option>Battery replacement</option><option>Diagnosis</option><option>Charging issue</option><option>Other repair</option></select></label><label class="full">Customer-reported issue<textarea name="issue" placeholder="What is happening with the device?"></textarea></label></div><div class="modal-actions"><button value="cancel" class="secondary-button">Cancel</button><button class="primary-button" value="default">Create ticket</button></div></form></dialog>
     <dialog id="ticket-detail"><div id="ticket-detail-content"></div></dialog>
+    <dialog id="operation-dialog"><form id="operation-form"><div id="operation-dialog-content"></div></form></dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase.js"></script>
     <script src="discord-integration.js"></script>
     <script src="workflow.js"></script>
     <script src="app.js"></script>
     <script src="leads.js"></script>
-    <script src="portal-complete.js?v=2"></script>
+    <script src="portal-live.js"></script>
   </body>
 </html>

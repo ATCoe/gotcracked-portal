@@ -222,16 +222,26 @@
 
         setStaff(staff);
 
-        if (profile.must_change_password) {
-
-            window.location.href =
-                '/setup-password.html';
-
-            return true;
-        }
+        /* Legacy profiles used to redirect to a setup page that did not exist
+         * on Cloudflare Pages, causing an infinite fallback/reload loop.
+         * Discord onboarding now replaces that password-setup redirect. */
+        window.GotCrackedNeedsDiscordLink =
+            profile.role !== 'owner' && !profile.discord_user_id;
 
         if (loginScreen) {
             loginScreen.classList.add('hidden');
+        }
+
+        if (window.GotCrackedNeedsDiscordLink) {
+            sessionStorage.setItem(
+                'gc-onboarding-message',
+                'Link your individual Discord account in Staff access before using shared shop data.'
+            );
+            document.dispatchEvent(new CustomEvent(
+                'gc-onboarding-required',
+                { detail: 'Link your individual Discord account in Staff access before using shared shop data.' }
+            ));
+            setTimeout(() => document.querySelector('[data-view="staff"]')?.click(), 0);
         }
 
         console.log(

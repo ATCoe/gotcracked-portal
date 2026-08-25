@@ -60,6 +60,16 @@
     return data.url;
   }
 
+  function showOnboardingMessage(message) {
+    if (!message || document.querySelector('.onboarding-notice')) return;
+    const staffView = document.querySelector('#staff .page-heading');
+    if (!staffView) return;
+    const notice = document.createElement('div');
+    notice.className = 'onboarding-notice';
+    notice.innerHTML = `<strong>Finish account setup</strong><span>${message}</span>`;
+    staffView.insertAdjacentElement('afterend', notice);
+  }
+
   function wireUi() {
     document.querySelector('#discord-login')?.addEventListener('click', async event => {
       const button = event.currentTarget;
@@ -79,6 +89,13 @@
       if (element) element.textContent = priorError;
       sessionStorage.removeItem('gc-auth-error');
     }
+
+    const onboardingMessage = sessionStorage.getItem('gc-onboarding-message');
+    if (onboardingMessage) {
+      showOnboardingMessage(onboardingMessage);
+      sessionStorage.removeItem('gc-onboarding-message');
+    }
+    document.addEventListener('gc-onboarding-required', event => showOnboardingMessage(event.detail));
 
     document.addEventListener('click', async event => {
       if (event.target.closest('#link-discord')) {
