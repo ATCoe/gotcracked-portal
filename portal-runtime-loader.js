@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260825-release9';
+  const VERSION = '20260825-release10';
 
   // Only the modules needed to make the primary repair/dashboard workspace
   // useful belong on the critical post-auth path. Everything else is deferred
@@ -172,3 +172,4 @@
     watchLoginState();
   }
 })();
+

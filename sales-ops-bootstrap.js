@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const VERSION = '20260825-release8';
+  const VERSION = '20260825-release10';
   for (const file of ['sales-ops.css','checkout-receipts.css']) {
     if (document.querySelector(`link[data-gc-finance-style="${file}"]`)) continue;
     const link = document.createElement('link');
@@ -10,3 +10,4 @@
     document.head.appendChild(link);
   }
 })();
+

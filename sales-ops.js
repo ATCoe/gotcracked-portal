@@ -88,7 +88,7 @@
   }
 
   function salesCardMarkup() {
-    if (!summary) return `<section id="gc-sales-card" class="card gc-sales-card"><div class="gc-sales-thermometer-wrap"><div class="gc-sales-thermometer"><div class="gc-thermo-tube"><div class="gc-thermo-fill" style="height:0%"></div></div><div class="gc-thermo-bulb"></div></div></div><div class="gc-sales-copy"><p class="eyebrow">Sales goal</p><h2>External POS sales</h2><div class="gc-sales-empty">Sales reporting is temporarily unavailable. Repair workflow is unaffected.</div></div></section>`;
+    if (!summary) return `<section id="gc-sales-card" class="card gc-sales-card"><div class="gc-sales-copy"><p class="eyebrow">Sales goal</p><h2>External POS sales</h2><div class="gc-sales-empty">Sales reporting is temporarily unavailable. Repair workflow is unaffected.</div></div></section>`;
 
     const goal = Number(summary.goal_cents || 0);
     const sales = Number(summary.current_sales_cents || 0);
@@ -101,11 +101,10 @@
     const method = methodLabels[summary.goal_method] || String(summary.goal_method || 'Goal not configured').replaceAll('_',' ');
 
     return `<section id="gc-sales-card" class="card gc-sales-card ${percent >= 100 ? 'is-over-goal' : ''}">
-      <div class="gc-sales-thermometer-wrap" aria-hidden="true"><div class="gc-sales-thermometer"><div class="gc-thermo-tube"><div class="gc-thermo-fill" style="height:${fill}%"></div></div><div class="gc-thermo-bulb"></div></div></div>
       <div class="gc-sales-copy">
         <div class="gc-sales-head"><div><p class="eyebrow">Daily sales goal</p><h2>${closed ? 'Business day closed' : 'Today’s sales pace'}</h2></div><span class="gc-sales-status ${closed?'closed':''}">${closed?'Reconciled':'External POS'}</span></div>
         <div class="gc-sales-primary"><strong>${money(sales)}</strong><span>${goal ? `of ${money(goal)}` : '· goal not configured'}</span></div>
-        <div class="gc-sales-progress"><span style="width:${fill}%"></span></div>
+        <div class="gc-sales-progress" role="progressbar" aria-label="Daily sales goal progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(fill)}"><span style="width:${fill}%"></span><i class="gc-sales-goal-marker" aria-hidden="true"></i></div>
         <div class="gc-sales-facts">
           <div class="gc-sales-fact"><small>To goal</small><strong>${goal ? (percent >= 100 ? `${percent.toFixed(1)}% · goal met` : `${money(summary.remaining_cents || 0)} remaining`) : 'Set a launch goal'}</strong></div>
           <div class="gc-sales-fact"><small>Goal basis</small><strong>${esc(method)}</strong></div>
@@ -374,3 +373,4 @@
 
   setTimeout(initialize, 1800);
 })();
+

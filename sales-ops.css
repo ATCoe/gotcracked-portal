@@ -101,3 +101,23 @@
   .gc-sales-dialog .gc-form-grid{grid-template-columns:1fr}.gc-sales-dialog .full{grid-column:auto}
   .gc-closeout-preview{grid-template-columns:1fr}.gc-finance-settings-grid{grid-template-columns:1fr}.gc-margin-grid{grid-template-columns:1fr}
 }
+
+/* Compact dashboard temperature card. The track is the temperature scale;
+   progress reveals it left-to-right and turns solid green once goal is met. */
+.gc-sales-card{display:block;padding:18px 20px;margin:16px 0 20px;overflow:hidden}
+.gc-sales-card::after,.gc-sales-thermometer-wrap{display:none}
+.gc-sales-copy{display:block}
+.gc-sales-head{align-items:center;margin-bottom:9px}
+.gc-sales-head h2{font-size:1.08rem}
+.gc-sales-primary{margin:0 0 8px}
+.gc-sales-primary strong{font-size:clamp(1.7rem,3vw,2.3rem)}
+.gc-sales-progress{position:relative;height:18px;margin:10px 0 12px;border:2px solid #d8e1e8;border-radius:999px;background:#edf1f4;overflow:hidden;box-shadow:inset 0 1px 3px rgba(17,38,61,.12)}
+.gc-sales-progress>span{position:relative;z-index:1;min-width:0;background:linear-gradient(90deg,#d63b36 0%,#e85d31 30%,#f0bc32 62%,#42ad63 100%);border-radius:999px;transition:width .45s ease}
+.gc-sales-goal-marker{position:absolute;z-index:2;right:3px;top:2px;bottom:2px;width:2px;border-radius:2px;background:rgba(17,45,69,.35)}
+.gc-sales-card.is-over-goal .gc-sales-progress{border-color:#159052;background:#159052}
+.gc-sales-card.is-over-goal .gc-sales-progress>span{width:100%!important;background:#159052}
+.gc-sales-card.is-over-goal .gc-sales-goal-marker{display:none}
+.gc-sales-facts{margin:3px 0 12px}.gc-sales-fact{padding:8px 10px}
+@media(max-width:750px){.gc-sales-card{display:block;padding:15px;margin:12px 0 16px}.gc-sales-head{display:flex}.gc-sales-status{margin-top:0}.gc-sales-facts{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.gc-sales-fact:last-child{grid-column:auto}.gc-sales-fact strong{font-size:.78rem}.gc-sales-actions{grid-template-columns:1fr 1fr}.gc-sales-note{font-size:.7rem}}
+@media(max-width:480px){.gc-sales-head{align-items:flex-start}.gc-sales-facts{grid-template-columns:1fr}.gc-sales-actions{grid-template-columns:1fr}}
+

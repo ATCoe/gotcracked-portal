@@ -28,11 +28,10 @@
 .v1-table td small{display:block;margin-top:2px;color:#77889a}
 .v1-status{display:inline-flex;align-items:center;gap:6px;max-width:220px;padding:5px 9px;border-radius:999px;background:#eef3f8;color:#40556b;font-size:.72rem;font-weight:800;white-space:normal}
 .v1-status::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.7}
-.v1-status.need_to_contact,.v1-status.awaiting_callback{background:#fff3db;color:#946000}
-.v1-status.awaiting_device,.v1-status.awaiting_customer{background:#eaf3ff;color:#155fb4}
-.v1-status.need_to_order_part,.v1-status.need_to_order_parts,.v1-status.awaiting_parts{background:#f5edff;color:#6d3ba6}
-.v1-status.repaired,.v1-status.ready_for_pickup,.v1-status.sale_complete,.v1-status.converted{background:#e8f8f1;color:#087657}
-.v1-status.lost,.v1-status.cancelled,.v1-status.unrepairable{background:#f4f4f5;color:#666}
+.v1-status.need_to_contact,.v1-status.need_to_order_part,.v1-status.need_to_order_parts,.v1-status.awaiting_repair{background:#fde8e7;color:#b42318}
+.v1-status.awaiting_device,.v1-status.awaiting_customer,.v1-status.awaiting_callback,.v1-status.awaiting_parts{background:#fff3d6;color:#8a5a00}
+.v1-status.repaired,.v1-status.ready_for_pickup,.v1-status.converted,.v1-status.customer_declined,.v1-status.unrepairable{background:#e5f7ed;color:#087657}
+.v1-status.sale_complete{background:#e6f1ff;color:#1769c2}
 .v1-count-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#e8f1fc;color:#145faa;font-size:.67rem;font-weight:800}
 
 /* Lead stage tabs */
@@ -226,3 +225,4 @@
 }
 
 @media(prefers-reduced-motion:reduce){.v1-right-drawer,.v1-switch span,.v1-switch span::after{transition:none}}
+

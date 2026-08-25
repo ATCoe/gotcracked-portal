@@ -62,6 +62,11 @@ jobs:
           app = Path('app.js').read_text(encoding='utf-8')
           final_js = Path('portal-v1-final.js').read_text(encoding='utf-8')
           runtime = Path('portal-runtime-loader.js').read_text(encoding='utf-8')
+          operations = Path('operations-v1-core.js').read_text(encoding='utf-8')
+          directory = Path('master-directory.js').read_text(encoding='utf-8')
+          sales = Path('sales-ops.js').read_text(encoding='utf-8')
+          sales_css = Path('sales-ops.css').read_text(encoding='utf-8')
+          migration = Path('supabase/migrations/0011_portal_realtime_publication.sql').read_text(encoding='utf-8')
 
           if re.search(r'<style(?:\s|>)', html, re.I):
               raise SystemExit('Inline <style> blocks are forbidden in index.html; use the release cascade.')
@@ -140,4 +145,21 @@ jobs:
               if fragment not in release:
                   raise SystemExit(f'Release CSS invariant missing: {fragment}')
 
+          realtime_tables = ['leads','repair_tickets','customers','devices','intake_sessions','work_order_items','ticket_events']
+          for table in realtime_tables:
+              if table not in operations or table not in migration:
+                  raise SystemExit(f'Cross-user realtime coverage missing for {table}.')
+          if 'queueRealtimeReload' not in operations or 'realtimeReloading' not in operations:
+              raise SystemExit('Operational realtime refresh must remain debounced and single-flight.')
+          if 'first_name?.trim()&&x.newCustomer.phone?.trim()' not in operations:
+              raise SystemExit('Walk-in intake must require only customer name and phone.')
+          for status_class in ['status-red','status-yellow','status-green','status-blue']:
+              if status_class not in directory:
+                  raise SystemExit(f'Master Directory status mapping missing {status_class}.')
+          if 'linear-gradient(90deg,#d63b36' not in sales_css or 'is-over-goal .gc-sales-progress>span' not in sales_css:
+              raise SystemExit('Compact red-to-green sales goal bar invariant missing.')
+          if 'gc-sales-goal-marker' not in sales:
+              raise SystemExit('Sales goal progress markup missing.')
+
           print('Portal 1.0 architecture checks passed.')
+

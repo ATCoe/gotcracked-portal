@@ -12,6 +12,18 @@
   --gc-drawer-shadow:-20px 0 52px rgba(5,18,32,.2);
 }
 
+/* Authoritative modal geometry for work-order creation and walk-in intake. */
+#new-ticket,#ticket-detail,#v1-intake-dialog{box-sizing:border-box;padding:0!important;overflow:hidden!important}
+#new-ticket{width:min(720px,calc(100vw - 28px));max-width:720px}
+#new-ticket>form{display:grid;grid-template-rows:auto minmax(0,1fr) auto;max-height:calc(100dvh - 28px);padding:22px}
+#new-ticket .form-grid{min-height:0;overflow:auto;padding:2px}
+#new-ticket .modal-actions{position:sticky;bottom:0;margin:18px -2px -2px;padding-top:14px;border-top:1px solid #e3e9ef}
+#v1-intake-dialog .v1-intake-shell{width:100%;height:min(760px,calc(100dvh - 28px));max-height:calc(100dvh - 28px);min-height:0}
+#v1-intake-dialog .v1-intake-body{min-height:0;overscroll-behavior:contain}
+#v1-intake-dialog .v1-form-grid{align-content:start}
+.v1-required{float:right;color:#b42318;font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+@media(max-width:750px){#new-ticket{width:100vw!important;max-width:none!important;height:100dvh!important;max-height:100dvh!important;margin:0!important;border:0!important;border-radius:0!important}#new-ticket>form{height:100dvh;max-height:100dvh;padding:14px}#new-ticket .form-grid{grid-template-columns:1fr}#v1-intake-dialog .v1-intake-shell{height:100dvh;max-height:100dvh}.v1-device-types{grid-template-columns:repeat(2,minmax(0,1fr))}.v1-check-row{grid-template-columns:minmax(0,1fr) 128px}}
+
 html,body{max-width:100%;overflow-x:clip}
 body{min-width:0}
 main,.view,.card,.v1-ops-card,.gc-directory{min-width:0;max-width:100%}
@@ -389,3 +401,4 @@ dialog::backdrop,#v1-intake-dialog::backdrop,#v1-po-dialog::backdrop,#portal-v1-
   html{scroll-behavior:auto}
   .sidebar,.v1-right-drawer,.v1-workflow-panel,.gc-mobile-nav-group>summary::after{transition:none!important}
 }
+
