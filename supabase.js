@@ -9,14 +9,14 @@ window.supabaseClient = supabase.createClient(
 
 // CSS is intentionally static in index.html. Do not dynamically append release
 // styles here: portal-v1-release.css must remain the final stylesheet.
-const PORTAL_V1_FINAL_VERSION = '20260825-release1';
-const MASTER_DIRECTORY_VERSION = '20260825-release1';
+const PORTAL_V1_FINAL_VERSION = '20260825-release2';
+const MASTER_DIRECTORY_VERSION = '20260825-release2';
 
 // Portal 1.0 operations is intentionally loaded after all legacy modules so it
 // can become the authoritative workflow UI without breaking existing auth.
 window.addEventListener('load', () => {
   if (document.querySelector('script[data-gc-operations-v1]')) return;
-  const version = '20260825-release1';
+  const version = '20260825-release2';
   const script = document.createElement('script');
   script.src = `operations-v1-core.js?v=${version}`;
   script.async = false;
