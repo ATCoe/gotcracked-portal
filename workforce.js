@@ -106,12 +106,13 @@
     if (event.target.closest('[data-close-workforce]')) return ensureDialog().close();
     const deleteShift = event.target.closest('[data-delete-shift]'); if (deleteShift && confirm('Delete this shift?')) { await client.from('shifts').delete().eq('id',deleteShift.dataset.deleteShift); return load(); }
     if (event.target.closest('[data-publish-schedule]')) { const published = state.week.status !== 'published'; await client.from('schedule_weeks').update({ status:published?'published':'draft', published_at:published?new Date().toISOString():null, published_by:published?state.profile.id:null }).eq('id',state.week.id); return load(); }
-    if (event.target.closest('[data-clock-in]')) { await client.from('time_entries').insert({ location_id:state.profile.location_id, employee_id:state.profile.id, clock_in:new Date().toISOString() }); return load(); }
+    const runClock = async action => { const result = await client.rpc('workforce_clock', { clock_action:action }); const status=document.querySelector('#clock-status'); if(result.error){if(status)status.textContent=result.error.message;return false;} await load(); return true; };
+    if (event.target.closest('[data-clock-in]')) return runClock('clock_in');
     const openEntry = state.entries.find(item=>item.employee_id===state.profile.id&&!item.clock_out);
     const openBreak = openEntry?.time_entry_breaks?.find(item=>!item.ended_at);
-    if (event.target.closest('[data-break-start]') && openEntry) { await client.from('time_entry_breaks').insert({ time_entry_id:openEntry.id, employee_id:state.profile.id }); return load(); }
-    if (event.target.closest('[data-break-end]') && openBreak) { await client.from('time_entry_breaks').update({ ended_at:new Date().toISOString() }).eq('id',openBreak.id); return load(); }
-    if (event.target.closest('[data-clock-out]') && openEntry) { if (openBreak) await client.from('time_entry_breaks').update({ ended_at:new Date().toISOString() }).eq('id',openBreak.id); await client.from('time_entries').update({ clock_out:new Date().toISOString() }).eq('id',openEntry.id); return load(); }
+    if (event.target.closest('[data-break-start]') && openEntry) return runClock('break_start');
+    if (event.target.closest('[data-break-end]') && openBreak) return runClock('break_end');
+    if (event.target.closest('[data-clock-out]') && openEntry) return runClock('clock_out');
     const decision = event.target.closest('[data-time-off]'); if (decision) { await client.from('time_off_requests').update({ status:decision.dataset.decision, reviewed_by:state.profile.id, reviewed_at:new Date().toISOString() }).eq('id',decision.dataset.timeOff); return load(); }
     const savePay = event.target.closest('[data-save-pay]'); if (savePay) { const id=savePay.dataset.savePay; await client.from('staff_compensation').upsert({ profile_id:id, location_id:state.profile.location_id, employment_type:document.querySelector(`[data-pay-type="${id}"]`).value, hourly_rate_cents:Math.round(Number(document.querySelector(`[data-pay-rate="${id}"]`).value||0)*100), updated_at:new Date().toISOString() },{onConflict:'profile_id'}); return load(); }
   });
