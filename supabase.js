@@ -12,7 +12,7 @@ window.supabaseClient = supabase.createClient(
 window.addEventListener('load', () => {
   if (document.querySelector('script[data-gc-operations-v1]')) return;
   const script = document.createElement('script');
-  script.src = 'operations-v1.js?v=20260825-v1ops3';
+  script.src = 'operations-v1-core.js?v=20260825-v1ops4';
   script.dataset.gcOperationsV1 = 'true';
   document.body.appendChild(script);
 }, { once: true });
