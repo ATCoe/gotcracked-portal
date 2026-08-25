@@ -5,6 +5,7 @@
 -- Profiles/locations ---------------------------------------------------------
 drop policy if exists "Authenticated users can read profiles" on public.profiles;
 drop policy if exists "staff can read their profile" on public.profiles;
+drop policy if exists "staff can read profiles at their location" on public.profiles;
 create policy "staff can read profiles at their location"
   on public.profiles for select to authenticated
   using (
@@ -13,6 +14,7 @@ create policy "staff can read profiles at their location"
   );
 
 drop policy if exists "Authenticated users can read locations" on public.locations;
+drop policy if exists "staff can read their location" on public.locations;
 create policy "staff can read their location"
   on public.locations for select to authenticated
   using (id = public.current_location_id());
