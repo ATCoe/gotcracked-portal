@@ -43,8 +43,8 @@
 </a>
         <nav aria-label="Main navigation">
           <a class="nav-link active" href="#dashboard" data-view="dashboard"><span>▦</span>Dashboard</a>
-          <a class="nav-link" href="#repairs" data-view="repairs"><span>⌁</span>Repairs <b id="repair-count">5</b></a>
-          <a class="nav-link" href="#leads" data-view="leads"><span>⌁</span>Leads <b id="lead-count">0</b></a>
+          <a class="nav-link" href="#repairs" data-view="repairs"><span>⌁</span>Repairs <b id="repair-count" hidden>0</b></a>
+          <a class="nav-link" href="#leads" data-view="leads"><span>⌁</span>Leads <b id="lead-count" hidden>0</b></a>
           <a class="nav-link" href="#appointments" data-view="appointments"><span>◷</span>Appointments</a>
           <a class="nav-link" href="#customers" data-view="customers"><span>♙</span>Customers</a>
           <a class="nav-link" href="#inventory" data-view="inventory"><span>▤</span>Inventory</a>
@@ -53,15 +53,15 @@
         </nav>
         <div class="sidebar-bottom">
           <a class="nav-link" href="#settings" data-view="settings"><span>⚙</span>Settings</a>
-          <div class="profile"><div id="staff-initials" class="avatar">AC</div><div><strong id="staff-name">Austin C.</strong><small id="staff-role">Owner</small></div><button id="sign-out" class="icon-button" aria-label="Sign out">↪</button></div>
+          <div class="profile"><div id="staff-initials" class="avatar">GC</div><div><strong id="staff-name">Loading staff…</strong><small id="staff-role">Authorized staff</small></div><button id="sign-out" class="icon-button" aria-label="Sign out">↪</button></div>
         </div>
       </aside>
 
       <main>
-        <header class="topbar"><button class="mobile-menu icon-button" aria-label="Open menu">☰</button><div class="location"><span class="status-dot"></span> GotCracked — Main Store <span class="chevron">⌄</span></div><div class="top-actions"><button class="icon-button" aria-label="Notifications">♧<i></i></button><button class="help">?</button></div></header>
+        <header class="topbar"><button class="mobile-menu icon-button" aria-label="Open menu">☰</button><div class="location"><span class="status-dot"></span> GotCracked — Main Store <span class="chevron">⌄</span></div><div class="top-actions"><button class="icon-button" aria-label="Notifications">♧<i hidden></i></button><button class="help">?</button></div></header>
 
         <section id="dashboard" class="view active-view">
-          <div class="page-heading"><div><p class="eyebrow">Monday, August 23</p><h1>Good morning, Austin.</h1><p class="subtle">Here’s what needs attention at GotCracked today.</p></div><button class="primary-button" data-open-ticket>+ New repair</button></div>
+          <div class="page-heading"><div><p class="eyebrow">Today</p><h1>Loading your dashboard…</h1><p class="subtle">Here’s what needs attention at GotCracked today.</p></div><button class="primary-button" data-open-ticket>+ New repair</button></div>
           <section class="metrics" aria-label="Today at a glance">
             <article><span class="metric-icon blue">⌁</span><div><p>Open repairs</p><strong>0</strong><small>Live shop data</small></div></article>
             <article><span class="metric-icon amber">◷</span><div><p>Today’s appointments</p><strong>0</strong><small>Live shop data</small></div></article>
@@ -75,7 +75,7 @@
         </section>
 
         <section id="repairs" class="view"><div class="page-heading"><div><p class="eyebrow">Operations</p><h1>Repair tickets</h1><p class="subtle">Track every device from intake through pickup.</p></div><button class="primary-button" data-open-ticket>+ New repair</button></div><div class="card"><div class="toolbar"><div class="search">⌕ <input id="repair-search" placeholder="Search ticket, customer, or device" /></div><select id="status-filter"><option value="all">All statuses</option><option>In diagnosis</option><option>Waiting on parts</option><option>In repair</option><option>Ready for pickup</option></select></div><div class="table-wrap"><table><thead><tr><th>Ticket</th><th>Customer / device</th><th>Service</th><th>Assigned to</th><th>Status</th><th>Updated</th></tr></thead><tbody id="repair-table"></tbody></table></div></div></section>
-        <section id="leads" class="view"><div class="page-heading"><div><p class="eyebrow">Discord-connected pipeline</p><h1>Leads</h1><p class="subtle">The same live lead queue used by the GotCracked bot.</p></div></div><div class="card"><div class="toolbar"><div class="search">⌕ <input id="lead-search" placeholder="Search leads"></div><select id="lead-status"><option value="all">All statuses</option><option value="new">New</option><option value="claimed">Claimed</option><option value="qualified">Qualified</option><option value="won">Won</option><option value="lost">Lost</option></select></div><div id="portal-leads"></div></div></section>
+        <section id="leads" class="view"><div class="page-heading"><div><p class="eyebrow">Unified lead pipeline</p><h1>Leads</h1><p class="subtle">Create leads manually or work the same live queue shared with Discord.</p></div><button class="primary-button" data-live-action="lead">+ New lead</button></div><div class="card"><div class="toolbar"><div class="search">⌕ <input id="lead-search" placeholder="Search leads"></div><select id="lead-status"><option value="all">All statuses</option><option value="new">New</option><option value="claimed">Claimed</option><option value="qualified">Qualified</option><option value="won">Won</option><option value="lost">Lost</option></select></div><div id="portal-leads"></div></div></section>
         <section id="appointments" class="view"><div class="page-heading"><div><p class="eyebrow">Scheduling</p><h1>Appointments</h1><p class="subtle">Reserve time without losing room for walk-ins.</p></div><button class="primary-button" data-open-ticket>+ Walk-in repair</button></div><div class="empty-card"><span>◷</span><h2>Appointment calendar is ready for your schedule.</h2><p>Connect your booking page when you’re ready; today’s appointments already appear on the dashboard.</p></div></section>
         <section id="customers" class="view"><div class="page-heading"><div><p class="eyebrow">Relationships</p><h1>Customers</h1><p class="subtle">A complete repair history for every customer.</p></div><button class="primary-button">+ New customer</button></div><div class="empty-card"><span>♙</span><h2>Customer records are linked to every repair ticket.</h2><p>Search, contact, and view devices from one place.</p></div></section>
         <section id="inventory" class="view"><div class="page-heading"><div><p class="eyebrow">Parts & supplies</p><h1>Inventory</h1><p class="subtle">Know what is on hand before you promise a turnaround.</p></div><button class="primary-button">+ Add part</button></div><div class="empty-card"><span>▤</span><h2>Inventory management foundation is in place.</h2><p>Parts will support stock levels, suppliers, reorder points, and ticket reservations.</p></div></section>

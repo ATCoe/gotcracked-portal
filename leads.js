@@ -17,7 +17,10 @@
         <span class="row-main"><strong>${esc(lead.name)}</strong><small>${esc(lead.service || 'No service')} · ${esc(lead.source || 'Unknown source')}</small></span>
         <span>${esc(lead.phone || lead.email || '')}</span><small>${new Date(lead.created_at).toLocaleString()}</small><em>›</em>
       </button>`).join('') : '<div class="empty-card"><h2>No matching leads</h2><p>New webhook leads will appear here and in Discord.</p></div>';
-    document.querySelector('#lead-count').textContent = leads.filter(lead => ['new', 'claimed', 'qualified'].includes(lead.status)).length;
+    const badge = document.querySelector('#lead-count');
+    const activeCount = leads.filter(lead => ['new', 'claimed', 'qualified'].includes(lead.status)).length;
+    badge.textContent = activeCount;
+    badge.hidden = activeCount === 0;
   }
 
   async function load() {

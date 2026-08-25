@@ -14,7 +14,7 @@
     redirect.hash = '';
     const { error } = await client.auth.signInWithOAuth({
       provider: 'discord',
-      options: { redirectTo: redirect.toString(), scopes: 'identify email' }
+      options: { redirectTo: redirect.toString(), queryParams: { prompt: 'consent' } }
     });
     if (error) throw error;
   }
@@ -42,6 +42,14 @@
       params.delete('invite');
       history.replaceState({}, document.title, `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`);
     }
+  }
+
+  let verificationRunning = false;
+  async function verifyOnce() {
+    if (verificationRunning) return;
+    verificationRunning = true;
+    try { await verifyDiscordSession(); }
+    finally { verificationRunning = false; }
   }
 
   async function linkDiscord() {
@@ -116,9 +124,12 @@
     });
   }
 
-  window.GotCrackedDiscordReady = verifyDiscordSession().catch(error => {
+  window.GotCrackedDiscordReady = verifyOnce().catch(error => {
     console.error('Discord verification failed', error);
     sessionStorage.setItem('gc-auth-error', 'Discord verification failed. Please try again.');
+  });
+  client.auth.onAuthStateChange(event => {
+    if (event === 'SIGNED_IN') setTimeout(() => verifyOnce().catch(console.error), 0);
   });
   wireUi();
 })();

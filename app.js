@@ -111,9 +111,11 @@
         const count = document.querySelector('#repair-count');
 
         if (count) {
-            count.textContent = getRepairs()
+            const openCount = getRepairs()
                 .filter(r => r.status !== 'Ready for pickup')
                 .length;
+            count.textContent = openCount;
+            count.hidden = openCount === 0;
         }
     }
 
