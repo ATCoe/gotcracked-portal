@@ -1,10 +1,16 @@
 .v1-mobile-nav{display:none}
 
 @media(max-width:750px){
-  /* Mobile left drawer is navigation only. The original long desktop nav is
-     replaced by this fixed, grouped menu so the drawer never needs scrolling. */
-  .sidebar>nav:not(.v1-mobile-nav){display:none!important}
-  .sidebar-bottom>.nav-link[data-view="settings"]{display:none!important}
+  /* Mobile left drawer is navigation only. Hide the desktop nav only after the
+     compact replacement has been built successfully. */
+  .sidebar.v1-mobile-nav-ready>nav:not(.v1-mobile-nav){display:none!important}
+  .sidebar.v1-mobile-nav-ready .sidebar-bottom>.nav-link[data-view="settings"]{display:none!important}
+
+  .sidebar{
+    overflow:hidden!important;
+    scrollbar-width:none!important;
+  }
+  .sidebar::-webkit-scrollbar{display:none!important}
 
   .sidebar>.v1-mobile-nav{
     display:flex!important;
