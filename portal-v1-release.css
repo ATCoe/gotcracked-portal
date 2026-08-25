@@ -28,6 +28,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .icon-button,.help{min-width:var(--gc-touch);min-height:var(--gc-touch)}
 .view{min-width:0}
 
+/* Page titles stay concise. Supporting guidance belongs inside the workspace,
+   not directly beneath every title. */
+.page-heading .subtle{display:none!important}
+.gc-dir-head p:not(.eyebrow){display:none!important}
+
 /* -------------------------------------------------------------------------
    LEFT SIDEBAR — navigation only
    Desktop can use the full navigation list. Mobile receives a compact grouped
@@ -42,8 +47,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .sidebar .profile strong,.sidebar .profile small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gc-mobile-nav{display:none}
 
-/* Drawers use their own shadow/border. The exposed application NEVER dims. */
-.sidebar-backdrop,.v1-drawer-backdrop{
+/* The old mobile backdrop button is retired. Hide any stale cached instance so
+   it can never become an invisible layer over the app. */
+.sidebar-backdrop{display:none!important}
+
+/* Operational drawers use their own shadow/border. The exposed application
+   NEVER dims or blurs. */
+.v1-drawer-backdrop{
   background:transparent!important;
   -webkit-backdrop-filter:none!important;
   backdrop-filter:none!important;
@@ -100,6 +110,11 @@ body.v1-overlay-open,body.v1-workflow-open{overflow:hidden}
 .metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
 .metrics article{min-width:0}
 #dashboard .metrics article[data-v1-metric-link]{cursor:pointer}
+
+/* Master Directory is the dashboard directory. The older parallel Work Order
+   and Lead dashboard tables remain available on their dedicated pages only. */
+#dashboard>.v1-dashboard-grid{display:none!important}
+
 .table-wrap,.v1-table-wrap,.audit-table-wrap,.schedule-grid,.bar-chart{max-width:100%;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}
 .v1-table-wrap{overflow-x:auto;overflow-y:visible}
 .v1-table{width:100%}
@@ -187,8 +202,6 @@ dialog::backdrop,#v1-intake-dialog::backdrop,#v1-po-dialog::backdrop,#portal-v1-
   }
   .sidebar::-webkit-scrollbar,.sidebar nav::-webkit-scrollbar,.gc-mobile-nav::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
   .sidebar.open{transform:translateX(0);visibility:visible;pointer-events:auto}
-  .sidebar-backdrop{position:fixed!important;inset:0 0 0 var(--gc-sidebar-mobile)!important;z-index:59!important;border:0!important;padding:0!important;cursor:pointer!important;background:transparent!important}
-  .sidebar-backdrop[hidden]{display:none!important}
 
   .sidebar>.brand{
     flex:0 0 96px!important;
