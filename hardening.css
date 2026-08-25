@@ -1,0 +1,563 @@
+/* GotCracked Portal — production hardening layer
+   Loaded by app.js after the legacy stylesheets so this file is the final,
+   intentional cascade for responsive behavior and interaction polish. */
+
+:root {
+  --gc-touch: 44px;
+  --gc-sidebar-width: 250px;
+  --gc-mobile-gutter: 14px;
+}
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+body.mobile-nav-open {
+  overflow: hidden;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+[role="button"],
+.nav-link,
+.primary-button,
+.secondary-button {
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: 3px solid rgba(24, 119, 242, .35);
+  outline-offset: 2px;
+}
+
+main,
+.view,
+.card,
+.metrics article,
+.card-title > *,
+.row-main,
+.repair-customer {
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.location {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon-button,
+.help {
+  min-width: var(--gc-touch);
+  min-height: var(--gc-touch);
+  display: inline-grid;
+  place-items: center;
+}
+
+.primary-button,
+.secondary-button,
+.discord-button,
+.form-grid input,
+.form-grid select,
+.form-grid textarea,
+.search,
+.toolbar select {
+  min-height: var(--gc-touch);
+}
+
+.sidebar {
+  z-index: 40;
+}
+
+.sidebar .brand {
+  height: 138px !important;
+  min-height: 138px !important;
+  max-height: 138px !important;
+  margin: 0 0 8px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+
+.sidebar .brand-logo {
+  width: 200px !important;
+  height: 120px !important;
+  max-width: 200px !important;
+  max-height: 120px !important;
+  margin: 0 !important;
+  object-fit: contain !important;
+  transform: none !important;
+}
+
+.sidebar nav {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding-top: 0 !important;
+}
+
+.nav-link {
+  min-height: var(--gc-touch);
+}
+
+.profile {
+  flex: 0 0 auto;
+}
+
+.profile > div:nth-child(2) {
+  min-width: 0;
+}
+
+.profile strong,
+.profile small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-title {
+  gap: 14px;
+}
+
+.status {
+  max-width: 100%;
+}
+
+.table-wrap,
+.audit-table-wrap,
+.schedule-grid,
+.bar-chart {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+
+dialog {
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+dialog[open] {
+  display: block;
+}
+
+.form-grid input,
+.form-grid select,
+.form-grid textarea,
+.settings-list input,
+.settings-list select,
+.settings-list textarea {
+  max-width: 100%;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  border: 0;
+  padding: 0;
+  background: rgba(5, 13, 25, .52);
+  backdrop-filter: blur(2px);
+  cursor: default;
+}
+
+.sidebar-backdrop[hidden] {
+  display: none;
+}
+
+.report-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+}
+
+.shelf-revenue {
+  border-color: #7fd7ba !important;
+  background: #f1fbf7 !important;
+}
+
+.shelf-revenue strong {
+  color: #087657;
+}
+
+.abandoned-policy {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 11px 13px;
+  border-radius: 9px;
+  background: #f4f6f8;
+  color: #56677a;
+  font-size: .78rem;
+}
+
+@media (max-width: 1100px) and (min-width: 751px) {
+  .repair-row {
+    grid-template-columns: 42px minmax(0, 1fr) minmax(120px, auto);
+  }
+
+  .repair-tech,
+  .repair-row > .ticket-id {
+    display: none;
+  }
+
+  .sidebar .brand-logo {
+    width: 178px !important;
+    max-width: 178px !important;
+  }
+}
+
+@media (max-width: 750px) {
+  :root {
+    --gc-topbar-height: 62px;
+  }
+
+  .app-shell {
+    display: block;
+    min-height: 100dvh;
+  }
+
+  .sidebar {
+    display: flex !important;
+    position: fixed !important;
+    inset: 0 auto 0 0;
+    width: min(86vw, 290px) !important;
+    height: 100dvh !important;
+    padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
+    transform: translateX(-102%);
+    transition: transform .22s ease;
+    box-shadow: 18px 0 50px rgba(5, 13, 25, .28);
+    visibility: hidden;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .sidebar .brand {
+    height: 126px !important;
+    min-height: 126px !important;
+    max-height: 126px !important;
+  }
+
+  .sidebar .brand-logo {
+    width: 195px !important;
+    height: 112px !important;
+    max-width: 195px !important;
+    max-height: 112px !important;
+  }
+
+  .topbar {
+    height: var(--gc-topbar-height);
+    padding: 0 var(--gc-mobile-gutter);
+    gap: 8px;
+  }
+
+  .mobile-menu {
+    display: inline-grid !important;
+    flex: 0 0 var(--gc-touch);
+  }
+
+  .top-actions {
+    gap: 2px;
+    flex: 0 0 auto;
+  }
+
+  .location {
+    flex: 1;
+    font-size: 12px;
+  }
+
+  .chevron {
+    display: none;
+  }
+
+  .view {
+    padding: 22px var(--gc-mobile-gutter) max(38px, env(safe-area-inset-bottom));
+  }
+
+  .page-heading {
+    align-items: stretch;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .page-heading > .primary-button,
+  .page-heading > a.primary-button {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  h1 {
+    font-size: clamp(24px, 8vw, 28px);
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .metrics article {
+    padding: 16px;
+  }
+
+  .card {
+    padding: 17px;
+  }
+
+  .card-title {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .right-column {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .repair-row {
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: start;
+    gap: 9px 11px;
+    padding: 14px 0;
+  }
+
+  .repair-tech,
+  .repair-row > .ticket-id {
+    display: none;
+  }
+
+  .repair-row .status {
+    grid-column: 2;
+    justify-self: start;
+    width: auto;
+    max-width: 100%;
+    white-space: normal;
+    line-height: 1.25;
+  }
+
+  .repair-customer small {
+    overflow-wrap: anywhere;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .search {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .toolbar select {
+    width: 100%;
+    padding: 0 10px;
+  }
+
+  table {
+    min-width: 680px;
+  }
+
+  .empty-card {
+    padding: 48px 18px;
+  }
+
+  dialog {
+    width: calc(100% - 16px);
+    max-width: none;
+    max-height: calc(100dvh - 16px);
+    margin: auto;
+    padding: 18px;
+    border-radius: 14px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .form-grid input,
+  .form-grid select,
+  .form-grid textarea,
+  .settings-list input,
+  .settings-list select,
+  .settings-list textarea {
+    width: 100% !important;
+    font-size: 16px;
+  }
+
+  .full {
+    grid-column: 1;
+  }
+
+  .modal-actions {
+    position: sticky;
+    bottom: -18px;
+    margin: 18px -18px -18px;
+    padding: 12px 18px max(12px, env(safe-area-inset-bottom));
+    background: rgba(255, 255, 255, .96);
+    border-top: 1px solid var(--line);
+    backdrop-filter: blur(8px);
+  }
+
+  .modal-actions .primary-button,
+  .modal-actions .secondary-button {
+    flex: 1;
+  }
+
+  .detail-row {
+    align-items: flex-start;
+  }
+
+  .detail-row strong {
+    max-width: 62%;
+    overflow-wrap: anywhere;
+  }
+
+  .settings-list label {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+    align-items: start !important;
+  }
+
+  .settings-list .toggle-row {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+  }
+
+  .settings-list .toggle-row > span {
+    max-width: none;
+  }
+
+  .settings-list input,
+  .settings-list select {
+    width: 100% !important;
+  }
+
+  .list-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .list-row .row-main {
+    flex-basis: calc(100% - 12px);
+  }
+
+  .lead-row {
+    grid-template-columns: minmax(72px, auto) minmax(0, 1fr) 18px !important;
+    gap: 10px;
+    padding: 14px 10px;
+  }
+
+  .lead-row > :nth-child(3),
+  .lead-row > :nth-child(4) {
+    display: none;
+  }
+
+  .shipping-row,
+  .shipping-lead {
+    min-width: 0;
+  }
+
+  .schedule-plan {
+    grid-template-columns: 1fr !important;
+  }
+
+  .labor-metrics,
+  .report-metrics {
+    grid-template-columns: 1fr !important;
+  }
+
+  .audit-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .audit-actions {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .customer-history-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .customer-history-row > :nth-child(3) {
+    grid-column: 1;
+  }
+
+  .login-screen {
+    min-height: 100dvh !important;
+    padding: max(16px, env(safe-area-inset-top)) 12px max(16px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .login-panel {
+    padding: 28px 22px !important;
+  }
+
+  .login-panel input {
+    min-height: 46px;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 390px) {
+  .view {
+    padding-inline: 11px;
+  }
+
+  .card,
+  .metrics article {
+    border-radius: 10px;
+  }
+
+  .card {
+    padding: 15px;
+  }
+
+  .top-actions .help {
+    display: none;
+  }
+
+  .profile {
+    margin-inline: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none !important;
+  }
+}
