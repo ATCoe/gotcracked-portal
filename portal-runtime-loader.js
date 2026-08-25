@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260825-release8';
+  const VERSION = '20260825-release9';
 
   // Only the modules needed to make the primary repair/dashboard workspace
   // useful belong on the critical post-auth path. Everything else is deferred
@@ -32,7 +32,8 @@
     staff: ['workforce.js'],
     reports: ['analytics.js'],
     shipping: ['shipping.js'],
-    inventory: ['inventory-audit.js']
+    inventory: ['inventory-audit.js'],
+    settings: ['pricing-settings.js']
   };
 
   let started = false;
