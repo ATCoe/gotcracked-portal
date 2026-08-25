@@ -59,6 +59,7 @@ jobs:
           html = Path('index.html').read_text(encoding='utf-8')
           release = Path('portal-v1-release.css').read_text(encoding='utf-8')
           mobile = Path('mobile-nav-safe.js').read_text(encoding='utf-8')
+          app = Path('app.js').read_text(encoding='utf-8')
 
           if re.search(r'<style(?:\s|>)', html, re.I):
               raise SystemExit('Inline <style> blocks are forbidden in index.html; use the release cascade.')
@@ -85,14 +86,22 @@ jobs:
               raise SystemExit('Mobile left navigation must not be vertically scrollable.')
           if "createElement('style')" in mobile or 'createElement("style")' in mobile:
               raise SystemExit('mobile-nav-safe.js must not inject CSS.')
+          if 'sidebarBackdrop' in app or "createElement('button')" in app and 'sidebar-backdrop' in app:
+              raise SystemExit('app.js must not recreate the retired full-screen mobile backdrop.')
+          if 'hardening.css' in app:
+              raise SystemExit('app.js must not dynamically inject hardening.css.')
 
           required_release_fragments = [
               '.sidebar.gc-mobile-nav-ready>nav:not(.gc-mobile-nav)',
               '.sidebar>.gc-mobile-nav',
-              '.sidebar-backdrop,.v1-drawer-backdrop',
+              '.sidebar-backdrop{display:none!important}',
+              '.v1-drawer-backdrop',
               'background:transparent!important',
               '.v1-workflow-panel',
-              'body.v1-overlay-open,body.v1-workflow-open'
+              'body.v1-overlay-open,body.v1-workflow-open',
+              '#dashboard>.v1-dashboard-grid{display:none!important}',
+              '.page-heading .subtle{display:none!important}',
+              '.gc-dir-head p:not(.eyebrow){display:none!important}'
           ]
           for fragment in required_release_fragments:
               if fragment not in release:
