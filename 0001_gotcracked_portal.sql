@@ -18,6 +18,7 @@ create table public.profiles (
   display_name text not null,
   role public.staff_role not null default 'front_desk',
   active boolean not null default true,
+  must_change_password boolean not null default true,
   created_at timestamptz not null default now()
 );
 
@@ -118,6 +119,22 @@ create policy "staff can view ticket events" on public.ticket_events for select 
 create policy "staff can add ticket events" on public.ticket_events for insert to authenticated with check (exists (select 1 from public.repair_tickets t where t.id = ticket_id and t.location_id = public.current_location_id()));
 create policy "staff can view inventory at their location" on public.inventory_items for select to authenticated using (location_id = public.current_location_id());
 create policy "managers can edit inventory" on public.inventory_items for all to authenticated using (location_id = public.current_location_id() and exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('owner', 'manager'))) with check (location_id = public.current_location_id() and exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('owner', 'manager')));
+
+-- Clear only the caller's first-login requirement after Auth accepts their new password.
+create function public.complete_initial_password_setup() returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.profiles
+  set must_change_password = false
+  where id = auth.uid() and active = true;
+
+  if not found then
+    raise exception 'Active staff profile not found';
+  end if;
+end; $$;
+
+revoke all on function public.complete_initial_password_setup() from public;
+grant execute on function public.complete_initial_password_setup() to authenticated;
 
 -- Keep an audit timeline without allowing application code to forge it.
 create function public.set_ticket_updated_at() returns trigger language plpgsql as $$

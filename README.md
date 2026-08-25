@@ -13,6 +13,7 @@ This is an original operations portal informed by common repair-shop workflows: 
 - A working new-repair intake flow that adds a ticket to the queue.
 - Placeholder modules that establish the information architecture for appointments, customer history, inventory, and reports.
 - A deliberate data vocabulary for the next build phase: `Customer`, `Device`, `RepairTicket`, `Appointment`, `InventoryItem`, `Supplier`, `User`, `Location`, and `Payment`.
+- Mandatory first-login password creation for new staff profiles, enforced before the dashboard loads.
 
 ## Proposed production stack
 

@@ -48,6 +48,8 @@
     let recoveryMode =
         window.location.hash.includes('type=recovery');
 
+    let initialPasswordSetupMode = false;
+
     /*
      * Helpers
      */
@@ -119,11 +121,31 @@
     }
 
     function showRecoveryPanel() {
+        initialPasswordSetupMode = false;
         recoveryMode = true;
+        document.querySelector('#new-password-eyebrow').textContent = 'Account recovery';
+        document.querySelector('#new-password-title').textContent = 'Create a new password';
+        document.querySelector('#new-password-description').textContent = 'Choose a password with at least 8 characters.';
+        newPasswordForm?.querySelector('button[type="submit"]')?.replaceChildren('Save new password');
         showAuthPanel(newPasswordPanel);
         setMessage(
             document.querySelector('#new-password-message'),
             'Use the form below to set your new password.'
+        );
+        document.querySelector('#new-password')?.focus();
+    }
+
+    function showInitialPasswordPanel() {
+        initialPasswordSetupMode = true;
+        recoveryMode = false;
+        document.querySelector('#new-password-eyebrow').textContent = 'First-time setup';
+        document.querySelector('#new-password-title').textContent = 'Secure your staff account';
+        document.querySelector('#new-password-description').textContent = 'Create your private password before entering the GotCracked Portal.';
+        newPasswordForm?.querySelector('button[type="submit"]')?.replaceChildren('Set password and enter portal');
+        showAuthPanel(newPasswordPanel);
+        setMessage(
+            document.querySelector('#new-password-message'),
+            'This one-time step is required for every new staff account.'
         );
         document.querySelector('#new-password')?.focus();
     }
@@ -223,11 +245,8 @@
         setStaff(staff);
 
         if (profile.must_change_password) {
-
-            window.location.href =
-                '/setup-password.html';
-
-            return true;
+            showInitialPasswordPanel();
+            return false;
         }
 
         if (loginScreen) {
@@ -582,16 +601,30 @@
                     throw error;
                 }
 
-                await window.supabaseClient.auth.signOut();
-                clearRecoveryUrl();
-                recoveryMode = false;
-                newPasswordForm.reset();
-                showAuthPanel(signInPanel);
-                setMessage(
-                    document.querySelector('#login-error'),
-                    'Password updated. Sign in with your new password.'
-                );
-                loginEmail?.focus();
+                if (initialPasswordSetupMode) {
+                    const { error: completionError } = await window.supabaseClient
+                        .rpc('complete_initial_password_setup');
+
+                    if (completionError) {
+                        throw completionError;
+                    }
+
+                    initialPasswordSetupMode = false;
+                    newPasswordForm.reset();
+                    loginScreen?.classList.add('hidden');
+                    await loadRepairs();
+                } else {
+                    await window.supabaseClient.auth.signOut();
+                    clearRecoveryUrl();
+                    recoveryMode = false;
+                    newPasswordForm.reset();
+                    showAuthPanel(signInPanel);
+                    setMessage(
+                        document.querySelector('#login-error'),
+                        'Password updated. Sign in with your new password.'
+                    );
+                    loginEmail?.focus();
+                }
             } catch (error) {
                 console.error('PASSWORD UPDATE FAILED:', error);
                 setMessage(
@@ -601,7 +634,9 @@
                 );
             } finally {
                 button.disabled = false;
-                button.textContent = 'Save new password';
+                button.textContent = initialPasswordSetupMode
+                    ? 'Set password and enter portal'
+                    : 'Save new password';
             }
         }
     );

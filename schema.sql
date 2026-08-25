@@ -25,6 +25,7 @@ create table users (
   email text not null unique,
   role user_role not null,
   active boolean not null default true,
+  must_change_password boolean not null default true,
   created_at timestamptz not null default now()
 );
 

@@ -22,12 +22,13 @@
           <p class="demo-note">Authorized GotCracked staff only. Use your company email to sign in.</p>
         </div>
         <div id="forgot-password-panel" class="auth-panel hidden" aria-hidden="true">
-          <p class="eyebrow">Account recovery</p><h1>Reset your password</h1><p class="subtle">Enter your work email and we’ll send a secure reset link.</p>
-          <form id="forgot-password-form"><label>Work email<input id="reset-email" type="email" required autocomplete="email" placeholder="name@gotcracked.co"></label><button class="primary-button" type="submit">Send reset link</button></form>
+          <p class="eyebrow">Account recovery</p><h1>Reset your password</h1><p class="subtle">Enter the exact email used for your staff login.</p>
+          <form id="forgot-password-form"><label>Staff login email<input id="reset-email" type="email" required autocomplete="email" placeholder="name@gotcracked.co"></label><button class="primary-button" type="submit">Send secure reset link</button></form>
+          <div class="recovery-route-note"><span>↗</span><p><strong>Central recovery inbox</strong>All GotCracked email aliases should forward to <b>support@gotcracked.co</b>, so the account-specific reset link reaches the monitored Gmail inbox.</p></div>
           <button class="text-button" type="button" data-show-sign-in>Back to sign in</button><p id="forgot-password-message" class="auth-message" role="status"></p>
         </div>
         <div id="new-password-panel" class="auth-panel hidden" aria-hidden="true">
-          <p class="eyebrow">Account recovery</p><h1>Create a new password</h1><p class="subtle">Choose a password with at least 8 characters.</p>
+          <p class="eyebrow" id="new-password-eyebrow">Account recovery</p><h1 id="new-password-title">Create a new password</h1><p class="subtle" id="new-password-description">Choose a password with at least 8 characters.</p>
           <form id="new-password-form"><label>New password<input id="new-password" type="password" required minlength="8" autocomplete="new-password"></label><label>Confirm new password<input id="confirm-password" type="password" required minlength="8" autocomplete="new-password"></label><button class="primary-button" type="submit">Save new password</button></form>
           <p id="new-password-message" class="auth-message" role="status"></p>
         </div>
@@ -83,6 +84,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase.js"></script>
     <script src="workflow.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
     <script src="app.js"></script>
     <script src="portal-complete.js"></script>
   </body>
