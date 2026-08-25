@@ -1,8 +1,108 @@
 // ============================================================
-// GOTCRACKED PORTAL - AUTHENTICATION WORKFLOW
+// GOTCRACKED PORTAL
+// AUTHENTICATION WORKFLOW
 // ============================================================
 
 console.log('LOGIN HANDLER LOADED');
+
+
+// ============================================================
+// STATE
+// ============================================================
+
+let loginInProgress = false;
+
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function getLoginElements() {
+
+    return {
+
+        form:
+            document.querySelector(
+                '#login-form'
+            ),
+
+        email:
+            document.querySelector(
+                '#login-email'
+            ),
+
+        password:
+            document.querySelector(
+                '#login-password'
+            ),
+
+        error:
+            document.querySelector(
+                '#login-error'
+            ),
+
+        button:
+            document.querySelector(
+                '#login-form button[type="submit"]'
+            ) ||
+            document.querySelector(
+                '#login-form button'
+            )
+
+    };
+
+}
+
+
+function showLoginMessage(message) {
+
+    const element =
+        document.querySelector(
+            '#login-error'
+        );
+
+
+    if (element) {
+
+        element.textContent =
+            message || '';
+
+    }
+    else if (message) {
+
+        console.error(
+            'LOGIN:',
+            message
+        );
+
+    }
+
+}
+
+
+function setLoginBusy(busy) {
+
+    const elements =
+        getLoginElements();
+
+
+    if (elements.button) {
+
+        elements.button.disabled =
+            busy;
+
+    }
+
+
+    if (busy) {
+
+        showLoginMessage(
+            'Signing in...'
+        );
+
+    }
+
+}
 
 
 // ============================================================
@@ -11,42 +111,54 @@ console.log('LOGIN HANDLER LOADED');
 
 function setStaff(staff) {
 
-    const nameElement =
-        document.querySelector('#staff-name');
-
-    const roleElement =
-        document.querySelector('#staff-role');
-
-    const initialsElement =
-        document.querySelector('#staff-initials');
+    const name =
+        document.querySelector(
+            '#staff-name'
+        );
 
 
-    if (nameElement) {
-        nameElement.textContent =
-            staff.name || 'Staff';
+    const role =
+        document.querySelector(
+            '#staff-role'
+        );
+
+
+    const initials =
+        document.querySelector(
+            '#staff-initials'
+        );
+
+
+    if (name) {
+
+        name.textContent =
+            staff.name ||
+            'Staff';
+
     }
 
 
-    if (roleElement) {
-        roleElement.textContent =
-            staff.role || 'Staff';
+    if (role) {
+
+        role.textContent =
+            staff.role ||
+            'Staff';
+
     }
 
 
-    if (initialsElement) {
+    if (initials) {
 
-        const initials =
+        initials.textContent =
             (staff.name || 'Staff')
                 .split(' ')
                 .filter(Boolean)
-                .map(part => part[0])
+                .map(
+                    part => part[0]
+                )
                 .join('')
                 .slice(0, 2)
                 .toUpperCase();
-
-
-        initialsElement.textContent =
-            initials;
 
     }
 
@@ -54,20 +166,15 @@ function setStaff(staff) {
 
 
 // ============================================================
-// LOAD STAFF PROFILE
+// LOAD PROFILE
 // ============================================================
 
 async function loadProfile(userId) {
 
-    if (!window.supabaseClient) {
-
-        console.error(
-            'Supabase client is not available.'
-        );
-
-        return false;
-
-    }
+    console.log(
+        'Loading staff profile:',
+        userId
+    );
 
 
     const {
@@ -88,18 +195,10 @@ async function loadProfile(userId) {
             error
         );
 
-        const message =
-            document.querySelector(
-                '#login-error'
-            );
 
-
-        if (message) {
-
-            message.textContent =
-                'Your account was authenticated, but your staff profile could not be loaded.';
-
-        }
+        showLoginMessage(
+            'Login succeeded, but your staff profile could not be loaded.'
+        );
 
 
         return false;
@@ -109,7 +208,8 @@ async function loadProfile(userId) {
 
     const staff = {
 
-        id: userId,
+        id:
+            userId,
 
         name:
             profile.display_name ||
@@ -131,7 +231,9 @@ async function loadProfile(userId) {
     setStaff(staff);
 
 
-    if (profile.must_change_password) {
+    if (
+        profile.must_change_password
+    ) {
 
         window.location.href =
             '/setup-password.html';
@@ -156,9 +258,13 @@ async function loadProfile(userId) {
     }
 
 
+    console.log(
+        'STAFF AUTHENTICATED'
+    );
+
+
     // ========================================================
-    // AUTHENTICATION IS NOW CONFIRMED.
-    // Tell app.js to load live repair data.
+    // NOW LOAD LIVE REPAIR DATA
     // ========================================================
 
     if (
@@ -166,7 +272,19 @@ async function loadProfile(userId) {
         'function'
     ) {
 
+        console.log(
+            'Loading repairs after authentication...'
+        );
+
+
         await window.loadRepairs();
+
+    }
+    else {
+
+        console.error(
+            'window.loadRepairs is not available.'
+        );
 
     }
 
@@ -177,52 +295,205 @@ async function loadProfile(userId) {
 
 
 // ============================================================
-// LOAD EXISTING SESSION
+// LOGIN
 // ============================================================
 
-async function loadSession() {
+async function performLogin() {
 
-    if (!window.supabaseClient) {
-
-        console.error(
-            'Supabase client is not available.'
-        );
+    if (loginInProgress) {
 
         return;
 
     }
 
 
+    loginInProgress = true;
+
+
+    const elements =
+        getLoginElements();
+
+
+    const email =
+        elements.email?.value
+            ?.trim() ||
+        '';
+
+
+    const password =
+        elements.password?.value ||
+        '';
+
+
+    showLoginMessage('');
+
+
+    if (!email) {
+
+        showLoginMessage(
+            'Please enter your email address.'
+        );
+
+
+        elements.email?.focus();
+
+
+        loginInProgress = false;
+
+
+        return;
+
+    }
+
+
+    if (!password) {
+
+        showLoginMessage(
+            'Please enter your password.'
+        );
+
+
+        elements.password?.focus();
+
+
+        loginInProgress = false;
+
+
+        return;
+
+    }
+
+
+    if (!window.supabaseClient) {
+
+        showLoginMessage(
+            'Authentication service is unavailable.'
+        );
+
+
+        console.error(
+            'window.supabaseClient is missing.'
+        );
+
+
+        loginInProgress = false;
+
+
+        return;
+
+    }
+
+
+    setLoginBusy(true);
+
+
+    console.log(
+        'LOGIN REQUEST STARTING'
+    );
+
+
     try {
 
         const {
-            data: {
-                session
-            }
+            data,
+            error
         } =
             await window.supabaseClient
                 .auth
-                .getSession();
+                .signInWithPassword({
+
+                    email:
+                        email,
+
+                    password:
+                        password
+
+                });
 
 
-        if (!session) {
+        if (error) {
+
+            console.error(
+                'LOGIN FAILED:',
+                error
+            );
+
+
+            showLoginMessage(
+                error.message ||
+                'Unable to sign in.'
+            );
+
 
             return;
 
         }
 
 
+        if (
+            !data ||
+            !data.user
+        ) {
+
+            console.error(
+                'Login returned no user:',
+                data
+            );
+
+
+            showLoginMessage(
+                'Login completed, but no user session was returned.'
+            );
+
+
+            return;
+
+        }
+
+
+        console.log(
+            'LOGIN SUCCESS:',
+            data.user.email
+        );
+
+
+        showLoginMessage('');
+
+
         await loadProfile(
-            session.user.id
+            data.user.id
         );
 
     }
     catch (error) {
 
         console.error(
-            'Session load failed:',
+            'UNEXPECTED LOGIN ERROR:',
             error
         );
+
+
+        showLoginMessage(
+            error?.message ||
+            'An unexpected error occurred while signing in.'
+        );
+
+    }
+    finally {
+
+        loginInProgress = false;
+
+
+        const button =
+            getLoginElements().button;
+
+
+        if (button) {
+
+            button.disabled =
+                false;
+
+        }
 
     }
 
@@ -230,18 +501,53 @@ async function loadSession() {
 
 
 // ============================================================
-// LOGIN FORM
+// DIRECT LOGIN BUTTON HANDLER
 //
-// IMPORTANT:
-// This is delegated to document rather than querying
-// #login-form during script startup. That prevents the
-// browser's native form submission from refreshing the page
-// when workflow.js loads before the form exists.
+// This is the important part.
+// We catch the actual button click rather than relying
+// exclusively on the form's submit event.
+// ============================================================
+
+document.addEventListener(
+    'click',
+    event => {
+
+        const button =
+            event.target.closest(
+                '#login-form button'
+            );
+
+
+        if (!button) {
+
+            return;
+
+        }
+
+
+        console.log(
+            'LOGIN BUTTON CLICKED'
+        );
+
+
+        event.preventDefault();
+        event.stopPropagation();
+
+
+        performLogin();
+
+    },
+    true
+);
+
+
+// ============================================================
+// FORM SUBMIT FALLBACK
 // ============================================================
 
 document.addEventListener(
     'submit',
-    async event => {
+    event => {
 
         const form =
             event.target;
@@ -257,228 +563,16 @@ document.addEventListener(
         }
 
 
-        // STOP THE BROWSER FROM SUBMITTING
-        // THE FORM AND REFRESHING THE PAGE.
+        console.log(
+            'LOGIN FORM SUBMITTED'
+        );
+
+
         event.preventDefault();
         event.stopPropagation();
 
 
-        const emailInput =
-            document.querySelector(
-                '#login-email'
-            );
-
-
-        const passwordInput =
-            document.querySelector(
-                '#login-password'
-            );
-
-
-        const message =
-            document.querySelector(
-                '#login-error'
-            );
-
-
-        const button =
-            form.querySelector(
-                'button[type="submit"]'
-            );
-
-
-        const email =
-            emailInput?.value?.trim() ||
-            '';
-
-
-        const password =
-            passwordInput?.value ||
-            '';
-
-
-        if (message) {
-
-            message.textContent = '';
-
-        }
-
-
-        if (!email) {
-
-            if (message) {
-
-                message.textContent =
-                    'Please enter your email address.';
-
-            }
-
-
-            emailInput?.focus();
-
-            return;
-
-        }
-
-
-        if (!password) {
-
-            if (message) {
-
-                message.textContent =
-                    'Please enter your password.';
-
-            }
-
-
-            passwordInput?.focus();
-
-            return;
-
-        }
-
-
-        if (!window.supabaseClient) {
-
-            if (message) {
-
-                message.textContent =
-                    'Authentication service is unavailable.';
-
-            }
-
-
-            console.error(
-                'Supabase client is not available.'
-            );
-
-            return;
-
-        }
-
-
-        if (button) {
-
-            button.disabled = true;
-
-        }
-
-
-        if (message) {
-
-            message.textContent =
-                'Signing in...';
-
-        }
-
-
-        try {
-
-            console.log(
-                'LOGIN SUBMIT HANDLER FIRED'
-            );
-
-
-            const {
-                data,
-                error
-            } =
-                await window.supabaseClient
-                    .auth
-                    .signInWithPassword({
-
-                        email,
-
-                        password
-
-                    });
-
-
-            if (error) {
-
-                console.error(
-                    'Login failed:',
-                    error
-                );
-
-
-                if (message) {
-
-                    message.textContent =
-                        error.message ||
-                        'Unable to sign in.';
-
-                }
-
-
-                return;
-
-            }
-
-
-            if (
-                !data ||
-                !data.user
-            ) {
-
-                if (message) {
-
-                    message.textContent =
-                        'Login succeeded, but no user session was returned.';
-
-                }
-
-
-                return;
-
-            }
-
-
-            console.log(
-                'LOGIN SUCCESS:',
-                data.user.email
-            );
-
-
-            if (message) {
-
-                message.textContent =
-                    '';
-
-            }
-
-
-            await loadProfile(
-                data.user.id
-            );
-
-        }
-        catch (error) {
-
-            console.error(
-                'Unexpected login error:',
-                error
-            );
-
-
-            if (message) {
-
-                message.textContent =
-                    error?.message ||
-                    'An unexpected error occurred while signing in.';
-
-            }
-
-        }
-        finally {
-
-            if (button) {
-
-                button.disabled = false;
-
-            }
-
-        }
+        performLogin();
 
     },
     true
@@ -559,7 +653,7 @@ document.addEventListener(
         catch (error) {
 
             console.error(
-                'Sign out failed:',
+                'SIGN OUT FAILED:',
                 error
             );
 
@@ -571,14 +665,17 @@ document.addEventListener(
 
 
 // ============================================================
-// SUPABASE AUTH STATE
+// AUTH STATE
 // ============================================================
 
 if (window.supabaseClient) {
 
     window.supabaseClient.auth
         .onAuthStateChange(
-            async (event, session) => {
+            async (
+                event,
+                session
+            ) => {
 
                 console.log(
                     'AUTH STATE:',
@@ -609,17 +706,9 @@ if (window.supabaseClient) {
                 }
 
 
-                if (
-                    event ===
-                    'SIGNED_IN' &&
-                    session?.user
-                ) {
-
-                    await loadProfile(
-                        session.user.id
-                    );
-
-                }
+                // Don't independently load the profile here
+                // for SIGNED_IN. performLogin() already does it.
+                // This avoids duplicate profile/repair requests.
 
             }
         );
@@ -628,7 +717,65 @@ if (window.supabaseClient) {
 
 
 // ============================================================
-// INITIAL SESSION CHECK
+// EXISTING SESSION
+// ============================================================
+
+async function loadSession() {
+
+    if (!window.supabaseClient) {
+
+        console.error(
+            'Supabase client is unavailable.'
+        );
+
+        return;
+
+    }
+
+
+    try {
+
+        const {
+            data: {
+                session
+            }
+        } =
+            await window.supabaseClient
+                .auth
+                .getSession();
+
+
+        console.log(
+            'AUTH STATE: INITIAL_SESSION'
+        );
+
+
+        if (!session) {
+
+            return;
+
+        }
+
+
+        await loadProfile(
+            session.user.id
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            'INITIAL SESSION FAILED:',
+            error
+        );
+
+    }
+
+}
+
+
+// ============================================================
+// START
 // ============================================================
 
 if (
