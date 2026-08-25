@@ -45,7 +45,7 @@
     if (!target) return;
 
     const metric = target.closest('[data-v1-metric-link]');
-    if (metric) {
+    if (metric && !metric.dataset.gcDirectoryFilter) {
       event.preventDefault();
       openMetric(metric);
       return;
@@ -53,8 +53,6 @@
 
     const openTicket = target.closest('[data-open-ticket]');
     if (openTicket && typeof ops()?.openIntake === 'function') {
-      /* app.js already prefers guided intake; this capture closes the tiny
-         startup race where the legacy modal could otherwise appear first. */
       event.preventDefault();
       event.stopPropagation();
       ops().openIntake();
@@ -64,7 +62,7 @@
   document.addEventListener('keydown', event => {
     if (!(event.target instanceof Element)) return;
     const metric = event.target.closest('[data-v1-metric-link]');
-    if (metric && (event.key === 'Enter' || event.key === ' ')) {
+    if (metric && !metric.dataset.gcDirectoryFilter && (event.key === 'Enter' || event.key === ' ')) {
       event.preventDefault();
       openMetric(metric);
     }
