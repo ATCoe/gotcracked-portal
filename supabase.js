@@ -7,25 +7,16 @@ window.supabaseClient = supabase.createClient(
     SUPABASE_ANON_KEY
 );
 
-const PORTAL_V1_FINAL_VERSION = '20260825-v1final6';
-const MASTER_DIRECTORY_VERSION = '20260825-directory1';
-for (const [href, key] of [
-  [`portal-v1-final.css?v=${PORTAL_V1_FINAL_VERSION}`, 'gcV1Final'],
-  [`master-directory.css?v=${MASTER_DIRECTORY_VERSION}`, 'gcMasterDirectory']
-]) {
-  if (document.querySelector(`link[data-${key.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`)}]`)) continue;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = href;
-  link.dataset[key] = 'true';
-  document.head.appendChild(link);
-}
+// CSS is intentionally static in index.html. Do not dynamically append release
+// styles here: portal-v1-release.css must remain the final stylesheet.
+const PORTAL_V1_FINAL_VERSION = '20260825-release1';
+const MASTER_DIRECTORY_VERSION = '20260825-release1';
 
 // Portal 1.0 operations is intentionally loaded after all legacy modules so it
 // can become the authoritative workflow UI without breaking existing auth.
 window.addEventListener('load', () => {
   if (document.querySelector('script[data-gc-operations-v1]')) return;
-  const version = '20260825-v1ops5';
+  const version = '20260825-release1';
   const script = document.createElement('script');
   script.src = `operations-v1-core.js?v=${version}`;
   script.async = false;
