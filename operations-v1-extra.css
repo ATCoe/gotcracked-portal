@@ -1,0 +1,21 @@
+/* Portal 1.0 supplemental functional styles. */
+.v1-store-switch{display:inline-flex;align-items:center;gap:8px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;min-height:44px;padding:0 6px;border-radius:8px}
+.v1-store-switch:hover{background:rgba(61,125,189,.08)}
+.v1-training-banner{position:sticky;top:0;z-index:38;display:flex;align-items:center;gap:12px;min-height:42px;padding:8px 16px;background:#fff4c7;border-bottom:1px solid #e3ca6a;color:#604b00;font-size:.78rem}
+.v1-training-banner strong{font-size:.72rem;letter-spacing:.08em}
+.v1-training-banner span{flex:1}
+.v1-training-banner button{border:1px solid #c7a53a;background:#fff9df;border-radius:8px;padding:7px 10px;font-weight:800;color:#604b00;cursor:pointer}
+body.training-store .topbar{top:42px}
+body.training-store .status-dot{background:#d69b00!important;box-shadow:0 0 0 4px rgba(214,155,0,.13)!important}
+body.training-store .sidebar{border-right-color:#d7bd65}
+.v1-migration-warning{margin:0 0 16px;border-color:#e5c676!important;background:#fff9e7!important}
+.v1-migration-warning strong{color:#745900}
+.v1-migration-warning p{margin:5px 0 0;color:#7c6a2b}
+.v1-checkout{border-color:#bfe3d4!important;background:#f5fcf9!important}
+.v1-checkout .v1-form-grid{margin-top:10px}
+.v1-inline-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.v1-po-add-line{margin-top:16px;padding-top:14px;border-top:1px solid #e1e8ef}
+.v1-po-add-line h3{margin:0 0 10px;font-size:.9rem}
+.v1-training-chip{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;background:#fff0b2;color:#745600;font-size:.66rem;font-weight:900;letter-spacing:.05em}
+.v1-permission-note{margin:12px 0 0;padding:10px 12px;border-radius:9px;background:#f5f8fb;color:#61758a;font-size:.75rem}
+@media(max-width:750px){.v1-training-banner{position:relative;top:auto;flex-wrap:wrap;padding:8px 12px}.v1-training-banner span{flex-basis:calc(100% - 120px)}body.training-store .topbar{top:0}.v1-store-switch strong{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
