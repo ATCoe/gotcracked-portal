@@ -1,0 +1,124 @@
+/* GotCracked Portal 1.0 — final visual polish and drawer safety.
+   This is intentionally the last cascade layer. Drawers never tint or blur
+   the work surface behind them; separation comes from the panel itself. */
+
+:root{
+  --v1-panel-shadow:0 14px 36px rgba(8,25,45,.075);
+  --v1-drawer-shadow:-20px 0 48px rgba(5,18,32,.18);
+  --v1-blue:#1877f2;
+}
+
+/* Never blur, dim, filter, or otherwise alter the page behind either drawer. */
+.sidebar-backdrop,
+.v1-drawer-backdrop{
+  background:transparent!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-filter:none!important;
+  filter:none!important;
+}
+body.mobile-nav-open .app-shell,
+body.mobile-nav-open main,
+body.mobile-nav-open .view,
+body.mobile-nav-open .topbar{
+  -webkit-filter:none!important;
+  filter:none!important;
+  opacity:1!important;
+}
+.sidebar.open{
+  box-shadow:18px 0 46px rgba(4,17,31,.24)!important;
+  border-right:1px solid rgba(255,255,255,.08);
+}
+.v1-right-drawer{
+  box-shadow:var(--v1-drawer-shadow)!important;
+}
+
+/* Cleaner 1.0 surfaces and stronger hierarchy without changing the brand. */
+.topbar{
+  box-shadow:0 1px 10px rgba(9,28,48,.035);
+}
+.v1-ops-card,
+.v1-device-card,
+.v1-workflow-panel,
+.v1-guide,
+.v1-permission-person{
+  border-color:#dce4ec!important;
+  box-shadow:var(--v1-panel-shadow);
+}
+.v1-ops-card{border-radius:16px}
+.v1-ops-card-head{background:linear-gradient(180deg,#fff,#fbfcfe)}
+.v1-table th{position:sticky;top:0;z-index:2;background:#f7f9fc}
+.v1-table tbody tr{transition:background .12s ease,box-shadow .12s ease}
+.v1-table tbody tr:hover{background:#f4f9ff}
+.v1-table tbody tr:focus-within{background:#f4f9ff}
+.v1-status{border:1px solid rgba(62,91,119,.08)}
+.v1-stage-tabs button{min-height:40px}
+.v1-stage-tabs button.active{box-shadow:0 4px 12px rgba(15,41,66,.14)}
+.v1-device-image{box-shadow:inset 0 0 0 1px rgba(123,188,246,.12)}
+.v1-line-search input:focus,
+.v1-reference-search input:focus,
+.v1-table-tools input:focus,
+.v1-table-tools select:focus{
+  border-color:#7db5ec;
+  box-shadow:0 0 0 3px rgba(24,119,242,.11);
+  outline:0;
+}
+.v1-workflow-panel .v1-drawer-head{background:#fbfcfe}
+.v1-required-note{box-shadow:inset 3px 0 0 #d99a2b}
+.v1-training-banner{box-shadow:0 4px 14px rgba(97,75,0,.08)}
+
+/* Active navigation gets a small edge marker instead of heavier visual effects. */
+.nav-link{position:relative}
+.nav-link.active::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:10px;
+  bottom:10px;
+  width:3px;
+  border-radius:0 3px 3px 0;
+  background:#58a8f5;
+}
+
+/* Make dashboard metrics useful as quick navigation targets. */
+#dashboard .metrics article[data-v1-metric-link]{cursor:pointer;transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease}
+#dashboard .metrics article[data-v1-metric-link]:hover{transform:translateY(-1px);border-color:#cbdced;box-shadow:0 8px 20px rgba(8,25,45,.07)}
+#dashboard .metrics article[data-v1-metric-link]:focus-visible{outline:3px solid rgba(24,119,242,.3);outline-offset:2px}
+
+@media(max-width:750px){
+  /* Four one-column metric cards made the mobile dashboard unnecessarily tall. */
+  #dashboard .metrics{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:9px!important;
+  }
+  #dashboard .metrics article{
+    min-height:104px;
+    padding:13px!important;
+    gap:9px;
+    align-items:flex-start;
+  }
+  #dashboard .metrics .metric-icon{
+    width:32px;
+    height:32px;
+    min-width:32px;
+    font-size:15px;
+  }
+  #dashboard .metrics strong{font-size:21px}
+  #dashboard .metrics small{font-size:10.5px;line-height:1.25}
+  .v1-ops-card{border-radius:13px}
+  .v1-stage-tabs{margin-inline:-2px;padding-inline:2px}
+  .v1-workorder-head{gap:12px}
+  .v1-right-drawer{width:min(92vw,400px)}
+  .v1-drawer-backdrop{cursor:pointer}
+}
+
+@media(max-width:390px){
+  #dashboard .metrics article{min-height:98px;padding:11px!important}
+  #dashboard .metrics p{font-size:11px}
+  #dashboard .metrics strong{font-size:19px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .v1-table tbody tr,
+  #dashboard .metrics article[data-v1-metric-link]{transition:none!important}
+}
