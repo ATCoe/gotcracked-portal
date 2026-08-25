@@ -141,10 +141,12 @@
       return;
     }
     host.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Employee</th><th>Portal role</th><th>Discord</th><th>Status</th><th>Actions</th></tr></thead><tbody>${cache.staff.map(member => {
-      const protectedMember = member.role === 'owner' || (profile.role === 'manager' && member.role === 'manager');
       const self = member.id === profile.id;
+      const roleProtected = member.role === 'owner' || (profile.role === 'manager' && member.role === 'manager');
+      const canToggleOwner = profile.role === 'owner' && member.role === 'owner' && !self;
+      const actionProtected = roleProtected && !canToggleOwner;
       const roleOptions = ['front_desk', 'technician', ...(profile.role === 'owner' ? ['manager'] : [])];
-      return `<tr><td><strong>${esc(member.display_name)}</strong>${self ? '<small>You</small>' : ''}</td><td>${protectedMember ? `<span>${esc(friendly(member.role))}</span>` : `<select data-staff-role="${member.id}">${roleOptions.map(role => `<option value="${role}" ${member.role === role ? 'selected' : ''}>${friendly(role)}</option>`).join('')}</select>`}</td><td>${member.discord_user_id ? '<span class="tag confirmed">Linked</span>' : '<span class="tag">Not linked</span>'}</td><td><span class="tag ${member.active ? 'confirmed' : ''}">${member.active ? 'Active' : 'Inactive'}</span></td><td>${protectedMember ? '<small>Protected</small>' : `<button class="secondary-button" data-save-staff="${member.id}">Save role</button> <button class="${member.active ? 'danger-button' : 'secondary-button'}" data-toggle-staff="${member.id}" data-active="${member.active ? 'false' : 'true'}" ${self ? 'disabled' : ''}>${member.active ? 'Deactivate' : 'Reactivate'}</button>`}</td></tr>`;
+      return `<tr><td><strong>${esc(member.display_name)}</strong>${self ? '<small>You</small>' : ''}</td><td>${roleProtected ? `<span>${esc(friendly(member.role))}</span>` : `<select data-staff-role="${member.id}">${roleOptions.map(role => `<option value="${role}" ${member.role === role ? 'selected' : ''}>${friendly(role)}</option>`).join('')}</select>`}</td><td>${member.discord_user_id ? '<span class="tag confirmed">Linked</span>' : '<span class="tag">Not linked</span>'}</td><td><span class="tag ${member.active ? 'confirmed' : ''}">${member.active ? 'Active' : 'Inactive'}</span></td><td>${actionProtected ? '<small>Protected</small>' : `${roleProtected ? '' : `<button class="secondary-button" data-save-staff="${member.id}">Save role</button> `}<button class="${member.active ? 'danger-button' : 'secondary-button'}" data-toggle-staff="${member.id}" data-active="${member.active ? 'false' : 'true'}" ${self ? 'disabled' : ''}>${member.active ? 'Deactivate' : 'Reactivate'}</button>`}</td></tr>`;
     }).join('')}</tbody></table></div>${cache.staff.length ? '' : '<p class="empty-state">No staff profiles found.</p>'}<p id="staff-management-status" class="auth-message" role="status"></p>`;
   }
 
