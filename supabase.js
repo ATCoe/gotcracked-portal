@@ -7,13 +7,17 @@ window.supabaseClient = supabase.createClient(
     SUPABASE_ANON_KEY
 );
 
-const PORTAL_V1_FINAL_VERSION = '20260825-v1final6';
-if (!document.querySelector('link[data-gc-v1-final]')) {
-  const finalCss = document.createElement('link');
-  finalCss.rel = 'stylesheet';
-  finalCss.href = `portal-v1-final.css?v=${PORTAL_V1_FINAL_VERSION}`;
-  finalCss.dataset.gcV1Final = 'true';
-  document.head.appendChild(finalCss);
+const PORTAL_V1_FINAL_VERSION = '20260825-v1final7';
+for (const [href, key] of [
+  [`portal-v1-final.css?v=${PORTAL_V1_FINAL_VERSION}`, 'gcV1Final'],
+  [`portal-v1-mobile-nav.css?v=${PORTAL_V1_FINAL_VERSION}`, 'gcV1MobileNav']
+]) {
+  if (document.querySelector(`link[data-${key.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`)}]`)) continue;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  link.dataset[key] = 'true';
+  document.head.appendChild(link);
 }
 
 // Portal 1.0 operations is intentionally loaded after all legacy modules so it
