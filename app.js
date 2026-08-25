@@ -8,9 +8,6 @@
         'Ready for pickup': 'ready'
     }[value] || '');
 
-    const list = document.querySelector('#repair-list');
-    const table = document.querySelector('#repair-table');
-
     function getRepairs() {
         return Array.isArray(window.GotCrackedRepairs)
             ? window.GotCrackedRepairs
@@ -22,98 +19,107 @@
             items = [];
         }
 
+        const list =
+            document.querySelector('#repair-list');
+
+        const table =
+            document.querySelector('#repair-table');
+
         if (list) {
-            list.innerHTML = items.map(r => `
+            list.innerHTML = items.map(repair => `
                 <div
                     class="repair-row"
-                    data-ticket="${r.id}"
+                    data-ticket="${repair.id}"
                 >
                     <div class="device-icon">
-                        ${r.icon || '▯'}
+                        ${repair.icon || '▯'}
                     </div>
 
                     <div class="repair-customer">
                         <strong>
-                            ${r.customer || 'Unknown customer'}
+                            ${repair.customer || 'Unknown customer'}
                         </strong>
 
                         <small>
-                            ${r.device || 'Unknown device'}
+                            ${repair.device || 'Unknown device'}
                             ·
-                            ${r.service || 'No service listed'}
+                            ${repair.service || 'No service listed'}
                         </small>
                     </div>
 
                     <div class="repair-tech">
-                        ${r.tech || '—'}
+                        ${repair.tech || '—'}
                     </div>
 
                     <span
-                        class="status ${statusClass(r.status)}"
+                        class="status ${statusClass(repair.status)}"
                     >
-                        ${r.status || 'In diagnosis'}
+                        ${repair.status || 'In diagnosis'}
                     </span>
 
                     <div class="ticket-id">
-                        ${r.id || '—'}<br>
-                        ${r.updated || 'Recently updated'}
+                        ${repair.id || '—'}<br>
+                        ${repair.updated || 'Recently updated'}
                     </div>
                 </div>
             `).join('');
         }
 
         if (table) {
-            table.innerHTML = items.map(r => `
-                <tr data-ticket="${r.id}">
+            table.innerHTML = items.map(repair => `
+                <tr data-ticket="${repair.id}">
                     <td>
                         <strong>
-                            ${r.id || '—'}
+                            ${repair.id || '—'}
                         </strong>
 
                         <small>
-                            ${r.updated || 'Recently updated'}
+                            ${repair.updated || 'Recently updated'}
                         </small>
                     </td>
 
                     <td>
                         <strong>
-                            ${r.customer || 'Unknown customer'}
+                            ${repair.customer || 'Unknown customer'}
                         </strong>
 
                         <small>
-                            ${r.device || 'Unknown device'}
+                            ${repair.device || 'Unknown device'}
                         </small>
                     </td>
 
                     <td>
-                        ${r.service || 'No service listed'}
+                        ${repair.service || 'No service listed'}
                     </td>
 
                     <td>
-                        ${r.tech || '—'}
+                        ${repair.tech || '—'}
                     </td>
 
                     <td>
                         <span
-                            class="status ${statusClass(r.status)}"
+                            class="status ${statusClass(repair.status)}"
                         >
-                            ${r.status || 'In diagnosis'}
+                            ${repair.status || 'In diagnosis'}
                         </span>
                     </td>
 
                     <td>
-                        ${r.updated || 'Recently updated'}
+                        ${repair.updated || 'Recently updated'}
                     </td>
                 </tr>
             `).join('');
         }
 
-        const count = document.querySelector('#repair-count');
+        const count =
+            document.querySelector('#repair-count');
 
         if (count) {
-            count.textContent = getRepairs()
-                .filter(r => r.status !== 'Ready for pickup')
-                .length;
+            count.textContent =
+                getRepairs().filter(
+                    repair =>
+                        repair.status !== 'Ready for pickup'
+                ).length;
         }
     }
 
@@ -125,25 +131,30 @@
             document.querySelector('#status-filter');
 
         const query =
-            searchElement?.value?.trim().toLowerCase() || '';
+            searchElement?.value
+                ?.trim()
+                .toLowerCase() || '';
 
         const status =
             statusElement?.value || 'all';
 
-        const filtered = getRepairs().filter(repair => {
+        const filtered =
+            getRepairs().filter(repair => {
 
-            const matchesStatus =
-                status === 'all' ||
-                repair.status === status;
+                const matchesStatus =
+                    status === 'all' ||
+                    repair.status === status;
 
-            const searchableText =
-                Object.values(repair)
-                    .join(' ')
-                    .toLowerCase();
+                const searchableText =
+                    Object.values(repair)
+                        .join(' ')
+                        .toLowerCase();
 
-            return matchesStatus &&
-                searchableText.includes(query);
-        });
+                return (
+                    matchesStatus &&
+                    searchableText.includes(query)
+                );
+            });
 
         renderRepairs(filtered);
     }
@@ -151,9 +162,12 @@
     function showTicket(ticketId) {
         const repairs = getRepairs();
 
-        const ticket = repairs.find(
-            repair => String(repair.id) === String(ticketId)
-        );
+        const ticket =
+            repairs.find(
+                repair =>
+                    String(repair.id) ===
+                    String(ticketId)
+            );
 
         if (!ticket) {
             return;
@@ -163,7 +177,9 @@
             document.querySelector('#ticket-detail');
 
         const detailContent =
-            document.querySelector('#ticket-detail-content');
+            document.querySelector(
+                '#ticket-detail-content'
+            );
 
         if (!detailModal || !detailContent) {
             return;
@@ -289,6 +305,7 @@
                     window.location.hash = id;
                 }
             );
+
         });
 
     /*
@@ -329,8 +346,10 @@
                     if (ticketModal) {
                         ticketModal.showModal();
                     }
+
                 }
             );
+
         });
 
     /*
@@ -342,13 +361,18 @@
         event => {
 
             const row =
-                event.target.closest('[data-ticket]');
+                event.target.closest(
+                    '[data-ticket]'
+                );
 
             if (!row) {
                 return;
             }
 
-            showTicket(row.dataset.ticket);
+            showTicket(
+                row.dataset.ticket
+            );
+
         }
     );
 
@@ -364,16 +388,17 @@
 
                 document
                     .querySelector('.sidebar')
-                    ?.classList.toggle('open');
+                    ?.classList.toggle(
+                        'open'
+                    );
 
             }
         );
 
     /*
-     * Public UI API
+     * Compatibility layer.
      *
-     * workflow.js uses this instead of
-     * defining its own renderRepairs().
+     * workflow.js owns the actual repair data.
      */
 
     window.GotCrackedUI = {
@@ -381,6 +406,30 @@
         filterRepairs,
         showTicket
     };
+
+    /*
+     * portal-complete.js historically references
+     * "repairs" directly. Keep that reference pointed
+     * at the real application array.
+     */
+
+    try {
+        Object.defineProperty(
+            window,
+            'repairs',
+            {
+                configurable: true,
+                get() {
+                    return getRepairs();
+                }
+            }
+        );
+    } catch (error) {
+        console.warn(
+            'Could not create repairs compatibility alias.',
+            error
+        );
+    }
 
     console.log('APP.JS LOADED');
 })();
