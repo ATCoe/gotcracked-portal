@@ -11,6 +11,7 @@
   const training = () => localStorage.getItem('gc-training-store') === '1';
   const managementRole = role => ['owner','manager'].includes(role);
   const snapshotRole = role => ['owner','manager','front_desk'].includes(role);
+  const showFormError = (form,error,context='Failure to update sales') => {const message=error?.message||String(error||'Unknown error');const status=form.querySelector('.auth-message');if(status)status.textContent=message;window.GotCrackedDiagnostics?.error(error,{context});};
   const methodLabels = {
     manual_override:'Manual goal', scheduled_labor_x_splh:'Scheduled labor × SPLH', weekly_forecast_by_labor_share:'Weekly forecast allocation',
     launch_baseline:'Launch baseline', adaptive_launch:'Adaptive launch goal', adaptive_history:'Adaptive historical goal', history_only:'Historical average', unset:'Goal not configured'
@@ -320,7 +321,7 @@
         ensureDialog().close(); return renderDashboard();
       }
       const result = await client.rpc('record_pos_sales_snapshot', { net_sales_cents:dollarsToCents(d.net_sales), transaction_count:d.transaction_count ? Number(d.transaction_count) : null, note:d.note?.trim() || null });
-      if (result.error) return form.querySelector('.auth-message').textContent = result.error.message;
+      if (result.error) return showFormError(form,result.error,'Failure to update POS sales');
       ensureDialog().close(); await loadSummary();
     }
 
@@ -332,7 +333,7 @@
         ensureDialog().close(); return renderDashboard();
       }
       const result = await client.rpc('set_daily_sales_goal', { target_date:summary?.business_date || todayLocal(), goal_cents:dollarsToCents(d.goal), reason:d.reason?.trim() || null });
-      if (result.error) return form.querySelector('.auth-message').textContent = result.error.message;
+      if (result.error) return showFormError(form,result.error,'Failure to update sales goal');
       ensureDialog().close(); await loadSummary();
     }
 
@@ -342,7 +343,7 @@
       if (training()) return;
       const result = await client.rpc('save_sales_goal_settings', { launch_daily_goal_cents:d.launch_goal ? dollarsToCents(d.launch_goal) : null, adaptive_enabled:d.adaptive === 'true', growth_target_pct:Number(d.growth_target || 0) });
       const status = form.querySelector('.auth-message');
-      if (result.error) return status.textContent = result.error.message;
+      if (result.error) return showFormError(form,result.error,'Failure to save finance settings');
       status.textContent = 'Finance settings saved.';
       await loadSettings(); await loadSummary(); ensureSettingsPanel();
     }
@@ -360,7 +361,7 @@
         cash_tender_cents:dollarsToCents(d.cash_tender), card_tender_cents:dollarsToCents(d.card_tender), other_tender_cents:dollarsToCents(d.other_tender), transaction_count:d.transaction_count ? Number(d.transaction_count) : null,
         opening_cash_cents:dollarsToCents(d.opening_cash), cash_paid_out_cents:dollarsToCents(d.cash_paid_out), actual_drawer_cents:dollarsToCents(d.actual_drawer), notes:d.notes?.trim() || null
       });
-      if (result.error) return form.querySelector('.auth-message').textContent = result.error.message;
+      if (result.error) return showFormError(form,result.error,'Failure to close business day');
       ensureDialog().close(); await loadSummary();
     }
   });

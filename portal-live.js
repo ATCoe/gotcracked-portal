@@ -396,7 +396,7 @@
         shipping_charge_cents: Math.round(Number(data.shipping_charge || 0) * 100)
       }, new_line: newLine, manual_discount_cents: Math.round(Number(data.manual_discount || 0) * 100), manual_discount_reason: data.discount_reason?.trim() || null, entered_promo_code: data.promo_code?.trim() || null });
     }
-    if (result?.error) { status.textContent = result.error.message; button.disabled = false; return; }
+    if (result?.error) { status.textContent = result.error.message; window.GotCrackedDiagnostics?.error(result.error,{context:data.kind==='repair'?'Failure to save work order':'Failure to save Portal entry'}); button.disabled = false; return; }
     if (data.kind === 'adjustment' && Number(data.quantity_delta) > 0 && cache.settings?.label_prompt_on_receive !== false) {
       const item = cache.inventory.find(row => row.id === data.id);
       if (item && confirm(`${data.quantity_delta} unit(s) received. Print a DYMO SKU barcode label now? Use the print dialog's Copies setting for multiple identical parts.`)) printDymoLabel({ title: item.name, subtitle: `Received ${data.quantity_delta} · ${item.category || 'GotCracked inventory'}`, code: item.sku, price: money(item.sell_price_cents) });
@@ -508,3 +508,4 @@
   setTimeout(loadData, 700);
   client.channel('portal-live').on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, loadData).on('postgres_changes', { event: '*', schema: 'public', table: 'repair_tickets' }, loadData).on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, loadData).subscribe();
 })();
+

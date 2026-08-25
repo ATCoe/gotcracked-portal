@@ -194,6 +194,7 @@
       try { await ops()?.reload?.(); } catch {}
     } catch (error) {
       status.textContent = error?.message || 'Unable to complete the sale.';
+      window.GotCrackedDiagnostics?.error(error,{context:'Failure to complete work order sale'});
       button.disabled = false;
       button.textContent = 'Confirm Sale Complete';
     }
@@ -231,6 +232,7 @@
       button.textContent = 'Email sent';
     } catch (error) {
       status.textContent = error?.message || 'Unable to send receipt.';
+      window.GotCrackedDiagnostics?.error(error,{context:'Failure to email receipt'});
       button.disabled = false;
       button.textContent = 'Email receipt';
     }
@@ -290,3 +292,4 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(watchWorkOrder,0), { once:true });
   else setTimeout(watchWorkOrder,0);
 })();
+

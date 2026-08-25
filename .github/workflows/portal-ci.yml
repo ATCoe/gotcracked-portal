@@ -104,6 +104,10 @@ jobs:
               raise SystemExit('app.js must not recreate the retired full-screen mobile backdrop.')
           if 'hardening.css' in app:
               raise SystemExit('app.js must not dynamically inject hardening.css.')
+          if 'window.GotCrackedDiagnostics = diagnostics' not in app or 'unhandledrejection' not in app:
+              raise SystemExit('Global live diagnostics must remain available.')
+          if '.gc-diagnostic-stack' not in release or 'data-gc-copy-diagnostic' not in app:
+              raise SystemExit('Diagnostic toast UI or copyable reference is missing.')
 
           if 'attributes: true' in final_js or "attributeFilter: ['class'" in final_js:
               raise SystemExit('portal-v1-final.js must not globally observe class/attribute mutations.')

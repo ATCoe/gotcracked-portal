@@ -1,6 +1,58 @@
 (() => {
   'use strict';
 
+  /* Staff-facing live diagnostics. Messages intentionally contain only the
+     operation and provider error text—never form values or customer records. */
+  const diagnostics = (() => {
+    let sequence = 0;
+    const normalize = value => String(value?.message || value || 'Unknown error').replace(/\s+/g,' ').trim().slice(0,500);
+    const ensureHost = () => {
+      let host = document.getElementById('gc-diagnostic-stack');
+      if (host) return host;
+      host = document.createElement('section');
+      host.id = 'gc-diagnostic-stack';
+      host.className = 'gc-diagnostic-stack';
+      host.setAttribute('aria-label','Portal diagnostics');
+      host.setAttribute('aria-live','assertive');
+      document.body.appendChild(host);
+      return host;
+    };
+    const report = (error, options = {}) => {
+      const message = normalize(error);
+      const context = normalize(options.context || 'Portal operation failed');
+      const id = `GC-${new Date().toISOString().slice(11,19).replaceAll(':','')}-${String(++sequence).padStart(2,'0')}`;
+      const time = new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'});
+      const card = document.createElement('article');
+      card.className = 'gc-diagnostic';
+      card.dataset.diagnosticId = id;
+      card.innerHTML = `<div class="gc-diagnostic-icon" aria-hidden="true">!</div><div class="gc-diagnostic-copy"><strong></strong><p></p><small></small><div class="gc-diagnostic-actions"><button type="button" data-gc-copy-diagnostic>Copy reference</button><button type="button" data-gc-dismiss-diagnostic>Dismiss</button></div></div>`;
+      card.querySelector('strong').textContent = context;
+      card.querySelector('p').textContent = message;
+      card.querySelector('small').textContent = `${id} · ${time}`;
+      card.dataset.copyText = `${id} | ${time} | ${context} | ${message}`;
+      const host = ensureHost();
+      host.prepend(card);
+      while (host.children.length > 4) host.lastElementChild.remove();
+      setTimeout(() => card.classList.add('is-visible'), 20);
+      setTimeout(() => dismiss(card), Number(options.duration || 12000));
+      return id;
+    };
+    const dismiss = card => { if (!card?.isConnected) return; card.classList.remove('is-visible'); setTimeout(() => card.remove(), 180); };
+    document.addEventListener('click', async event => {
+      const card = event.target.closest?.('.gc-diagnostic');
+      if (!card) return;
+      if (event.target.closest('[data-gc-dismiss-diagnostic]')) dismiss(card);
+      if (event.target.closest('[data-gc-copy-diagnostic]')) {
+        try { await navigator.clipboard.writeText(card.dataset.copyText || ''); event.target.textContent = 'Copied'; }
+        catch { event.target.textContent = 'Copy failed'; }
+      }
+    });
+    window.addEventListener('unhandledrejection', event => report(event.reason, {context:'Unexpected Portal failure'}));
+    window.addEventListener('error', event => report(event.error || event.message, {context:'Portal script failure'}));
+    return { error:report };
+  })();
+  window.GotCrackedDiagnostics = diagnostics;
+
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({
     '&': '&amp;',
     '<': '&lt;',
@@ -222,3 +274,4 @@
 
   window.GotCrackedUI = { renderRepairs, filterRepairs, showTicket, activateView, setMobileMenu };
 })();
+

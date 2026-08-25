@@ -123,7 +123,7 @@
       if (repairs.error) throw repairs.error; if (leads.error) throw leads.error; state.data.repairs=repairs.data||[]; state.data.leads=leads.data||[];
       const leadBadge=document.querySelector('#lead-count'); if (leadBadge) { const count=state.data.leads.filter(lead=>!LEAD_TERMINAL.has(leadStage(lead))).length; leadBadge.textContent=String(count); leadBadge.hidden=count===0; }
       state.loaded=true;
-    } catch (error) { console.error('GotCracked directory failed to load',error); document.querySelectorAll('.gc-dir-summary').forEach(node=>{node.textContent=`Directory refresh failed: ${error.message||'Unknown error'}`;}); }
+    } catch (error) { console.error('GotCracked directory failed to load',error); window.GotCrackedDiagnostics?.error(error,{context:'Failure to refresh Portal directory'}); document.querySelectorAll('.gc-dir-summary').forEach(node=>{node.textContent=`Directory refresh failed: ${error.message||'Unknown error'}`;}); }
     finally { state.loading=false; renderVisible(); }
   }
   function renderVisible() { if (document.querySelector('#dashboard')) renderShell('dashboard'); if (document.querySelector('#leads #portal-leads')) renderShell('leads'); }
