@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="assets/gotcracked-favicon.png" />
+    <link rel="canonical" href="https://portal.gotcracked.co/" />
     <title>GotCracked | Portal</title>
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="workflow.css" />
@@ -11,70 +12,26 @@
   </head>
   <body>
     <section id="login-screen" class="login-screen">
-
-    <div class="login-card">
-
-        <img 
-            src="YOUR_LOGO_PATH_HERE"
-            class="login-logo"
-            alt="GotCracked"
-        >
-
-        <h1>GotCracked Portal</h1>
-
-        <p class="subtitle">
-            Staff access only
-        </p>
-
-
-        <form id="login-form">
-
-            <label>
-                Work email
-
-                <input
-                    id="login-email"
-                    type="email"
-                    placeholder="name@gotcracked.co"
-                    required
-                >
-
-            </label>
-
-
-            <label>
-                Password
-
-                <input
-                    id="login-password"
-                    type="password"
-                    placeholder="Password"
-                    required
-                >
-
-            </label>
-
-
-            <button 
-                class="primary-button"
-                type="submit"
-            >
-                Sign in to portal
-            </button>
-
-
-        </form>
-
-
-        <p id="login-error" class="error-message"></p>
-
-    </div>
-
-</section>
-    <section id="login-screen" class="login-screen">
-      <div class="login-panel"><a class="brand login-brand" href="#"><span class="brand-mark">G</span><span>Got<span>Cracked</span></span></a><p class="eyebrow">Staff portal</p><h1>Welcome back.</h1><p class="subtle">Sign in to manage today’s repair work.</p><form id="login-form"><label>Work email<input id="login-email" type="email" required placeholder="name@gotcracked.co"></label><label>Password<input id="login-password" type="password" required placeholder="Password"></label><button class="primary-button" type="submit">Sign in to portal</button></form><p class="demo-note">
-Authorized GotCracked staff only. Use your company email to sign in.
-</p>
+      <div class="login-panel">
+        <img class="login-logo" src="assets/gotcracked-portal-logo.png" alt="GotCracked" />
+        <div id="sign-in-panel">
+          <p class="eyebrow">Staff portal</p><h1>Welcome back.</h1><p class="subtle">Sign in to manage today’s repair work.</p>
+          <form id="login-form"><label>Work email<input id="login-email" type="email" required autocomplete="email" placeholder="name@gotcracked.co"></label><label>Password<input id="login-password" type="password" required autocomplete="current-password" placeholder="Password"></label><button class="primary-button" type="submit">Sign in to portal</button></form>
+          <button id="forgot-password" class="text-button" type="button">Forgot password?</button>
+          <p id="login-error" class="error-message" role="alert"></p>
+          <p class="demo-note">Authorized GotCracked staff only. Use your company email to sign in.</p>
+        </div>
+        <div id="forgot-password-panel" class="auth-panel hidden" aria-hidden="true">
+          <p class="eyebrow">Account recovery</p><h1>Reset your password</h1><p class="subtle">Enter your work email and we’ll send a secure reset link.</p>
+          <form id="forgot-password-form"><label>Work email<input id="reset-email" type="email" required autocomplete="email" placeholder="name@gotcracked.co"></label><button class="primary-button" type="submit">Send reset link</button></form>
+          <button class="text-button" type="button" data-show-sign-in>Back to sign in</button><p id="forgot-password-message" class="auth-message" role="status"></p>
+        </div>
+        <div id="new-password-panel" class="auth-panel hidden" aria-hidden="true">
+          <p class="eyebrow">Account recovery</p><h1>Create a new password</h1><p class="subtle">Choose a password with at least 8 characters.</p>
+          <form id="new-password-form"><label>New password<input id="new-password" type="password" required minlength="8" autocomplete="new-password"></label><label>Confirm new password<input id="confirm-password" type="password" required minlength="8" autocomplete="new-password"></label><button class="primary-button" type="submit">Save new password</button></form>
+          <p id="new-password-message" class="auth-message" role="status"></p>
+        </div>
+      </div>
       <div class="login-aside"><div><p class="eyebrow">GotCracked operations</p><h2>Every repair.<br />One clear workflow.</h2><p>Intake, repair status, parts, customer communication, and pickup—kept together.</p></div></div>
     </section>
     <div class="app-shell">
@@ -83,6 +40,7 @@ Authorized GotCracked staff only. Use your company email to sign in.
     <img src="assets/gotcracked-portal-logo.png" alt="GotCracked" class="brand-logo">
 </a>
         <nav aria-label="Main navigation">
+          <a class="nav-link" href="https://gotcracked.co/"><span>↗</span>Customer site</a>
           <a class="nav-link active" href="#dashboard" data-view="dashboard"><span>▦</span>Dashboard</a>
           <a class="nav-link" href="#repairs" data-view="repairs"><span>⌁</span>Repairs <b id="repair-count">5</b></a>
           <a class="nav-link" href="#appointments" data-view="appointments"><span>◷</span>Appointments</a>

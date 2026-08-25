@@ -66,3 +66,5 @@
     margin-top:8px;
     padding:12px;
 }
+
+.login-panel .login-logo{display:block;width:min(280px,100%);height:auto;margin:0 auto 18px}.auth-panel.hidden,.hidden{display:none!important}.text-button{margin-top:15px;padding:0;border:0;background:transparent;color:#4fa3ff;font:inherit;font-weight:700;cursor:pointer}.text-button:hover{text-decoration:underline}.auth-message{min-height:1.25em;margin:16px 0 0;color:#a8d6ff;font-size:14px}.auth-message.error,.error-message{color:#ff9292}.login-panel label{display:grid;gap:7px;margin-top:16px;font-weight:700;color:#dce6f6}.login-panel input{box-sizing:border-box;width:100%;margin:0;padding:12px;border:1px solid #34435b;border-radius:8px;background:#0b1220;color:#fff}.login-panel .primary-button{width:100%;margin-top:22px}

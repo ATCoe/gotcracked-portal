@@ -3,354 +3,893 @@
 
     console.log('WORKFLOW.JS LOADED');
 
-    const supabase = window.supabaseClient;
+    /*
+     * Single source of truth for repairs.
+     *
+     * app.js reads this array.
+     * workflow.js owns the data.
+     */
 
-    if (!supabase) {
-        console.error('SUPABASE CLIENT NOT FOUND');
-        return;
-    }
+    window.GotCrackedRepairs = [];
 
-    const loginScreen = document.querySelector('#login-screen');
-    const loginForms = document.querySelectorAll('#login-form');
+    const loginScreen =
+        document.querySelector('#login-screen');
 
-    console.log('LOGIN FORMS FOUND:', loginForms.length);
+    const loginForm =
+        document.querySelector('#login-form');
 
-    function getLoginErrorElement() {
-        let element = document.querySelector('#login-error');
+    const loginEmail =
+        document.querySelector('#login-email');
 
-        if (!element && loginForms.length) {
-            element = document.createElement('div');
-            element.id = 'login-error';
-            element.setAttribute('role', 'alert');
+    const loginPassword =
+        document.querySelector('#login-password');
 
-            element.style.marginTop = '12px';
-            element.style.padding = '10px 12px';
-            element.style.borderRadius = '8px';
-            element.style.background = '#fee2e2';
-            element.style.color = '#991b1b';
-            element.style.fontSize = '14px';
+    const loginError =
+        document.querySelector('#login-error');
 
-            loginForms[0].appendChild(element);
+    const signOutButton =
+        document.querySelector('#sign-out');
+
+    const signInPanel =
+        document.querySelector('#sign-in-panel');
+
+    const forgotPasswordPanel =
+        document.querySelector('#forgot-password-panel');
+
+    const newPasswordPanel =
+        document.querySelector('#new-password-panel');
+
+    const forgotPasswordForm =
+        document.querySelector('#forgot-password-form');
+
+    const newPasswordForm =
+        document.querySelector('#new-password-form');
+
+    let recoveryMode =
+        window.location.hash.includes('type=recovery');
+
+    /*
+     * Helpers
+     */
+
+    function renderRepairs() {
+        if (window.GotCrackedUI?.renderRepairs) {
+            window.GotCrackedUI.renderRepairs(
+                window.GotCrackedRepairs
+            );
         }
-
-        return element;
     }
 
     function showLoginError(message) {
-        const element = getLoginErrorElement();
+        console.error(
+            'LOGIN ERROR:',
+            message
+        );
 
-        if (element) {
-            element.textContent = message;
-            element.style.display = 'block';
+        if (loginError) {
+            loginError.textContent =
+                message;
+
+            loginError.style.display =
+                'block';
         }
-
-        console.error('LOGIN ERROR:', message);
     }
 
     function clearLoginError() {
-        const element = getLoginErrorElement();
+        if (loginError) {
+            loginError.textContent = '';
 
-        if (element) {
-            element.textContent = '';
-            element.style.display = 'none';
+            loginError.style.display =
+                'none';
         }
+    }
+
+    function setMessage(element, message, isError = false) {
+        if (!element) {
+            return;
+        }
+
+        element.textContent = message;
+        element.classList.toggle('error', isError);
+    }
+
+    function showAuthPanel(panel) {
+        [signInPanel, forgotPasswordPanel, newPasswordPanel]
+            .forEach(item => {
+                if (!item) {
+                    return;
+                }
+
+                const active = item === panel;
+                item.classList.toggle('hidden', !active);
+                item.setAttribute('aria-hidden', String(!active));
+            });
+
+        if (loginScreen) {
+            loginScreen.classList.remove('hidden');
+        }
+    }
+
+    function clearRecoveryUrl() {
+        window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname + window.location.search
+        );
+    }
+
+    function showRecoveryPanel() {
+        recoveryMode = true;
+        showAuthPanel(newPasswordPanel);
+        setMessage(
+            document.querySelector('#new-password-message'),
+            'Use the form below to set your new password.'
+        );
+        document.querySelector('#new-password')?.focus();
     }
 
     function setStaff(staff) {
-        const nameElement = document.querySelector('#staff-name');
-        const roleElement = document.querySelector('#staff-role');
-        const initialsElement = document.querySelector('#staff-initials');
+
+        const nameElement =
+            document.querySelector('#staff-name');
+
+        const roleElement =
+            document.querySelector('#staff-role');
+
+        const initialsElement =
+            document.querySelector('#staff-initials');
 
         if (nameElement) {
-            nameElement.textContent = staff.name || staff.email || 'Staff';
+            nameElement.textContent =
+                staff.name || 'Staff';
         }
 
         if (roleElement) {
-            roleElement.textContent = staff.role || 'Staff';
+            roleElement.textContent =
+                staff.role || 'Staff';
         }
 
         if (initialsElement) {
-            const source = staff.name || staff.email || 'GC';
 
-            initialsElement.textContent = source
-                .split(/\s+/)
-                .map(part => part[0])
-                .join('')
-                .slice(0, 2)
-                .toUpperCase();
+            initialsElement.textContent =
+                (staff.name || 'Staff')
+                    .split(' ')
+                    .filter(Boolean)
+                    .map(part => part[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase();
         }
     }
 
-    async function loadProfile(userId, email) {
-        try {
-            const {
-                data: profile,
+    /*
+     * Load staff profile
+     */
+
+    async function loadProfile(userId) {
+
+        console.log(
+            'Loading staff profile:',
+            userId
+        );
+
+        const {
+            data: profile,
+            error
+        } = await window.supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+        if (error) {
+
+            console.error(
+                'PROFILE LOAD FAILED:',
                 error
-            } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .maybeSingle();
-
-            if (error) {
-                console.warn('PROFILE LOAD FAILED:', error);
-
-                const fallbackStaff = {
-                    id: userId,
-                    name: email || 'Staff',
-                    role: 'Staff',
-                    email: email || ''
-                };
-
-                sessionStorage.setItem(
-                    'gotcracked-staff',
-                    JSON.stringify(fallbackStaff)
-                );
-
-                setStaff(fallbackStaff);
-
-                return fallbackStaff;
-            }
-
-            const staff = {
-                id: userId,
-                name: profile?.display_name || email || 'Staff',
-                role: profile?.role || 'Staff',
-                email: email || ''
-            };
-
-            sessionStorage.setItem(
-                'gotcracked-staff',
-                JSON.stringify(staff)
             );
 
-            setStaff(staff);
-
-            if (profile?.must_change_password) {
-                window.location.href = '/setup-password.html';
-                return staff;
-            }
-
-            return staff;
-
-        } catch (error) {
-            console.error('PROFILE EXCEPTION:', error);
-
-            const fallbackStaff = {
-                id: userId,
-                name: email || 'Staff',
-                role: 'Staff',
-                email: email || ''
-            };
-
-            sessionStorage.setItem(
-                'gotcracked-staff',
-                JSON.stringify(fallbackStaff)
+            showLoginError(
+                'Your account signed in, but your staff profile could not be loaded.'
             );
 
-            setStaff(fallbackStaff);
-
-            return fallbackStaff;
+            return false;
         }
+
+        if (!profile) {
+
+            showLoginError(
+                'Your account signed in, but no staff profile was found.'
+            );
+
+            return false;
+        }
+
+        const staff = {
+            id: userId,
+            name:
+                profile.display_name ||
+                'Staff',
+            role:
+                profile.role ||
+                'Staff'
+        };
+
+        sessionStorage.setItem(
+            'gotcracked-staff',
+            JSON.stringify(staff)
+        );
+
+        setStaff(staff);
+
+        if (profile.must_change_password) {
+
+            window.location.href =
+                '/setup-password.html';
+
+            return true;
+        }
+
+        if (loginScreen) {
+            loginScreen.classList.add('hidden');
+        }
+
+        console.log(
+            'STAFF PROFILE LOADED:',
+            staff.name
+        );
+
+        return true;
     }
 
-    async function handleLogin(event) {
-        event.preventDefault();
-        event.stopPropagation();
+    /*
+     * Load repairs.
+     *
+     * IMPORTANT:
+     * This is NOT called until a valid authenticated
+     * session exists.
+     *
+     * This prevents the previous:
+     *
+     * 42501 permission denied
+     *
+     * anonymous RLS error.
+     */
 
-        console.log('LOGIN SUBMIT HANDLER FIRED');
+    async function loadRepairs() {
 
-        clearLoginError();
+        if (!window.supabaseClient) {
 
-        const form = event.currentTarget;
+            console.error(
+                'REPAIR LOAD FAILED: Supabase client unavailable.'
+            );
 
-        const emailInput = form.querySelector(
-            '#login-email, [name="email"], input[type="email"]'
+            return;
+        }
+
+        console.log(
+            'Loading repair tickets...'
         );
 
-        const passwordInput = form.querySelector(
-            '#login-password, [name="password"], input[type="password"]'
+        const {
+            data,
+            error
+        } = await window.supabaseClient
+            .from('repair_tickets')
+            .select(`
+                *,
+                customers (
+                    first_name,
+                    last_name
+                ),
+                devices (
+                    model
+                ),
+                profiles:assigned_user_id (
+                    display_name
+                )
+            `)
+            .order(
+                'ticket_number',
+                {
+                    ascending: false
+                }
+            );
+
+        if (error) {
+
+            console.error(
+                'REPAIR LOAD FAILED:',
+                error
+            );
+
+            return;
+        }
+
+        window.GotCrackedRepairs =
+            (data || []).map(ticket => {
+
+                const firstName =
+                    ticket.customers?.first_name ||
+                    '';
+
+                const lastName =
+                    ticket.customers?.last_name ||
+                    '';
+
+                const customerName =
+                    `${firstName} ${lastName}`
+                        .trim();
+
+                return {
+
+                    id:
+                        ticket.ticket_number,
+
+                    customer:
+                        customerName ||
+                        ticket.customer_id ||
+                        'Unknown customer',
+
+                    device:
+                        ticket.devices?.model ||
+                        ticket.device_id ||
+                        'Unknown device',
+
+                    service:
+                        ticket.customer_issue ||
+                        'No service listed',
+
+                    tech:
+                        ticket.profiles?.display_name ||
+                        ticket.assigned_user_id ||
+                        '—',
+
+                    status:
+                        ticket.status ||
+                        'In diagnosis',
+
+                    updated:
+                        ticket.updated_at
+                            ? new Date(
+                                ticket.updated_at
+                            ).toLocaleString()
+                            : 'Recently updated',
+
+                    icon:
+                        '▯'
+                };
+            });
+
+        console.log(
+            'REPAIR TICKETS LOADED:',
+            window.GotCrackedRepairs.length
         );
 
-        if (!emailInput || !passwordInput) {
-            showLoginError('Login form fields could not be found.');
-            return false;
+        renderRepairs();
+    }
+
+    /*
+     * Authentication / session
+     */
+
+    async function loadSession() {
+
+        if (!window.supabaseClient) {
+
+            console.error(
+                'AUTH FAILED: Supabase client unavailable.'
+            );
+
+            showLoginError(
+                'The portal could not connect to authentication.'
+            );
+
+            return;
         }
 
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
+        console.log(
+            'AUTH STATE: INITIAL_SESSION'
+        );
 
-        if (!email || !password) {
-            showLoginError('Please enter your email and password.');
-            return false;
+        if (recoveryMode) {
+            showRecoveryPanel();
+            return;
         }
-
-        const submitButton =
-            form.querySelector('button[type="submit"], input[type="submit"]');
-
-        if (submitButton) {
-            submitButton.disabled = true;
-            submitButton.dataset.originalText =
-                submitButton.textContent || submitButton.value || '';
-
-            if (submitButton.tagName === 'BUTTON') {
-                submitButton.textContent = 'Signing in...';
-            } else {
-                submitButton.value = 'Signing in...';
-            }
-        }
-
-        console.log('ATTEMPTING SUPABASE LOGIN:', email);
 
         try {
+
             const {
                 data,
                 error
-            } = await supabase.auth.signInWithPassword({
-                email,
-                password
-            });
-
-            console.log('SUPABASE LOGIN RESULT:', {
-                success: !error,
-                userId: data?.user?.id || null,
-                error: error?.message || null
-            });
+            } =
+            await window.supabaseClient
+                .auth.getSession();
 
             if (error) {
-                showLoginError(error.message || 'Unable to sign in.');
-                return false;
+
+                console.error(
+                    'SESSION LOAD FAILED:',
+                    error
+                );
+
+                return;
+            }
+
+            const session =
+                data?.session;
+
+            if (!session) {
+
+                console.log(
+                    'NO ACTIVE SESSION'
+                );
+
+                /*
+                 * DO NOT load repairs here.
+                 *
+                 * Anonymous users do not have
+                 * permission to read repair_tickets.
+                 */
+
+                return;
+            }
+
+            console.log(
+                'EXISTING SESSION:',
+                session.user.email
+            );
+
+            const profileLoaded =
+                await loadProfile(
+                    session.user.id
+                );
+
+            if (profileLoaded) {
+                await loadRepairs();
+            }
+
+        } catch (error) {
+
+            console.error(
+                'SESSION ERROR:',
+                error
+            );
+        }
+    }
+
+    /*
+     * Password recovery
+     */
+
+    document
+        .querySelector('#forgot-password')
+        ?.addEventListener('click', () => {
+            clearLoginError();
+            setMessage(
+                document.querySelector('#forgot-password-message'),
+                ''
+            );
+            showAuthPanel(forgotPasswordPanel);
+            document.querySelector('#reset-email')?.focus();
+        });
+
+    document
+        .querySelector('[data-show-sign-in]')
+        ?.addEventListener('click', () => {
+            showAuthPanel(signInPanel);
+            loginEmail?.focus();
+        });
+
+    forgotPasswordForm?.addEventListener(
+        'submit',
+        async event => {
+            event.preventDefault();
+
+            const message =
+                document.querySelector('#forgot-password-message');
+
+            const email =
+                document.querySelector('#reset-email')?.value?.trim();
+
+            if (!email) {
+                setMessage(message, 'Enter your work email.', true);
+                return;
+            }
+
+            if (!window.supabaseClient) {
+                setMessage(
+                    message,
+                    'The portal could not connect to authentication. Please refresh and try again.',
+                    true
+                );
+                return;
+            }
+
+            const button =
+                forgotPasswordForm.querySelector('button[type="submit"]');
+
+            button.disabled = true;
+            button.textContent = 'Sending…';
+            setMessage(message, '');
+
+            try {
+                const { error } = await window.supabaseClient
+                    .auth.resetPasswordForEmail(email, {
+                        redirectTo:
+                            window.location.origin +
+                            window.location.pathname
+                    });
+
+                if (error) {
+                    throw error;
+                }
+
+                setMessage(
+                    message,
+                    'If this email belongs to a staff account, a reset link has been sent.'
+                );
+            } catch (error) {
+                console.error('PASSWORD RESET REQUEST FAILED:', error);
+                setMessage(
+                    message,
+                    error?.message || 'Unable to send the reset link. Please try again.',
+                    true
+                );
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Send reset link';
+            }
+        }
+    );
+
+    newPasswordForm?.addEventListener(
+        'submit',
+        async event => {
+            event.preventDefault();
+
+            const message =
+                document.querySelector('#new-password-message');
+
+            const password =
+                document.querySelector('#new-password')?.value || '';
+
+            const confirmation =
+                document.querySelector('#confirm-password')?.value || '';
+
+            if (password.length < 8) {
+                setMessage(message, 'Use a password with at least 8 characters.', true);
+                return;
+            }
+
+            if (password !== confirmation) {
+                setMessage(message, 'The passwords do not match.', true);
+                return;
+            }
+
+            const button =
+                newPasswordForm.querySelector('button[type="submit"]');
+
+            button.disabled = true;
+            button.textContent = 'Saving…';
+            setMessage(message, '');
+
+            try {
+                const { error } = await window.supabaseClient
+                    .auth.updateUser({ password });
+
+                if (error) {
+                    throw error;
+                }
+
+                await window.supabaseClient.auth.signOut();
+                clearRecoveryUrl();
+                recoveryMode = false;
+                newPasswordForm.reset();
+                showAuthPanel(signInPanel);
+                setMessage(
+                    document.querySelector('#login-error'),
+                    'Password updated. Sign in with your new password.'
+                );
+                loginEmail?.focus();
+            } catch (error) {
+                console.error('PASSWORD UPDATE FAILED:', error);
+                setMessage(
+                    message,
+                    error?.message || 'Unable to save the new password. Request another reset link and try again.',
+                    true
+                );
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Save new password';
+            }
+        }
+    );
+
+    window.supabaseClient?.auth.onAuthStateChange(
+        event => {
+            if (event === 'PASSWORD_RECOVERY') {
+                showRecoveryPanel();
+            }
+        }
+    );
+
+    /*
+     * Login
+     */
+
+    let loginInProgress = false;
+
+    async function handleLogin(event) {
+
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        if (loginInProgress) {
+            return;
+        }
+
+        loginInProgress = true;
+
+        console.log(
+            'LOGIN SUBMIT FIRED'
+        );
+
+        clearLoginError();
+
+        if (!window.supabaseClient) {
+
+            showLoginError(
+                'Authentication is not available. Please refresh the portal.'
+            );
+
+            loginInProgress = false;
+
+            return;
+        }
+
+        const email =
+            loginEmail?.value?.trim() || '';
+
+        const password =
+            loginPassword?.value || '';
+
+        if (!email) {
+
+            showLoginError(
+                'Please enter your work email.'
+            );
+
+            loginEmail?.focus();
+
+            loginInProgress = false;
+
+            return;
+        }
+
+        if (!password) {
+
+            showLoginError(
+                'Please enter your password.'
+            );
+
+            loginPassword?.focus();
+
+            loginInProgress = false;
+
+            return;
+        }
+
+        const submitButton =
+            loginForm?.querySelector(
+                'button[type="submit"]'
+            );
+
+        if (submitButton) {
+
+            submitButton.disabled = true;
+
+            submitButton.textContent =
+                'Signing in...';
+        }
+
+        console.log(
+            'AUTH REQUEST:',
+            email
+        );
+
+        try {
+
+            const {
+                data,
+                error
+            } =
+            await window.supabaseClient
+                .auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+            console.log(
+                'AUTH RESPONSE:',
+                {
+                    user:
+                        data?.user?.id ||
+                        null,
+
+                    error:
+                        error?.message ||
+                        null
+                }
+            );
+
+            if (error) {
+
+                showLoginError(
+                    error.message ||
+                    'Unable to sign in.'
+                );
+
+                return;
             }
 
             if (!data?.user) {
-                showLoginError('Login succeeded but no user session was returned.');
-                return false;
+
+                showLoginError(
+                    'Sign-in completed without a user account.'
+                );
+
+                return;
             }
 
-            console.log('LOGIN SUCCESS:', data.user.id);
-
-            await loadProfile(
-                data.user.id,
-                data.user.email || email
+            console.log(
+                'LOGIN SUCCESS:',
+                data.user.email
             );
 
-            if (loginScreen) {
-                loginScreen.classList.add('hidden');
+            const profileLoaded =
+                await loadProfile(
+                    data.user.id
+                );
+
+            if (!profileLoaded) {
+                return;
             }
 
-            form.reset();
-
-            console.log('LOGIN COMPLETE');
-
-            return false;
+            await loadRepairs();
 
         } catch (error) {
-            console.error('LOGIN EXCEPTION:', error);
+
+            console.error(
+                'LOGIN EXCEPTION:',
+                error
+            );
 
             showLoginError(
                 error?.message ||
                 'An unexpected error occurred while signing in.'
             );
 
-            return false;
-
         } finally {
+
             if (submitButton) {
-                submitButton.disabled = false;
 
-                const originalText =
-                    submitButton.dataset.originalText || 'Sign in';
+                submitButton.disabled =
+                    false;
 
-                if (submitButton.tagName === 'BUTTON') {
-                    submitButton.textContent = originalText;
-                } else {
-                    submitButton.value = originalText;
-                }
+                submitButton.textContent =
+                    'Sign in to portal';
             }
+
+            loginInProgress = false;
         }
     }
 
-    loginForms.forEach(form => {
-        form.addEventListener('submit', handleLogin, true);
-    });
+    /*
+     * Login event wiring
+     */
 
-    console.log('LOGIN HANDLER LOADED');
+    if (loginForm) {
 
-    async function loadSession() {
-        console.log('AUTH STATE: CHECKING SESSION');
-
-        try {
-            const {
-                data,
-                error
-            } = await supabase.auth.getSession();
-
-            if (error) {
-                console.error('SESSION ERROR:', error);
-                return;
-            }
-
-            const session = data?.session;
-
-            if (!session) {
-                console.log('NO ACTIVE SESSION');
-
-                if (loginScreen) {
-                    loginScreen.classList.remove('hidden');
-                }
-
-                return;
-            }
-
-            console.log(
-                'ACTIVE SESSION:',
-                session.user.email
-            );
-
-            await loadProfile(
-                session.user.id,
-                session.user.email
-            );
-
-            if (loginScreen) {
-                loginScreen.classList.add('hidden');
-            }
-
-        } catch (error) {
-            console.error('SESSION EXCEPTION:', error);
-        }
-    }
-
-    supabase.auth.onAuthStateChange((event, session) => {
         console.log(
-            'AUTH EVENT:',
-            event,
-            session?.user?.email || 'NO USER'
+            'LOGIN FORM FOUND'
         );
-    });
 
-    const signOutButton = document.querySelector('#sign-out');
+        loginForm.addEventListener(
+            'submit',
+            handleLogin
+        );
+
+        /*
+         * Fallback click handler.
+         *
+         * This guarantees the login button still
+         * invokes authentication even if the HTML
+         * button markup is not behaving as expected.
+         */
+
+        const loginButton =
+            loginForm.querySelector(
+                'button[type="submit"]'
+            );
+
+        if (loginButton) {
+
+            loginButton.addEventListener(
+                'click',
+                event => {
+
+                    event.preventDefault();
+
+                    handleLogin(event);
+                }
+            );
+        }
+
+        console.log(
+            'LOGIN HANDLER LOADED'
+        );
+
+    } else {
+
+        console.error(
+            'LOGIN FORM NOT FOUND: #login-form'
+        );
+    }
+
+    /*
+     * Sign out
+     */
 
     if (signOutButton) {
-        signOutButton.addEventListener('click', async event => {
-            event.preventDefault();
 
-            try {
-                await supabase.auth.signOut();
+        signOutButton.addEventListener(
+            'click',
+            async event => {
 
-                sessionStorage.removeItem('gotcracked-staff');
+                event.preventDefault();
 
-                if (loginScreen) {
-                    loginScreen.classList.remove('hidden');
+                try {
+
+                    await window.supabaseClient
+                        .auth.signOut();
+
+                } catch (error) {
+
+                    console.error(
+                        'SIGN OUT FAILED:',
+                        error
+                    );
                 }
 
-                console.log('SIGNED OUT');
+                sessionStorage.removeItem(
+                    'gotcracked-staff'
+                );
 
-            } catch (error) {
-                console.error('SIGN OUT ERROR:', error);
+                window.GotCrackedRepairs = [];
+
+                if (loginScreen) {
+                    loginScreen.classList.remove(
+                        'hidden'
+                    );
+                }
+
+                renderRepairs();
             }
-        });
+        );
     }
+
+    /*
+     * Startup
+     *
+     * ONLY authentication starts here.
+     *
+     * loadRepairs() is intentionally NOT called
+     * separately because anonymous users are blocked
+     * by RLS.
+     */
 
     loadSession();
 
