@@ -1,6 +1,6 @@
 /* GotCracked Portal 1.0 — final visual polish and drawer safety.
-   This is intentionally the last cascade layer. Drawers never tint or blur
-   the work surface behind them; separation comes from the panel itself. */
+   This is intentionally the last cascade layer. The mobile sidebar remains
+   untouched while only the exposed work surface is dimmed behind it. */
 
 :root{
   --v1-panel-shadow:0 14px 36px rgba(8,25,45,.075);
@@ -8,14 +8,21 @@
   --v1-blue:#1877f2;
 }
 
-/* Never blur, dim, filter, or otherwise alter the page behind either drawer. */
+/* No blur or filter effects anywhere behind drawers. */
 .sidebar-backdrop,
 .v1-drawer-backdrop{
-  background:transparent!important;
   -webkit-backdrop-filter:none!important;
   backdrop-filter:none!important;
   -webkit-filter:none!important;
   filter:none!important;
+}
+
+/* Sidebar navigation: dim only the portion of the page that remains visible. */
+.sidebar-backdrop{
+  background:rgba(5,13,25,.46)!important;
+}
+.v1-drawer-backdrop{
+  background:transparent!important;
 }
 body.mobile-nav-open .app-shell,
 body.mobile-nav-open main,
@@ -28,6 +35,9 @@ body.mobile-nav-open .topbar{
 .sidebar.open{
   box-shadow:18px 0 46px rgba(4,17,31,.24)!important;
   border-right:1px solid rgba(255,255,255,.08);
+  opacity:1!important;
+  -webkit-filter:none!important;
+  filter:none!important;
 }
 .v1-right-drawer{
   box-shadow:var(--v1-drawer-shadow)!important;
@@ -86,6 +96,16 @@ body.mobile-nav-open .topbar{
 #dashboard .metrics article[data-v1-metric-link]:focus-visible{outline:3px solid rgba(24,119,242,.3);outline-offset:2px}
 
 @media(max-width:750px){
+  /* Keep the drawer above its dimmer and start the dimmer at the drawer edge. */
+  body.mobile-nav-open .sidebar{
+    z-index:60!important;
+    background:var(--navy,#111b2b)!important;
+  }
+  .sidebar-backdrop{
+    inset:0 0 0 min(86vw,290px)!important;
+    z-index:59!important;
+  }
+
   /* Four one-column metric cards made the mobile dashboard unnecessarily tall. */
   #dashboard .metrics{
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
