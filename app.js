@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const HARDENING_VERSION = '20260825-final1';
+  const HARDENING_VERSION = '20260825-final2';
   const hardeningHref = `hardening.css?v=${HARDENING_VERSION}`;
   if (![...document.styleSheets].some(sheet => sheet.href?.includes('hardening.css'))) {
     const link = document.createElement('link');
