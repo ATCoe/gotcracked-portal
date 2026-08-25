@@ -17,6 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
       - name: JavaScript syntax
         shell: bash
         run: |
@@ -25,6 +26,7 @@ jobs:
             echo "Checking $file"
             node --check "$file"
           done
+
       - name: CSS and local reference integrity
         shell: python
         run: |
@@ -47,3 +49,53 @@ jobs:
                   missing.append(ref)
           if missing:
               raise SystemExit('Missing local references: ' + ', '.join(sorted(set(missing))))
+
+      - name: Portal 1.0 CSS architecture invariants
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          html = Path('index.html').read_text(encoding='utf-8')
+          release = Path('portal-v1-release.css').read_text(encoding='utf-8')
+          mobile = Path('mobile-nav-safe.js').read_text(encoding='utf-8')
+
+          if re.search(r'<style(?:\s|>)', html, re.I):
+              raise SystemExit('Inline <style> blocks are forbidden in index.html; use the release cascade.')
+
+          css_refs = re.findall(r'<link[^>]+rel=["\']stylesheet["\'][^>]+href=["\']([^"\']+)', html, re.I)
+          css_files = [ref.split('?',1)[0] for ref in css_refs]
+          required_order = [
+              'styles.css', 'workflow.css', 'complete.css', 'auth-modern.css',
+              'workforce.css', 'hardening.css', 'operations-v1.css',
+              'operations-v1-extra.css', 'portal-v1-polish.css',
+              'master-directory.css', 'portal-v1-release.css'
+          ]
+          positions = []
+          for name in required_order:
+              if name not in css_files:
+                  raise SystemExit(f'Missing required stylesheet: {name}')
+              positions.append(css_files.index(name))
+          if positions != sorted(positions):
+              raise SystemExit('Portal stylesheet order changed; release cascade is no longer deterministic.')
+          if css_files[-1] != 'portal-v1-release.css':
+              raise SystemExit('portal-v1-release.css must be the final stylesheet in index.html.')
+
+          if "overflow-y:auto" in mobile.replace(' ', ''):
+              raise SystemExit('Mobile left navigation must not be vertically scrollable.')
+          if "createElement('style')" in mobile or 'createElement("style")' in mobile:
+              raise SystemExit('mobile-nav-safe.js must not inject CSS.')
+
+          required_release_fragments = [
+              '.sidebar.gc-mobile-nav-ready>nav:not(.gc-mobile-nav)',
+              '.sidebar>.gc-mobile-nav',
+              '.sidebar-backdrop,.v1-drawer-backdrop',
+              'background:transparent!important',
+              '.v1-workflow-panel',
+              'body.v1-overlay-open,body.v1-workflow-open'
+          ]
+          for fragment in required_release_fragments:
+              if fragment not in release:
+                  raise SystemExit(f'Release CSS invariant missing: {fragment}')
+
+          print('Portal 1.0 CSS architecture checks passed.')
