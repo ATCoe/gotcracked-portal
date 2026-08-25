@@ -31,6 +31,15 @@
   const button = () => document.querySelector('.mobile-menu');
   const currentView = () => window.location.hash.slice(1).split('/')[0] || 'dashboard';
 
+  function replaceMenuButton() {
+    const oldButton = button();
+    if (!oldButton || oldButton.dataset.gcMobileOwner === 'true') return oldButton;
+    const cleanButton = oldButton.cloneNode(true);
+    cleanButton.dataset.gcMobileOwner = 'true';
+    oldButton.replaceWith(cleanButton);
+    return cleanButton;
+  }
+
   function linkMarkup([view, icon, label]) {
     return `<a class="nav-link" href="#${view}" data-view="${view}" data-mobile-nav-item="true"><span>${icon}</span>${label}</a>`;
   }
@@ -155,6 +164,7 @@
 
   function init() {
     document.querySelectorAll('.sidebar-backdrop').forEach(node => node.remove());
+    replaceMenuButton();
     buildOnce();
     setOpen(false);
     bind();
