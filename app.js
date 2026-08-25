@@ -5,7 +5,19 @@
         'In diagnosis': 'diagnosis',
         'Waiting on parts': 'parts',
         'In repair': 'in-repair',
-        'Ready for pickup': 'ready'
+        'Ready for pickup': 'ready',
+        'Awaiting Repair': 'diagnosis',
+        'Need to Order Parts': 'parts',
+        'Awaiting Parts': 'parts',
+        'Diagnostic in Progress': 'diagnosis',
+        'Repair in Progress': 'in-repair',
+        'Quality Inspection': 'inspection',
+        'Awaiting Callback': 'callback',
+        'Repaired – Ready for Pickup': 'ready',
+        'Sale Complete': 'complete',
+        'Abandoned': 'closed',
+        'Unrepairable': 'closed',
+        'Customer Declined': 'closed'
     }[value] || '');
 
     const list = document.querySelector('#repair-list');
@@ -112,7 +124,7 @@
 
         if (count) {
             const openCount = getRepairs()
-                .filter(r => r.status !== 'Ready for pickup')
+                .filter(r => !['sale_complete', 'abandoned', 'unrepairable', 'customer_declined', 'completed', 'cancelled'].includes(r.statusKey))
                 .length;
             count.textContent = openCount;
             count.hidden = openCount === 0;
@@ -134,9 +146,12 @@
 
         const filtered = getRepairs().filter(repair => {
 
+            const archived = ['sale_complete', 'abandoned', 'unrepairable', 'customer_declined', 'completed', 'cancelled'].includes(repair.statusKey);
             const matchesStatus =
                 status === 'all' ||
-                repair.status === status;
+                (status === 'active' && !archived) ||
+                (status === 'archive' && archived) ||
+                repair.statusKey === status;
 
             const searchableText =
                 Object.values(repair)

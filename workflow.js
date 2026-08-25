@@ -12,6 +12,11 @@
 
     window.GotCrackedRepairs = [];
 
+    const repairStatusLabels = {
+        checked_in: 'Checked in (legacy)', in_diagnosis: 'In diagnosis (legacy)', awaiting_approval: 'Awaiting approval (legacy)', waiting_on_parts: 'Waiting on parts (legacy)', in_repair: 'In repair (legacy)', ready_for_pickup: 'Ready for pickup (legacy)', completed: 'Completed (legacy)',
+        awaiting_repair: 'Awaiting Repair', need_to_order_parts: 'Need to Order Parts', awaiting_parts: 'Awaiting Parts', diagnostic_in_progress: 'Diagnostic in Progress', repair_in_progress: 'Repair in Progress', quality_inspection: 'Quality Inspection', awaiting_callback: 'Awaiting Callback', repaired: 'Repaired – Ready for Pickup', sale_complete: 'Sale Complete', abandoned: 'Abandoned', unrepairable: 'Unrepairable', customer_declined: 'Customer Declined', cancelled: 'Cancelled'
+    };
+
     const loginScreen =
         document.querySelector('#login-screen');
 
@@ -53,10 +58,10 @@
      */
 
     function renderRepairs() {
-        if (window.GotCrackedUI?.renderRepairs) {
-            window.GotCrackedUI.renderRepairs(
-                window.GotCrackedRepairs
-            );
+        if (window.GotCrackedUI?.filterRepairs) {
+            window.GotCrackedUI.filterRepairs();
+        } else if (window.GotCrackedUI?.renderRepairs) {
+            window.GotCrackedUI.renderRepairs(window.GotCrackedRepairs);
         }
     }
 
@@ -376,9 +381,14 @@
                         ticket.assigned_user_id ||
                         '—',
 
-                    status:
+                    statusKey:
                         ticket.status ||
-                        'In diagnosis',
+                        'awaiting_repair',
+
+                    status:
+                        repairStatusLabels[ticket.status] ||
+                        ticket.status ||
+                        'Awaiting Repair',
 
                     updated:
                         ticket.updated_at

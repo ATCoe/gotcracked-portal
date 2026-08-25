@@ -14,7 +14,7 @@
     host.innerHTML = shown.length ? shown.map(lead => `
       <button class="lead-row" data-lead-id="${lead.id}">
         <span class="status ${lead.status}">${statusLabel(lead.status)}</span>
-        <span class="row-main"><strong>${esc(lead.name)}</strong><small>${esc(lead.service || 'No service')} · ${esc(lead.source || 'Unknown source')}</small></span>
+        <span class="row-main"><strong>${esc(lead.name)}${lead.intake_method === 'mail_in' ? ' · Mail-in' : ''}</strong><small>${esc(lead.service || 'No service')} · ${esc(lead.source || 'Unknown source')}</small></span>
         <span>${esc(lead.phone || lead.email || '')}</span><small>${new Date(lead.created_at).toLocaleString()}</small><em>›</em>
       </button>`).join('') : '<div class="empty-card"><h2>No matching leads</h2><p>New webhook leads will appear here and in Discord.</p></div>';
     const badge = document.querySelector('#lead-count');
@@ -38,7 +38,7 @@
     dialog.querySelector('#ticket-detail-content').innerHTML = `
       <div class="modal-head"><div><p class="eyebrow">Shared with Discord</p><h2>${esc(lead.name)}</h2></div><button class="icon-button" id="close-lead">×</button></div>
       <span class="status ${lead.status}">${statusLabel(lead.status)}</span>
-      <div class="ticket-detail"><div class="detail-row"><span>Contact</span><strong>${esc(lead.phone || lead.email || '—')}</strong></div><div class="detail-row"><span>Service</span><strong>${esc(lead.service || '—')}</strong></div><div class="detail-row"><span>Owner</span><strong>${esc(lead.profiles?.display_name || 'Unclaimed')}</strong></div><div class="detail-row"><span>Source</span><strong>${esc(lead.source || '—')}</strong></div></div>
+      <div class="ticket-detail"><div class="detail-row"><span>Contact</span><strong>${esc(lead.phone || lead.email || '—')}</strong></div><div class="detail-row"><span>Service</span><strong>${esc(lead.service || '—')}</strong></div><div class="detail-row"><span>Intake</span><strong>${lead.intake_method === 'mail_in' ? 'Mail-in repair' : 'Walk-in / local'}</strong></div>${lead.intake_method === 'mail_in' ? `<div class="detail-row"><span>Return address</span><strong>${esc(lead.shipping_address?.formatted || [lead.shipping_address?.line1, lead.shipping_address?.line2, [lead.shipping_address?.city, lead.shipping_address?.state, lead.shipping_address?.postal_code].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—')}</strong></div>` : ''}<div class="detail-row"><span>Owner</span><strong>${esc(lead.profiles?.display_name || 'Unclaimed')}</strong></div><div class="detail-row"><span>Source</span><strong>${esc(lead.source || '—')}</strong></div></div>
       <form id="lead-update-form" class="settings-list"><input type="hidden" name="leadId" value="${lead.id}"><label>Status<select name="status">${['new','claimed','qualified','won','lost'].map(value => `<option value="${value}" ${lead.status === value ? 'selected' : ''}>${statusLabel(value)}</option>`).join('')}</select></label><label>Activity note<textarea name="note" placeholder="Add an internal note"></textarea></label><button class="primary-button" type="submit">Save lead update</button><p class="auth-message" role="status"></p></form>
       <h3>Activity</h3><div class="lead-timeline">${(events || []).map(event => `<p><strong>${esc(event.profiles?.display_name || 'GotCracked bot')}</strong> ${esc(event.message || event.event_type)}<small>${new Date(event.created_at).toLocaleString()}</small></p>`).join('') || '<p>No activity yet.</p>'}</div>`;
     dialog.showModal();
