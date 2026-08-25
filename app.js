@@ -1,6 +1,17 @@
 (() => {
     'use strict';
 
+    console.log('APP.JS LOADED');
+
+    const supabase = window.supabaseClient;
+
+    if (!supabase) {
+        console.error('SUPABASE CLIENT NOT FOUND');
+        return;
+    }
+
+    let repairs = [];
+
     const statusClass = value => ({
         'In diagnosis': 'diagnosis',
         'Waiting on parts': 'parts',
@@ -8,118 +19,157 @@
         'Ready for pickup': 'ready'
     }[value] || '');
 
-    function getRepairs() {
-        return Array.isArray(window.GotCrackedRepairs)
-            ? window.GotCrackedRepairs
-            : [];
-    }
+    const list = document.querySelector('#repair-list');
+    const table = document.querySelector('#repair-table');
 
-    function renderRepairs(items = getRepairs()) {
+    function renderRepairs(items = repairs) {
         if (!Array.isArray(items)) {
             items = [];
         }
 
-        const list =
-            document.querySelector('#repair-list');
-
-        const table =
-            document.querySelector('#repair-table');
-
         if (list) {
-            list.innerHTML = items.map(repair => `
-                <div
-                    class="repair-row"
-                    data-ticket="${repair.id}"
-                >
-                    <div class="device-icon">
-                        ${repair.icon || '▯'}
-                    </div>
+            list.innerHTML = items.map(r => `
+                <div class="repair-row" data-ticket="${r.id}">
+                    <div class="device-icon">${r.icon || '▯'}</div>
 
                     <div class="repair-customer">
-                        <strong>
-                            ${repair.customer || 'Unknown customer'}
-                        </strong>
-
-                        <small>
-                            ${repair.device || 'Unknown device'}
-                            ·
-                            ${repair.service || 'No service listed'}
-                        </small>
+                        <strong>${r.customer}</strong>
+                        <small>${r.device} · ${r.service}</small>
                     </div>
 
                     <div class="repair-tech">
-                        ${repair.tech || '—'}
+                        ${r.tech}
                     </div>
 
-                    <span
-                        class="status ${statusClass(repair.status)}"
-                    >
-                        ${repair.status || 'In diagnosis'}
+                    <span class="status ${statusClass(r.status)}">
+                        ${r.status}
                     </span>
 
                     <div class="ticket-id">
-                        ${repair.id || '—'}<br>
-                        ${repair.updated || 'Recently updated'}
+                        ${r.id}<br>${r.updated}
                     </div>
                 </div>
             `).join('');
         }
 
         if (table) {
-            table.innerHTML = items.map(repair => `
-                <tr data-ticket="${repair.id}">
+            table.innerHTML = items.map(r => `
+                <tr data-ticket="${r.id}">
                     <td>
-                        <strong>
-                            ${repair.id || '—'}
-                        </strong>
-
-                        <small>
-                            ${repair.updated || 'Recently updated'}
-                        </small>
+                        <strong>${r.id}</strong>
+                        <small>${r.updated}</small>
                     </td>
 
                     <td>
-                        <strong>
-                            ${repair.customer || 'Unknown customer'}
-                        </strong>
-
-                        <small>
-                            ${repair.device || 'Unknown device'}
-                        </small>
+                        <strong>${r.customer}</strong>
+                        <small>${r.device}</small>
                     </td>
 
-                    <td>
-                        ${repair.service || 'No service listed'}
-                    </td>
+                    <td>${r.service}</td>
+
+                    <td>${r.tech}</td>
 
                     <td>
-                        ${repair.tech || '—'}
-                    </td>
-
-                    <td>
-                        <span
-                            class="status ${statusClass(repair.status)}"
-                        >
-                            ${repair.status || 'In diagnosis'}
+                        <span class="status ${statusClass(r.status)}">
+                            ${r.status}
                         </span>
                     </td>
 
-                    <td>
-                        ${repair.updated || 'Recently updated'}
-                    </td>
+                    <td>${r.updated}</td>
                 </tr>
             `).join('');
         }
 
-        const count =
-            document.querySelector('#repair-count');
+        const count = document.querySelector('#repair-count');
 
         if (count) {
-            count.textContent =
-                getRepairs().filter(
-                    repair =>
-                        repair.status !== 'Ready for pickup'
-                ).length;
+            count.textContent = repairs.filter(
+                r => r.status !== 'Ready for pickup'
+            ).length;
+        }
+    }
+
+    async function loadRepairs() {
+        if (!supabase) {
+            return;
+        }
+
+        try {
+            /*
+             * IMPORTANT:
+             * Do not join customers/devices/profiles here.
+             * The actual database schema does not match the relationship
+             * names used by the old app.js.
+             *
+             * We load the repair ticket itself first.
+             */
+
+            const {
+                data,
+                error
+            } = await supabase
+                .from('repair_tickets')
+                .select('*')
+                .order('ticket_number', {
+                    ascending: false
+                });
+
+            if (error) {
+                console.error('Repair load failed:', error);
+                return;
+            }
+
+            repairs = (data || []).map(ticket => ({
+                id:
+                    ticket.ticket_number ||
+                    ticket.id ||
+                    'Unknown',
+
+                customer:
+                    ticket.customer_name ||
+                    ticket.customer ||
+                    'Customer',
+
+                device:
+                    ticket.device_name ||
+                    ticket.device ||
+                    'Device',
+
+                service:
+                    ticket.customer_issue ||
+                    ticket.service ||
+                    'Repair',
+
+                tech:
+                    ticket.assigned_user_name ||
+                    ticket.tech ||
+                    '—',
+
+                status:
+                    ticket.status ||
+                    'In diagnosis',
+
+                updated:
+                    ticket.updated_at
+                        ? new Date(ticket.updated_at).toLocaleString()
+                        : 'Recently updated',
+
+                icon:
+                    '▯'
+            }));
+
+            renderRepairs();
+
+            console.log(
+                'REPAIRS LOADED:',
+                repairs.length
+            );
+
+        } catch (error) {
+            console.error(
+                'Repair load exception:',
+                error
+            );
         }
     }
 
@@ -130,142 +180,48 @@
         const statusElement =
             document.querySelector('#status-filter');
 
-        const query =
-            searchElement?.value
-                ?.trim()
-                .toLowerCase() || '';
+        const q =
+            searchElement?.value?.toLowerCase() || '';
 
-        const status =
+        const s =
             statusElement?.value || 'all';
 
-        const filtered =
-            getRepairs().filter(repair => {
+        const filtered = repairs.filter(r => {
+            const matchesStatus =
+                s === 'all' ||
+                r.status === s;
 
-                const matchesStatus =
-                    status === 'all' ||
-                    repair.status === status;
+            const matchesSearch =
+                Object.values(r)
+                    .join(' ')
+                    .toLowerCase()
+                    .includes(q);
 
-                const searchableText =
-                    Object.values(repair)
-                        .join(' ')
-                        .toLowerCase();
-
-                return (
-                    matchesStatus &&
-                    searchableText.includes(query)
-                );
-            });
+            return matchesStatus && matchesSearch;
+        });
 
         renderRepairs(filtered);
     }
 
-    function showTicket(ticketId) {
-        const repairs = getRepairs();
+    const search =
+        document.querySelector('#repair-search');
 
-        const ticket =
-            repairs.find(
-                repair =>
-                    String(repair.id) ===
-                    String(ticketId)
-            );
-
-        if (!ticket) {
-            return;
-        }
-
-        const detailModal =
-            document.querySelector('#ticket-detail');
-
-        const detailContent =
-            document.querySelector(
-                '#ticket-detail-content'
-            );
-
-        if (!detailModal || !detailContent) {
-            return;
-        }
-
-        detailContent.innerHTML = `
-            <div class="modal-head">
-                <div>
-                    <p class="eyebrow">
-                        ${ticket.id}
-                    </p>
-
-                    <h2>
-                        ${ticket.customer || 'Customer'}'s repair
-                    </h2>
-                </div>
-
-                <button
-                    class="icon-button"
-                    id="close-ticket"
-                    type="button"
-                    aria-label="Close"
-                >
-                    ×
-                </button>
-            </div>
-
-            <span
-                class="status ${statusClass(ticket.status)}"
-            >
-                ${ticket.status || 'In diagnosis'}
-            </span>
-
-            <div class="ticket-detail">
-
-                <div class="detail-row">
-                    <span>Device</span>
-                    <strong>
-                        ${ticket.device || 'Unknown device'}
-                    </strong>
-                </div>
-
-                <div class="detail-row">
-                    <span>Service</span>
-                    <strong>
-                        ${ticket.service || 'No service listed'}
-                    </strong>
-                </div>
-
-                <div class="detail-row">
-                    <span>Technician</span>
-                    <strong>
-                        ${ticket.tech || '—'}
-                    </strong>
-                </div>
-
-                <div class="detail-row">
-                    <span>Status</span>
-                    <strong>
-                        ${ticket.status || 'In diagnosis'}
-                    </strong>
-                </div>
-
-                <div class="detail-row">
-                    <span>Last updated</span>
-                    <strong>
-                        ${ticket.updated || 'Recently updated'}
-                    </strong>
-                </div>
-
-            </div>
-        `;
-
-        detailModal.showModal();
-
-        document
-            .querySelector('#close-ticket')
-            ?.addEventListener(
-                'click',
-                () => detailModal.close()
-            );
+    if (search) {
+        search.addEventListener(
+            'input',
+            filterRepairs
+        );
     }
 
-    /*
-     * Navigation
-     */
+    const filter =
+        document.querySelector('#status-filter');
+
+    if (filter) {
+        filter.addEventListener(
+            'change',
+            filterRepairs
+        );
+    }
 
     document
         .querySelectorAll('[data-view]')
@@ -308,29 +264,7 @@
 
         });
 
-    /*
-     * Search / filter
-     */
-
-    document
-        .querySelector('#repair-search')
-        ?.addEventListener(
-            'input',
-            filterRepairs
-        );
-
-    document
-        .querySelector('#status-filter')
-        ?.addEventListener(
-            'change',
-            filterRepairs
-        );
-
-    /*
-     * New ticket modal
-     */
-
-    const ticketModal =
+    const modal =
         document.querySelector('#new-ticket');
 
     document
@@ -343,8 +277,8 @@
 
                     event.preventDefault();
 
-                    if (ticketModal) {
-                        ticketModal.showModal();
+                    if (modal) {
+                        modal.showModal();
                     }
 
                 }
@@ -352,9 +286,99 @@
 
         });
 
-    /*
-     * Ticket rows
-     */
+    const ticketForm =
+        document.querySelector('#ticket-form');
+
+    if (ticketForm) {
+        ticketForm.addEventListener(
+            'submit',
+            async event => {
+
+                event.preventDefault();
+
+                console.log(
+                    'Ticket creation will be connected next.'
+                );
+
+            }
+        );
+    }
+
+    const detailModal =
+        document.querySelector('#ticket-detail');
+
+    function showTicket(ticketId) {
+
+        const ticket =
+            repairs.find(
+                r => String(r.id) === String(ticketId)
+            );
+
+        if (!ticket || !detailModal) {
+            return;
+        }
+
+        const content =
+            document.querySelector(
+                '#ticket-detail-content'
+            );
+
+        if (!content) {
+            return;
+        }
+
+        content.innerHTML = `
+            <div class="modal-head">
+                <div>
+                    <p class="eyebrow">${ticket.id}</p>
+                    <h2>${ticket.customer}'s repair</h2>
+                </div>
+
+                <button
+                    class="icon-button"
+                    id="close-ticket"
+                    type="button">
+                    ×
+                </button>
+            </div>
+
+            <span class="status ${statusClass(ticket.status)}">
+                ${ticket.status}
+            </span>
+
+            <div class="ticket-detail">
+
+                <div class="detail-row">
+                    <span>Device</span>
+                    <strong>${ticket.device}</strong>
+                </div>
+
+                <div class="detail-row">
+                    <span>Service</span>
+                    <strong>${ticket.service}</strong>
+                </div>
+
+                <div class="detail-row">
+                    <span>Technician</span>
+                    <strong>${ticket.tech}</strong>
+                </div>
+
+            </div>
+        `;
+
+        detailModal.showModal();
+
+        const closeButton =
+            document.querySelector('#close-ticket');
+
+        if (closeButton) {
+            closeButton.addEventListener(
+                'click',
+                () => detailModal.close(),
+                { once: true }
+            );
+        }
+    }
 
     document.addEventListener(
         'click',
@@ -365,71 +389,43 @@
                     '[data-ticket]'
                 );
 
-            if (!row) {
-                return;
+            if (row) {
+                showTicket(
+                    row.dataset.ticket
+                );
             }
-
-            showTicket(
-                row.dataset.ticket
-            );
 
         }
     );
 
-    /*
-     * Mobile menu
-     */
+    const mobileMenu =
+        document.querySelector('.mobile-menu');
 
-    document
-        .querySelector('.mobile-menu')
-        ?.addEventListener(
+    if (mobileMenu) {
+        mobileMenu.addEventListener(
             'click',
             () => {
 
-                document
-                    .querySelector('.sidebar')
-                    ?.classList.toggle(
-                        'open'
+                const sidebar =
+                    document.querySelector(
+                        '.sidebar'
                     );
 
-            }
-        );
-
-    /*
-     * Compatibility layer.
-     *
-     * workflow.js owns the actual repair data.
-     */
-
-    window.GotCrackedUI = {
-        renderRepairs,
-        filterRepairs,
-        showTicket
-    };
-
-    /*
-     * portal-complete.js historically references
-     * "repairs" directly. Keep that reference pointed
-     * at the real application array.
-     */
-
-    try {
-        Object.defineProperty(
-            window,
-            'repairs',
-            {
-                configurable: true,
-                get() {
-                    return getRepairs();
+                if (sidebar) {
+                    sidebar.classList.toggle(
+                        'open'
+                    );
                 }
+
             }
-        );
-    } catch (error) {
-        console.warn(
-            'Could not create repairs compatibility alias.',
-            error
         );
     }
 
-    console.log('APP.JS LOADED');
+    /*
+     * Load repairs only after the page is initialized.
+     * A failure here MUST NOT interfere with authentication.
+     */
+
+    loadRepairs();
+
 })();
