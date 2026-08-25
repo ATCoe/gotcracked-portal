@@ -516,7 +516,7 @@
     if(event.detail==='settings')renderTrainingSettings();
   });
 
-  let realtimeChannel=null,realtimeReloadTimer=null,realtimeReloading=false,realtimeReloadQueued=false;
+  let realtimeChannel=null,realtimeReloadTimer=null,realtimeReloading=false,realtimeReloadQueued=false,realtimeSubscribed=false,realtimeRetryTimer=null;
   function queueRealtimeReload(){
     clearTimeout(realtimeReloadTimer);
     realtimeReloadTimer=setTimeout(async()=>{
@@ -527,13 +527,29 @@
       finally{realtimeReloading=false;if(realtimeReloadQueued){realtimeReloadQueued=false;queueRealtimeReload();}}
     },180);
   }
-  function subscribeRealtime(){
+  async function subscribeRealtime(){
     if(realtimeChannel||state.training)return;
+    const {data:{session}}=await client.auth.getSession();
+    if(!session?.access_token)return;
+    await client.realtime.setAuth(session.access_token);
     const tables=['leads','repair_tickets','customers','devices','intake_sessions','work_order_items','ticket_events','purchase_orders','purchase_order_items'];
     realtimeChannel=client.channel(`portal-v1-operations-${state.profile.location_id}`);
     tables.forEach(table=>realtimeChannel.on('postgres_changes',{event:'*',schema:'public',table},queueRealtimeReload));
-    realtimeChannel.subscribe(status=>{if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')console.warn('Portal realtime is reconnecting:',status);});
+    realtimeChannel.subscribe(status=>{
+      realtimeSubscribed=status==='SUBSCRIBED';
+      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
+        console.warn('Portal realtime is reconnecting:',status);
+        clearTimeout(realtimeRetryTimer);
+        realtimeRetryTimer=setTimeout(async()=>{const old=realtimeChannel;realtimeChannel=null;if(old)await client.removeChannel(old);subscribeRealtime();},2500);
+      }
+    });
   }
+
+  // Realtime is primary. This low-frequency authoritative refresh is a safety
+  // net for sleeping laptops, network transitions, and browser websocket loss.
+  setInterval(()=>{if(!state.training&&document.visibilityState==='visible'&&!document.querySelector('dialog[open]')&&!document.activeElement?.closest('form'))queueRealtimeReload();},15000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')queueRealtimeReload();});
+  window.addEventListener('online',()=>{queueRealtimeReload();if(!realtimeSubscribed)subscribeRealtime();});
 
   async function start(){
     if(!(await initProfile()))return;

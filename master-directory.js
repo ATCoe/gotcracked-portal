@@ -134,6 +134,8 @@
   const channel=client.channel('gc-master-directory');
   ['repair_tickets','leads','customers','devices','intake_sessions','work_order_items','ticket_events'].forEach(table=>channel.on('postgres_changes',{event:'*',schema:'public',table},requestRefresh));
   channel.subscribe();
+  setInterval(()=>{if(document.visibilityState==='visible')requestRefresh();},15000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')requestRefresh();});
   window.addEventListener('gc-view-changed',()=>requestAnimationFrame(renderVisible));
   window.addEventListener('beforeunload',()=>{try{client.removeChannel(channel);}catch{}},{once:true});
   setTimeout(load,250); setTimeout(renderVisible,900);

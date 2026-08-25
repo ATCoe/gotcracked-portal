@@ -66,6 +66,7 @@ jobs:
           directory = Path('master-directory.js').read_text(encoding='utf-8')
           sales = Path('sales-ops.js').read_text(encoding='utf-8')
           sales_css = Path('sales-ops.css').read_text(encoding='utf-8')
+          supabase_js = Path('supabase.js').read_text(encoding='utf-8')
           migration = Path('supabase/migrations/0011_portal_realtime_publication.sql').read_text(encoding='utf-8')
 
           if re.search(r'<style(?:\s|>)', html, re.I):
@@ -151,6 +152,12 @@ jobs:
                   raise SystemExit(f'Cross-user realtime coverage missing for {table}.')
           if 'queueRealtimeReload' not in operations or 'realtimeReloading' not in operations:
               raise SystemExit('Operational realtime refresh must remain debounced and single-flight.')
+          if 'client.realtime.setAuth(persisted.access_token)' not in supabase_js:
+              raise SystemExit('Storage-first auth restore must pass its token to Realtime.')
+          if 'await client.realtime.setAuth(session.access_token)' not in operations:
+              raise SystemExit('Realtime subscription must authenticate before channel join.')
+          if 'setInterval' not in operations or 'visibilitychange' not in operations:
+              raise SystemExit('Realtime must retain an authoritative refresh fallback.')
           if 'first_name?.trim()&&x.newCustomer.phone?.trim()' not in operations:
               raise SystemExit('Walk-in intake must require only customer name and phone.')
           for status_class in ['status-red','status-yellow','status-green','status-blue']:

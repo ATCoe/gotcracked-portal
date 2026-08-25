@@ -67,6 +67,12 @@ window.supabaseClient = supabase.createClient(
     if (!force) {
       const persisted = readPersistedSession();
       if (persisted) {
+        // Storage-first restore bypasses Auth's normal initialization path.
+        // Realtime therefore needs the valid access token explicitly or its
+        // websocket joins as anon and RLS correctly suppresses staff rows.
+        client.realtime.setAuth(persisted.access_token).catch(error =>
+          console.warn('Portal realtime token restore failed:', error)
+        );
         const result = { session:persisted, error:null, source:'persisted' };
         lastSessionResult = result;
         return result;
@@ -118,6 +124,9 @@ window.supabaseClient = supabase.createClient(
   client.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') return clear();
     if (session && ['INITIAL_SESSION','SIGNED_IN','TOKEN_REFRESHED','USER_UPDATED'].includes(event)) {
+      client.realtime.setAuth(session.access_token).catch(error =>
+        console.warn('Portal realtime token update failed:', error)
+      );
       lastSessionResult = { session, error:null, source:'auth-event' };
       restoreCooldownUntil = 0;
     }
@@ -249,3 +258,4 @@ window.supabaseClient = supabase.createClient(
     detail:{ userId:persisted.user.id }
   }));
 })();
+
