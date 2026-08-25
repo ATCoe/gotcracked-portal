@@ -1,0 +1,49 @@
+name: Portal CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  static-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in *.js; do
+            echo "Checking $file"
+            node --check "$file"
+          done
+      - name: CSS and local reference integrity
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          for path in Path('.').glob('*.css'):
+              text = path.read_text(encoding='utf-8')
+              if text.count('{') != text.count('}'):
+                  raise SystemExit(f'Unbalanced CSS braces: {path}')
+
+          html = Path('index.html').read_text(encoding='utf-8')
+          refs = re.findall(r'(?:src|href)=["\']([^"\']+)["\']', html)
+          missing = []
+          for ref in refs:
+              ref = ref.split('?', 1)[0].split('#', 1)[0]
+              if not ref or ref.startswith(('http://','https://','mailto:','tel:','#')):
+                  continue
+              if not Path(ref).exists():
+                  missing.append(ref)
+          if missing:
+              raise SystemExit('Missing local references: ' + ', '.join(sorted(set(missing))))
