@@ -99,6 +99,81 @@ body.mobile-nav-open .topbar{
     z-index:59!important;
   }
 
+  /* The left drawer is navigation, not a scrolling workspace. Adapt its
+     vertical rhythm to the phone height so every destination stays visible. */
+  .sidebar{
+    overflow:hidden!important;
+    padding-top:max(8px,env(safe-area-inset-top))!important;
+    padding-bottom:max(8px,env(safe-area-inset-bottom))!important;
+  }
+  .sidebar .brand{
+    height:clamp(72px,10.5vh,104px)!important;
+    min-height:clamp(72px,10.5vh,104px)!important;
+    max-height:clamp(72px,10.5vh,104px)!important;
+    margin:0 0 clamp(2px,.5vh,6px)!important;
+  }
+  .sidebar .brand-logo{
+    width:clamp(150px,55vw,180px)!important;
+    height:clamp(68px,9.5vh,96px)!important;
+    max-width:180px!important;
+    max-height:96px!important;
+  }
+  .sidebar nav{
+    display:flex!important;
+    flex:1 1 auto!important;
+    min-height:0!important;
+    overflow:hidden!important;
+    padding:0!important;
+    gap:clamp(1px,.18vh,3px)!important;
+    scrollbar-width:none!important;
+  }
+  .sidebar nav::-webkit-scrollbar{display:none!important}
+  .sidebar .nav-link{
+    flex:0 0 auto!important;
+    min-height:0!important;
+    height:clamp(31px,4.45vh,43px)!important;
+    padding:0 10px!important;
+    gap:9px!important;
+    border-radius:8px!important;
+    font-size:clamp(11.5px,1.55vh,14px)!important;
+    line-height:1.1!important;
+    white-space:nowrap!important;
+  }
+  .sidebar .nav-link span{
+    width:17px!important;
+    font-size:clamp(13px,1.7vh,16px)!important;
+  }
+  .sidebar .nav-link b{
+    padding:1px 6px!important;
+    font-size:9.5px!important;
+  }
+  .sidebar .nav-link.active::before{
+    top:7px;
+    bottom:7px;
+  }
+  .sidebar-bottom{
+    flex:0 0 auto!important;
+    margin-top:clamp(3px,.4vh,7px)!important;
+  }
+  .sidebar-bottom>.nav-link{
+    height:clamp(31px,4.45vh,43px)!important;
+  }
+  .sidebar .profile{
+    margin:clamp(4px,.55vh,8px) 7px 0!important;
+    padding-top:clamp(6px,.8vh,10px)!important;
+    gap:8px!important;
+  }
+  .sidebar .avatar{
+    width:clamp(30px,4.3vh,38px)!important;
+    height:clamp(30px,4.3vh,38px)!important;
+  }
+  .sidebar .profile strong{font-size:clamp(11.5px,1.55vh,14px)!important}
+  .sidebar .profile small{font-size:clamp(10px,1.35vh,12px)!important}
+  .sidebar .profile .icon-button{
+    min-width:34px!important;
+    min-height:34px!important;
+  }
+
   /* Four one-column metric cards made the mobile dashboard unnecessarily tall. */
   #dashboard .metrics{
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
