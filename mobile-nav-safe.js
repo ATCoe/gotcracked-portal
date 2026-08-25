@@ -63,6 +63,12 @@
     return nav;
   }
 
+  function clearLegacyBodyLock() {
+    document.body.classList.remove('mobile-nav-open');
+    document.body.style.removeProperty('overflow');
+    document.documentElement.style.removeProperty('overflow');
+  }
+
   function forceOpenStyles(panel, open) {
     const properties = ['display', 'transform', 'visibility', 'pointer-events'];
     if (open) {
@@ -88,10 +94,8 @@
     toggle.setAttribute('aria-controls', panel.id || 'portal-sidebar');
     toggle.setAttribute('aria-label', shouldOpen ? 'Close menu' : 'Open menu');
     forceOpenStyles(panel, shouldOpen);
-
-    // Never let a legacy listener freeze the document behind this navigation.
-    document.body.classList.remove('mobile-nav-open');
-    requestAnimationFrame(() => document.body.classList.remove('mobile-nav-open'));
+    clearLegacyBodyLock();
+    requestAnimationFrame(clearLegacyBodyLock);
   }
 
   function syncActive() {
@@ -116,7 +120,6 @@
     toggle.setAttribute('aria-controls', panel.id || 'portal-sidebar');
     toggle.setAttribute('aria-expanded', 'false');
 
-    // Capture directly on the control so older bubble listeners never participate.
     toggle.addEventListener('click', event => {
       if (!mobileQuery.matches) return;
       event.preventDefault();
@@ -155,6 +158,11 @@
     buildOnce();
     setOpen(false);
     bind();
+
+    // Tiny defensive observer: only watches body class changes and strips the
+    // one legacy class that can freeze mobile scrolling. No subtree work.
+    const bodyClassGuard = new MutationObserver(clearLegacyBodyLock);
+    bodyClassGuard.observe(document.body, { attributes: true, attributeFilter: ['class'] });
   }
 
   window.GotCrackedMobileNav = { build: buildOnce, setOpen };
