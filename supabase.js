@@ -33,10 +33,13 @@ window.supabaseClient = supabase.createClient(
  *
  * A still-valid persisted access token can be used immediately without waiting
  * on the Supabase cross-tab refresh lock. Expired sessions fall through to one
- * shared getSession() call. Every module consumes this same result.
+ * shared original getSession() call. We also replace the public getSession()
+ * method with this single-flight wrapper so legacy modules cannot create a
+ * second competing refresh path.
  */
 (() => {
   const client = window.supabaseClient;
+  const originalGetSession = client.auth.getSession.bind(client.auth);
   let sessionPromise = null;
   let lastSessionResult = null;
 
@@ -52,18 +55,19 @@ window.supabaseClient = supabase.createClient(
     }
   }
 
-  async function restoreSession() {
-    const persisted = readPersistedSession();
-    if (persisted) {
-      const result = { session:persisted, error:null, source:'persisted' };
-      lastSessionResult = result;
-      return result;
+  async function restoreSession({ force = false } = {}) {
+    if (!force) {
+      const persisted = readPersistedSession();
+      if (persisted) {
+        const result = { session:persisted, error:null, source:'persisted' };
+        lastSessionResult = result;
+        return result;
+      }
+      if (lastSessionResult?.session) return lastSessionResult;
+      if (sessionPromise) return sessionPromise;
     }
 
-    if (lastSessionResult?.session) return lastSessionResult;
-    if (sessionPromise) return sessionPromise;
-
-    sessionPromise = client.auth.getSession()
+    sessionPromise = originalGetSession()
       .then(({ data, error }) => ({
         session:data?.session || null,
         error:error || null,
@@ -83,6 +87,11 @@ window.supabaseClient = supabase.createClient(
     lastSessionResult = null;
     sessionPromise = null;
   }
+
+  client.auth.getSession = async () => {
+    const result = await restoreSession();
+    return { data:{ session:result.session || null }, error:result.error || null };
+  };
 
   client.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') return clear();
