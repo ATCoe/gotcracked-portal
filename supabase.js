@@ -42,6 +42,8 @@ window.supabaseClient = supabase.createClient(
   const originalGetSession = client.auth.getSession.bind(client.auth);
   let sessionPromise = null;
   let lastSessionResult = null;
+  let restoreCooldownUntil = 0;
+  const SESSION_RESTORE_DEADLINE_MS = 11000;
 
   function readPersistedSession() {
     try {
@@ -55,6 +57,12 @@ window.supabaseClient = supabase.createClient(
     }
   }
 
+  function timeoutResult() {
+    const error = new Error('Remembered session restore timed out. Continue with Discord to reconnect.');
+    error.code = 'GC_SESSION_TIMEOUT';
+    return { session:null, error, source:'timeout' };
+  }
+
   async function restoreSession({ force = false } = {}) {
     if (!force) {
       const persisted = readPersistedSession();
@@ -65,20 +73,33 @@ window.supabaseClient = supabase.createClient(
       }
       if (lastSessionResult?.session) return lastSessionResult;
       if (sessionPromise) return sessionPromise;
+      if (Date.now() < restoreCooldownUntil) return timeoutResult();
     }
 
-    sessionPromise = originalGetSession()
-      .then(({ data, error }) => ({
-        session:data?.session || null,
-        error:error || null,
-        source:'supabase'
-      }))
-      .catch(error => ({ session:null, error, source:'supabase' }))
-      .then(result => {
-        if (result.session) lastSessionResult = result;
-        return result;
-      })
-      .finally(() => { sessionPromise = null; });
+    const underlying = originalGetSession()
+      .then(({ data, error }) => ({ session:data?.session || null, error:error || null, source:'supabase' }))
+      .catch(error => ({ session:null, error, source:'supabase' }));
+
+    // If a browser Web Lock is held by another Portal tab, the underlying
+    // promise can wait even before fetch() begins. Race the whole restore, not
+    // just the network request, so desktop can never be trapped behind it.
+    sessionPromise = Promise.race([
+      underlying,
+      new Promise(resolve => setTimeout(() => resolve(timeoutResult()), SESSION_RESTORE_DEADLINE_MS))
+    ]).then(result => {
+      if (result.session) lastSessionResult = result;
+      if (result.source === 'timeout') restoreCooldownUntil = Date.now() + 15000;
+      return result;
+    }).finally(() => { sessionPromise = null; });
+
+    // A late successful restore is still useful for the next operation, even if
+    // the UI already fell back to the login screen.
+    underlying.then(result => {
+      if (result?.session) {
+        lastSessionResult = result;
+        restoreCooldownUntil = 0;
+      }
+    }).catch(() => {});
 
     return sessionPromise;
   }
@@ -86,6 +107,7 @@ window.supabaseClient = supabase.createClient(
   function clear() {
     lastSessionResult = null;
     sessionPromise = null;
+    restoreCooldownUntil = 0;
   }
 
   client.auth.getSession = async () => {
@@ -97,6 +119,7 @@ window.supabaseClient = supabase.createClient(
     if (event === 'SIGNED_OUT') return clear();
     if (session && ['INITIAL_SESSION','SIGNED_IN','TOKEN_REFRESHED','USER_UPDATED'].includes(event)) {
       lastSessionResult = { session, error:null, source:'auth-event' };
+      restoreCooldownUntil = 0;
     }
   });
 
