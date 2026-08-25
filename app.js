@@ -1,15 +1,6 @@
 (() => {
   'use strict';
 
-  const HARDENING_VERSION = '20260825-final2';
-  const hardeningHref = `hardening.css?v=${HARDENING_VERSION}`;
-  if (![...document.styleSheets].some(sheet => sheet.href?.includes('hardening.css'))) {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = hardeningHref;
-    document.body.appendChild(link);
-  }
-
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({
     '&': '&amp;',
     '<': '&lt;',
@@ -48,31 +39,27 @@
   const sidebar = document.querySelector('.sidebar');
   const mobileMenu = document.querySelector('.mobile-menu');
   const ticketModal = document.querySelector('#new-ticket');
+  const mobileQuery = window.matchMedia('(max-width: 750px)');
+
+  // Portal 1.0 no longer uses a full-screen invisible backdrop button for the
+  // mobile menu. If an old cached script created one before this controller
+  // loaded, remove it so it cannot intercept taps.
+  document.querySelectorAll('.sidebar-backdrop').forEach(node => node.remove());
 
   if (sidebar && !sidebar.id) sidebar.id = 'portal-sidebar';
   if (mobileMenu) {
+    mobileMenu.type = 'button';
     mobileMenu.setAttribute('aria-controls', sidebar?.id || 'portal-sidebar');
     mobileMenu.setAttribute('aria-expanded', 'false');
   }
 
-  let sidebarBackdrop = document.querySelector('.sidebar-backdrop');
-  if (!sidebarBackdrop) {
-    sidebarBackdrop = document.createElement('button');
-    sidebarBackdrop.type = 'button';
-    sidebarBackdrop.className = 'sidebar-backdrop';
-    sidebarBackdrop.setAttribute('aria-label', 'Close menu');
-    sidebarBackdrop.hidden = true;
-    document.body.appendChild(sidebarBackdrop);
-  }
-
   function setMobileMenu(open) {
     if (!sidebar || !mobileMenu) return;
-    const shouldOpen = Boolean(open) && window.matchMedia('(max-width: 750px)').matches;
+    const shouldOpen = Boolean(open) && mobileQuery.matches;
     sidebar.classList.toggle('open', shouldOpen);
     document.body.classList.toggle('mobile-nav-open', shouldOpen);
     mobileMenu.setAttribute('aria-expanded', String(shouldOpen));
     mobileMenu.setAttribute('aria-label', shouldOpen ? 'Close menu' : 'Open menu');
-    sidebarBackdrop.hidden = !shouldOpen;
   }
 
   function getRepairs() {
@@ -237,12 +224,26 @@
 
   mobileMenu?.addEventListener('click', event => {
     event.preventDefault();
+    event.stopPropagation();
     setMobileMenu(!sidebar?.classList.contains('open'));
   });
-  sidebarBackdrop?.addEventListener('click', () => setMobileMenu(false));
 
-  window.addEventListener('resize', () => {
-    if (!window.matchMedia('(max-width: 750px)').matches) setMobileMenu(false);
+  // Outside taps close the drawer directly. There is deliberately no invisible
+  // overlay element between the user and the application.
+  document.addEventListener('pointerdown', event => {
+    if (!mobileQuery.matches || !sidebar?.classList.contains('open')) return;
+    const target = event.target instanceof Node ? event.target : null;
+    if (!target) return;
+    if (sidebar.contains(target) || mobileMenu?.contains(target)) return;
+    setMobileMenu(false);
+  }, true);
+
+  mobileQuery.addEventListener?.('change', event => {
+    if (!event.matches) setMobileMenu(false);
+  });
+  window.addEventListener('orientationchange', () => setMobileMenu(false));
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) setMobileMenu(false);
   });
 
   const syncViewFromLocation = () => {
@@ -263,5 +264,5 @@
     activateView(initialView, { updateHash: false });
   }
 
-  window.GotCrackedUI = { renderRepairs, filterRepairs, showTicket, activateView };
+  window.GotCrackedUI = { renderRepairs, filterRepairs, showTicket, activateView, setMobileMenu };
 })();
