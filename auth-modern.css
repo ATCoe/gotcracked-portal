@@ -1,0 +1,35 @@
+.login-screen {
+  position: fixed; inset: 0; z-index: 9999; min-height: 100vh;
+  display: grid; grid-template-columns: 1fr; place-items: center; overflow: auto;
+  padding: 32px 18px;
+  background: radial-gradient(circle at 50% -15%, rgba(17,125,255,.22), transparent 38%), radial-gradient(circle at 100% 100%, rgba(0,190,255,.09), transparent 34%), #030913;
+}
+.login-screen.hidden { display: none; }
+.login-aside { display: none !important; }
+.login-panel {
+  width: min(460px,100%); align-self: auto; justify-self: auto; padding: 42px;
+  border: 1px solid rgba(52,132,218,.42); border-radius: 22px; color: #f6f9ff;
+  background: linear-gradient(155deg,rgba(13,31,54,.98),rgba(5,17,34,.99));
+  box-shadow: 0 28px 90px rgba(0,0,0,.52),0 0 50px rgba(17,113,232,.13);
+}
+.login-panel .login-logo { width: min(245px,78%); margin: 0 auto 30px; filter: drop-shadow(0 12px 24px rgba(0,129,255,.18)); }
+.login-panel .eyebrow { color: #1dc9ff; letter-spacing: .12em; }
+.login-panel h1 { color: #fff; font-size: 34px; letter-spacing: -.8px; }
+.login-panel .subtle { color: #9eb2ca; margin: 8px 0 25px; }
+.login-panel .discord-button { min-height: 50px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: linear-gradient(135deg,#5865f2,#376cf4); box-shadow: 0 10px 25px rgba(55,108,244,.24); }
+.login-panel .discord-button:hover { background: linear-gradient(135deg,#6672ff,#247bff); }
+.login-panel .owner-recovery { margin: 22px 0 0; color: #91a6bf; }
+.login-panel .owner-recovery summary { padding: 4px; color: #65b8ff; font-weight: 750; }
+.login-panel .owner-recovery[open] summary { margin-bottom: 18px; }
+.login-panel form { margin-top: 0; }
+.login-panel label { color: #dbe8f8; }
+.login-panel input { min-height: 46px; border-color: #294869; background: #071425; }
+.login-panel input:focus { border-color: #1ca8ff; outline: 2px solid rgba(28,168,255,.2); }
+.login-panel .demo-note { margin: 20px 0 0; color: #7388a2; text-align: center; }
+.login-panel .error-message { margin: 18px 0 0; line-height: 1.45; text-align: center; }
+@media (max-width:540px) {
+  .login-screen { place-items: start center; padding: 18px 12px; }
+  .login-panel { padding: 30px 23px; border-radius: 18px; }
+  .login-panel .login-logo { margin-bottom: 24px; }
+  .login-panel h1 { font-size: 30px; }
+}
