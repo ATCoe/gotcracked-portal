@@ -89,3 +89,55 @@ window.supabaseClient = supabase.createClient(
     }
   });
 })();
+
+/*
+ * Returning-session fast path.
+ *
+ * workflow.js remains the authority that reloads the live profile and checks
+ * active status. This only avoids holding the login screen over a previously
+ * validated staff session while that small profile query completes.
+ *
+ * A valid Supabase session is still required, the cached staff id must match
+ * that authenticated user, and all shop data remains protected by RLS.
+ */
+(() => {
+  const client = window.supabaseClient;
+  if (!client) return;
+
+  client.auth.getSession().then(({ data, error }) => {
+    const session = data?.session;
+    if (error || !session) return;
+
+    let cachedStaff = null;
+    try {
+      cachedStaff = JSON.parse(sessionStorage.getItem('gotcracked-staff') || 'null');
+    } catch {
+      cachedStaff = null;
+    }
+
+    if (!cachedStaff || cachedStaff.id !== session.user.id) return;
+
+    const login = document.getElementById('login-screen');
+    if (login) login.classList.add('hidden');
+
+    const name = document.getElementById('staff-name');
+    const role = document.getElementById('staff-role');
+    const initials = document.getElementById('staff-initials');
+
+    if (name) name.textContent = cachedStaff.name || 'Staff';
+    if (role) role.textContent = cachedStaff.role || 'Staff';
+    if (initials) {
+      initials.textContent = (cachedStaff.name || 'Staff')
+        .split(' ')
+        .filter(Boolean)
+        .map(part => part[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+    }
+
+    document.dispatchEvent(new CustomEvent('gc-session-shell-restored', {
+      detail: { userId: session.user.id }
+    }));
+  }).catch(() => {});
+})();
