@@ -1,8 +1,11 @@
-// GotCracked Portal - Repair Workflow
-// app.js owns repair data and repair UI only.
-// Authentication is handled by workflow.js.
+// GotCracked Portal
+// app.js
+// Repair data and repair UI only.
+// Authentication/session handling lives in workflow.js.
 
 window.repairs = [];
+
+let repairsLoading = false;
 
 const statusClass = value => ({
     'In diagnosis': 'diagnosis',
@@ -17,9 +20,9 @@ const modal = document.querySelector('#new-ticket');
 const ticketForm = document.querySelector('#ticket-form');
 
 
-// ------------------------------------------------------------
-// LOAD REPAIRS FROM SUPABASE
-// ------------------------------------------------------------
+// ============================================================
+// LOAD REPAIRS
+// ============================================================
 
 async function loadRepairs() {
 
@@ -28,113 +31,140 @@ async function loadRepairs() {
         return;
     }
 
-    const {
-        data,
-        error
-    } = await window.supabaseClient
-        .from('repair_tickets')
-        .select(`
-            *,
-            customers (
-                first_name,
-                last_name,
-                phone,
-                email
-            ),
-            devices (
-                model
-            ),
-            profiles:assigned_user_id (
-                display_name
-            )
-        `)
-        .order('ticket_number', {
-            ascending: false
-        });
-
-
-    if (error) {
-
-        console.error(
-            'Repair load failed:',
-            error
-        );
-
+    if (repairsLoading) {
         return;
     }
 
+    repairsLoading = true;
 
-    window.repairs = (data || []).map(ticket => {
+    try {
 
-        const customer = ticket.customers;
+        // Never query repair data while anonymous.
+        const {
+            data: {
+                session
+            }
+        } = await window.supabaseClient.auth.getSession();
 
-        const customerName = customer
-            ? [
-                customer.first_name,
-                customer.last_name
-            ]
-                .filter(Boolean)
-                .join(' ')
-            : 'Unknown';
-
-
-        return {
-
-            id:
-                ticket.ticket_number,
-
-            customer:
-                customerName || 'Unknown',
-
-            phone:
-                customer?.phone || '',
-
-            email:
-                customer?.email || '',
-
-            device:
-                ticket.devices?.model ||
-                'Unknown device',
-
-            service:
-                ticket.customer_issue ||
-                'No service listed',
-
-            issue:
-                ticket.customer_issue ||
-                '',
-
-            tech:
-                ticket.profiles?.display_name ||
-                '—',
-
-            status:
-                ticket.status ||
-                'In diagnosis',
-
-            updated:
-                ticket.updated_at
-                    ? new Date(
-                        ticket.updated_at
-                    ).toLocaleString()
-                    : 'Recently updated',
-
-            icon:
-                '▯'
-
-        };
-
-    });
+        if (!session) {
+            window.repairs = [];
+            renderRepairs();
+            return;
+        }
 
 
-    renderRepairs();
+        const {
+            data,
+            error
+        } = await window.supabaseClient
+            .from('repair_tickets')
+            .select(`
+                *,
+                customers (
+                    first_name,
+                    last_name,
+                    phone,
+                    email
+                ),
+                devices (
+                    model
+                ),
+                profiles:assigned_user_id (
+                    display_name
+                )
+            `)
+            .order('ticket_number', {
+                ascending: false
+            });
 
+
+        if (error) {
+
+            console.error(
+                'Repair load failed:',
+                error
+            );
+
+            return;
+        }
+
+
+        window.repairs = (data || []).map(ticket => {
+
+            const customer = ticket.customers;
+
+            const customerName = customer
+                ? [
+                    customer.first_name,
+                    customer.last_name
+                ]
+                    .filter(Boolean)
+                    .join(' ')
+                : 'Unknown';
+
+
+            return {
+
+                id:
+                    ticket.ticket_number,
+
+                customer:
+                    customerName || 'Unknown',
+
+                phone:
+                    customer?.phone || '',
+
+                email:
+                    customer?.email || '',
+
+                device:
+                    ticket.devices?.model ||
+                    'Unknown device',
+
+                service:
+                    ticket.customer_issue ||
+                    'No service listed',
+
+                issue:
+                    ticket.customer_issue ||
+                    '',
+
+                tech:
+                    ticket.profiles?.display_name ||
+                    '—',
+
+                status:
+                    ticket.status ||
+                    'In diagnosis',
+
+                updated:
+                    ticket.updated_at
+                        ? new Date(
+                            ticket.updated_at
+                        ).toLocaleString()
+                        : 'Recently updated',
+
+                icon:
+                    '▯'
+
+            };
+
+        });
+
+
+        renderRepairs();
+
+    } finally {
+
+        repairsLoading = false;
+
+    }
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // RENDER REPAIRS
-// ------------------------------------------------------------
+// ============================================================
 
 function renderRepairs(items = window.repairs) {
 
@@ -285,9 +315,9 @@ function renderRepairs(items = window.repairs) {
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // FILTER REPAIRS
-// ------------------------------------------------------------
+// ============================================================
 
 function filterRepairs() {
 
@@ -341,9 +371,9 @@ function filterRepairs() {
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // NAVIGATION
-// ------------------------------------------------------------
+// ============================================================
 
 document
     .querySelectorAll('[data-view]')
@@ -388,15 +418,14 @@ document
                     id;
 
             }
-
         );
 
     });
 
 
-// ------------------------------------------------------------
+// ============================================================
 // SEARCH
-// ------------------------------------------------------------
+// ============================================================
 
 const search =
     document.querySelector(
@@ -414,9 +443,9 @@ if (search) {
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // STATUS FILTER
-// ------------------------------------------------------------
+// ============================================================
 
 const filter =
     document.querySelector(
@@ -434,9 +463,9 @@ if (filter) {
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // NEW TICKET MODAL
-// ------------------------------------------------------------
+// ============================================================
 
 document
     .querySelectorAll('[data-open-ticket]')
@@ -456,9 +485,9 @@ document
     });
 
 
-// ------------------------------------------------------------
+// ============================================================
 // TICKET DETAILS
-// ------------------------------------------------------------
+// ============================================================
 
 const detailModal =
     document.querySelector(
@@ -615,9 +644,9 @@ function showTicket(ticketId) {
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // TICKET CLICK HANDLER
-// ------------------------------------------------------------
+// ============================================================
 
 document.addEventListener(
     'click',
@@ -642,9 +671,9 @@ document.addEventListener(
 );
 
 
-// ------------------------------------------------------------
+// ============================================================
 // NEW TICKET FORM
-// ------------------------------------------------------------
+// ============================================================
 
 if (ticketForm) {
 
@@ -665,9 +694,9 @@ if (ticketForm) {
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // MOBILE MENU
-// ------------------------------------------------------------
+// ============================================================
 
 const mobileMenu =
     document.querySelector(
@@ -693,8 +722,87 @@ if (mobileMenu) {
 }
 
 
-// ------------------------------------------------------------
-// INITIAL LOAD
-// ------------------------------------------------------------
+// ============================================================
+// AUTH STATE
+// ============================================================
 
-loadRepairs();
+if (window.supabaseClient) {
+
+    window.supabaseClient.auth
+        .onAuthStateChange(
+            async (event, session) => {
+
+                if (
+                    event === 'SIGNED_IN' &&
+                    session
+                ) {
+
+                    await loadRepairs();
+
+                    return;
+                }
+
+
+                if (
+                    event === 'INITIAL_SESSION' &&
+                    session
+                ) {
+
+                    await loadRepairs();
+
+                    return;
+                }
+
+
+                if (
+                    event === 'SIGNED_OUT'
+                ) {
+
+                    window.repairs = [];
+
+                    renderRepairs();
+
+                }
+
+            }
+        );
+
+}
+
+
+// ============================================================
+// INITIAL AUTH-AWARE LOAD
+// ============================================================
+
+(async function initializeRepairs() {
+
+    if (!window.supabaseClient) {
+        console.error(
+            'Supabase client is not available.'
+        );
+        return;
+    }
+
+
+    const {
+        data: {
+            session
+        }
+    } =
+        await window.supabaseClient.auth.getSession();
+
+
+    if (session) {
+
+        await loadRepairs();
+
+    } else {
+
+        // Anonymous users should see no repair data.
+        window.repairs = [];
+
+        renderRepairs();
+
+    }
+
+})();
