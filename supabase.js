@@ -7,7 +7,7 @@ window.supabaseClient = supabase.createClient(
     SUPABASE_ANON_KEY
 );
 
-const PORTAL_V1_FINAL_VERSION = '20260825-v1final2';
+const PORTAL_V1_FINAL_VERSION = '20260825-v1final3';
 if (!document.querySelector('link[data-gc-v1-final]')) {
   const finalCss = document.createElement('link');
   finalCss.rel = 'stylesheet';
