@@ -4,6 +4,42 @@
   const ops = () => window.GotCrackedOperationsV1;
   const activate = view => window.GotCrackedUI?.activateView?.(view);
   const metricViews = ['repairs', 'appointments', 'ready-pickup', 'reports'];
+  const workflowMedia = window.matchMedia('(max-width: 1100px)');
+
+  function normalizeWorkOrderDrawer() {
+    const layout = document.getElementById('v1-workorder-layout');
+    if (!layout) {
+      document.body.classList.remove('v1-workflow-open');
+      return;
+    }
+
+    if (workflowMedia.matches) {
+      if (layout.dataset.v1DrawerMode !== 'narrow') {
+        layout.dataset.v1DrawerMode = 'narrow';
+        layout.classList.add('drawer-collapsed');
+      }
+      const open = !layout.classList.contains('drawer-collapsed');
+      document.body.classList.toggle('v1-workflow-open', open);
+      layout.querySelector('.v1-workflow-panel')?.setAttribute('aria-hidden', open ? 'false' : 'true');
+    } else {
+      layout.dataset.v1DrawerMode = 'wide';
+      layout.classList.remove('drawer-collapsed');
+      document.body.classList.remove('v1-workflow-open');
+      layout.querySelector('.v1-workflow-panel')?.setAttribute('aria-hidden', 'false');
+    }
+  }
+
+  function syncLeadDrawerState() {
+    const rightDrawer = document.getElementById('v1-lead-drawer');
+    if (!rightDrawer) {
+      document.body.classList.remove('v1-overlay-open');
+      return;
+    }
+    const open = rightDrawer.classList.contains('open');
+    rightDrawer.setAttribute('aria-label', 'Lead workflow panel');
+    rightDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+    document.body.classList.toggle('v1-overlay-open', open);
+  }
 
   function decorate() {
     document.querySelectorAll('.sidebar-backdrop,.v1-drawer-backdrop').forEach(backdrop => {
@@ -28,11 +64,8 @@
       button.setAttribute('aria-label', 'Create work order using guided intake');
     });
 
-    const rightDrawer = document.getElementById('v1-lead-drawer');
-    if (rightDrawer) {
-      rightDrawer.setAttribute('aria-label', 'Lead workflow panel');
-      rightDrawer.setAttribute('aria-hidden', rightDrawer.classList.contains('open') ? 'false' : 'true');
-    }
+    syncLeadDrawerState();
+    normalizeWorkOrderDrawer();
   }
 
   function openMetric(card) {
@@ -57,6 +90,10 @@
       event.stopPropagation();
       ops().openIntake();
     }
+
+    if (target.closest('[data-v1-toggle-workflow]')) {
+      requestAnimationFrame(normalizeWorkOrderDrawer);
+    }
   }, true);
 
   document.addEventListener('keydown', event => {
@@ -76,6 +113,8 @@
     attributeFilter: ['class', 'hidden']
   });
 
+  workflowMedia.addEventListener?.('change', () => requestAnimationFrame(normalizeWorkOrderDrawer));
+  window.addEventListener('resize', () => requestAnimationFrame(normalizeWorkOrderDrawer));
   window.addEventListener('gc-view-changed', () => requestAnimationFrame(decorate));
   window.addEventListener('load', decorate, { once: true });
   setTimeout(decorate, 1700);
