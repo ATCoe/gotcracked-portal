@@ -213,7 +213,9 @@
     const openTicketButton = target.closest('[data-open-ticket]');
     if (openTicketButton) {
       event.preventDefault();
-      ticketModal?.showModal();
+      const guidedIntake = window.GotCrackedOperationsV1?.openIntake;
+      if (typeof guidedIntake === 'function') guidedIntake();
+      else ticketModal?.showModal();
       return;
     }
 
