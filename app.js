@@ -8,13 +8,6 @@
         'Ready for pickup': 'ready'
     }[value] || '');
 
-    const escapeHtml = value => String(value ?? '').replace(
-        /[&<>"']/g,
-        character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character])
-    );
-
-    let linkedTicketOpened = false;
-
     const list = document.querySelector('#repair-list');
     const table = document.querySelector('#repair-table');
 
@@ -122,59 +115,6 @@
                 .filter(r => r.status !== 'Ready for pickup')
                 .length;
         }
-
-        openLinkedTicket();
-    }
-
-    function openLinkedTicket() {
-        if (linkedTicketOpened) return;
-        const ticketId = new URLSearchParams(window.location.search).get('ticket');
-        if (!ticketId || !getRepairs().some(repair => String(repair.id) === ticketId)) return;
-        linkedTicketOpened = true;
-        document.querySelectorAll('.view').forEach(view => view.classList.toggle('active-view', view.id === 'repairs'));
-        document.querySelectorAll('.nav-link').forEach(link => link.classList.toggle('active', link.dataset.view === 'repairs'));
-        showTicket(ticketId);
-    }
-
-    function printDeviceLabel(ticket) {
-        document.querySelector('#device-label-print')?.remove();
-        const label = document.createElement('section');
-        label.id = 'device-label-print';
-        label.className = 'device-label-print';
-        label.setAttribute('aria-hidden', 'true');
-        label.innerHTML = `
-            <div class="label-copy">
-                <div class="label-brand">GOTCRACKED · WORK ORDER</div>
-                <div class="label-ticket">${escapeHtml(ticket.id || 'Ticket pending')}</div>
-                <div class="label-customer">${escapeHtml(ticket.customer || 'Customer')}</div>
-                <div class="label-device">${escapeHtml(ticket.device || 'Device pending')}</div>
-                <div class="label-date">Printed ${new Date().toLocaleString()}</div>
-            </div>
-            <div><div class="label-qr" id="label-qr"></div><div class="label-scan">SCAN TO OPEN WORK ORDER</div></div>
-        `;
-        document.body.appendChild(label);
-
-        const workOrderUrl = new URL('/', 'https://portal.gotcracked.co');
-        workOrderUrl.searchParams.set('ticket', ticket.id || '');
-        if (window.QRCode) {
-            new window.QRCode(document.querySelector('#label-qr'), {
-                text: workOrderUrl.toString(),
-                width: 180,
-                height: 180,
-                correctLevel: window.QRCode.CorrectLevel.H
-            });
-        } else {
-            document.querySelector('#label-qr').textContent = ticket.id || '';
-        }
-
-        const cleanUp = () => {
-            document.body.classList.remove('printing-device-label');
-            label.remove();
-            window.removeEventListener('afterprint', cleanUp);
-        };
-        window.addEventListener('afterprint', cleanUp);
-        document.body.classList.add('printing-device-label');
-        setTimeout(() => window.print(), 120);
     }
 
     function filterRepairs() {
@@ -295,10 +235,6 @@
                 </div>
 
             </div>
-
-            <button class="primary-button label-print-button" id="print-device-label" type="button">
-                ▣ Print device label
-            </button>
         `;
 
         detailModal.showModal();
@@ -309,10 +245,6 @@
                 'click',
                 () => detailModal.close()
             );
-
-        document
-            .querySelector('#print-device-label')
-            ?.addEventListener('click', () => printDeviceLabel(ticket));
     }
 
     /*

@@ -39,13 +39,14 @@
     const newPasswordPanel =
         document.querySelector('#new-password-panel');
 
+    const forgotPasswordForm =
+        document.querySelector('#forgot-password-form');
+
     const newPasswordForm =
         document.querySelector('#new-password-form');
 
     let recoveryMode =
         window.location.hash.includes('type=recovery');
-
-    let initialPasswordSetupMode = false;
 
     /*
      * Helpers
@@ -118,31 +119,11 @@
     }
 
     function showRecoveryPanel() {
-        initialPasswordSetupMode = false;
         recoveryMode = true;
-        document.querySelector('#new-password-eyebrow').textContent = 'Account recovery';
-        document.querySelector('#new-password-title').textContent = 'Create a new password';
-        document.querySelector('#new-password-description').textContent = 'Choose a password with at least 8 characters.';
-        newPasswordForm?.querySelector('button[type="submit"]')?.replaceChildren('Save new password');
         showAuthPanel(newPasswordPanel);
         setMessage(
             document.querySelector('#new-password-message'),
             'Use the form below to set your new password.'
-        );
-        document.querySelector('#new-password')?.focus();
-    }
-
-    function showInitialPasswordPanel() {
-        initialPasswordSetupMode = true;
-        recoveryMode = false;
-        document.querySelector('#new-password-eyebrow').textContent = 'First-time setup';
-        document.querySelector('#new-password-title').textContent = 'Secure your staff account';
-        document.querySelector('#new-password-description').textContent = 'Create your private password before entering the GotCracked Portal.';
-        newPasswordForm?.querySelector('button[type="submit"]')?.replaceChildren('Set password and enter portal');
-        showAuthPanel(newPasswordPanel);
-        setMessage(
-            document.querySelector('#new-password-message'),
-            'This one-time step is required for every new staff account.'
         );
         document.querySelector('#new-password')?.focus();
     }
@@ -224,27 +205,15 @@
             return false;
         }
 
-        if (!profile.active) {
-            await window.supabaseClient.auth.signOut();
-            showLoginError(
-                'This staff account is disabled. Ask a GotCracked owner to restore access.'
-            );
-            return false;
-        }
-
         const staff = {
             id: userId,
-            email: profile.email || '',
             name:
                 profile.display_name ||
                 'Staff',
             role:
                 profile.role ||
-                'Staff',
-            locationId: profile.location_id
+                'Staff'
         };
-
-        window.GotCrackedStaff = staff;
 
         sessionStorage.setItem(
             'gotcracked-staff',
@@ -253,13 +222,12 @@
 
         setStaff(staff);
 
-        window.dispatchEvent(
-            new CustomEvent('gotcracked:staff-ready', { detail: staff })
-        );
-
         if (profile.must_change_password) {
-            showInitialPasswordPanel();
-            return false;
+
+            window.location.href =
+                '/setup-password.html';
+
+            return true;
         }
 
         if (loginScreen) {
@@ -407,6 +375,8 @@
 
     async function loadSession() {
 
+        await window.GotCrackedDiscordReady;
+
         if (!window.supabaseClient) {
 
             console.error(
@@ -503,6 +473,7 @@
                 ''
             );
             showAuthPanel(forgotPasswordPanel);
+            document.querySelector('#reset-email')?.focus();
         });
 
     document
@@ -511,6 +482,68 @@
             showAuthPanel(signInPanel);
             loginEmail?.focus();
         });
+
+    forgotPasswordForm?.addEventListener(
+        'submit',
+        async event => {
+            event.preventDefault();
+
+            const message =
+                document.querySelector('#forgot-password-message');
+
+            const email =
+                document.querySelector('#reset-email')?.value?.trim();
+
+            if (!email) {
+                setMessage(message, 'Enter your work email.', true);
+                return;
+            }
+
+            if (!window.supabaseClient) {
+                setMessage(
+                    message,
+                    'The portal could not connect to authentication. Please refresh and try again.',
+                    true
+                );
+                return;
+            }
+
+            const button =
+                forgotPasswordForm.querySelector('button[type="submit"]');
+
+            button.disabled = true;
+            button.textContent = 'Sending…';
+            setMessage(message, '');
+
+            try {
+                const { error } = await window.supabaseClient
+                    .auth.resetPasswordForEmail(email, {
+                        redirectTo:
+                            window.location.origin +
+                            window.location.pathname
+                    });
+
+                if (error) {
+                    throw error;
+                }
+
+                setMessage(
+                    message,
+                    'If this email belongs to a staff account, a reset link has been sent.'
+                );
+            } catch (error) {
+                console.error('PASSWORD RESET REQUEST FAILED:', error);
+                setMessage(
+                    message,
+                    error?.message || 'Unable to send the reset link. Please try again.',
+                    true
+                );
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Send reset link';
+            }
+        }
+    );
 
     newPasswordForm?.addEventListener(
         'submit',
@@ -551,30 +584,16 @@
                     throw error;
                 }
 
-                if (initialPasswordSetupMode) {
-                    const { error: completionError } = await window.supabaseClient
-                        .rpc('complete_initial_password_setup');
-
-                    if (completionError) {
-                        throw completionError;
-                    }
-
-                    initialPasswordSetupMode = false;
-                    newPasswordForm.reset();
-                    loginScreen?.classList.add('hidden');
-                    await loadRepairs();
-                } else {
-                    await window.supabaseClient.auth.signOut();
-                    clearRecoveryUrl();
-                    recoveryMode = false;
-                    newPasswordForm.reset();
-                    showAuthPanel(signInPanel);
-                    setMessage(
-                        document.querySelector('#login-error'),
-                        'Password updated. Sign in with your new password.'
-                    );
-                    loginEmail?.focus();
-                }
+                await window.supabaseClient.auth.signOut();
+                clearRecoveryUrl();
+                recoveryMode = false;
+                newPasswordForm.reset();
+                showAuthPanel(signInPanel);
+                setMessage(
+                    document.querySelector('#login-error'),
+                    'Password updated. Sign in with your new password.'
+                );
+                loginEmail?.focus();
             } catch (error) {
                 console.error('PASSWORD UPDATE FAILED:', error);
                 setMessage(
@@ -584,9 +603,7 @@
                 );
             } finally {
                 button.disabled = false;
-                button.textContent = initialPasswordSetupMode
-                    ? 'Set password and enter portal'
-                    : 'Save new password';
+                button.textContent = 'Save new password';
             }
         }
     );
@@ -852,9 +869,6 @@
                 sessionStorage.removeItem(
                     'gotcracked-staff'
                 );
-
-                window.GotCrackedStaff = null;
-                window.dispatchEvent(new CustomEvent('gotcracked:staff-signed-out'));
 
                 window.GotCrackedRepairs = [];
 

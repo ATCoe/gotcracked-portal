@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="assets/gotcracked-favicon.png" />
-    <link rel="canonical" href="https://portal.gotcracked.co/" />
     <title>GotCracked | Portal</title>
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="workflow.css" />
@@ -15,19 +14,21 @@
       <div class="login-panel">
         <img class="login-logo" src="assets/gotcracked-portal-logo.png" alt="GotCracked" />
         <div id="sign-in-panel">
-          <p class="eyebrow">Staff portal</p><h1>Welcome back.</h1><p class="subtle">Sign in to manage today’s repair work.</p>
+          <p class="eyebrow">Staff portal</p><h1>Welcome back.</h1><p class="subtle">Use your approved GotCracked Discord account.</p>
+          <button id="discord-login" class="discord-button" type="button"><span>◈</span> Continue with Discord</button>
+          <details class="owner-recovery"><summary>Owner recovery sign-in</summary>
           <form id="login-form"><label>Work email<input id="login-email" type="email" required autocomplete="email" placeholder="name@gotcracked.co"></label><label>Password<input id="login-password" type="password" required autocomplete="current-password" placeholder="Password"></label><button class="primary-button" type="submit">Sign in to portal</button></form>
-          <button id="forgot-password" class="text-button" type="button">Can’t sign in?</button>
+          <button id="forgot-password" class="text-button" type="button">Forgot password?</button></details>
           <p id="login-error" class="error-message" role="alert"></p>
-          <p class="demo-note">Authorized GotCracked staff only. Use your company email to sign in.</p>
+          <p class="demo-note">Invite-only. You must also belong to the GotCracked staff Discord.</p>
         </div>
         <div id="forgot-password-panel" class="auth-panel hidden" aria-hidden="true">
-          <p class="eyebrow">Account recovery</p><h1>Ask an owner for access.</h1><p class="subtle">GotCracked staff logins do not require a working email inbox.</p>
-          <div class="recovery-route-note"><span>✓</span><p><strong>No recovery email needed</strong>An owner can issue a one-time temporary password from <b>Staff accounts</b>. Sign in with it and the portal will immediately require your own private password.</p></div>
-          <button class="primary-button" type="button" data-show-sign-in>Back to sign in</button><p id="forgot-password-message" class="auth-message" role="status"></p>
+          <p class="eyebrow">Account recovery</p><h1>Reset your password</h1><p class="subtle">Enter your work email and we’ll send a secure reset link.</p>
+          <form id="forgot-password-form"><label>Work email<input id="reset-email" type="email" required autocomplete="email" placeholder="name@gotcracked.co"></label><button class="primary-button" type="submit">Send reset link</button></form>
+          <button class="text-button" type="button" data-show-sign-in>Back to sign in</button><p id="forgot-password-message" class="auth-message" role="status"></p>
         </div>
         <div id="new-password-panel" class="auth-panel hidden" aria-hidden="true">
-          <p class="eyebrow" id="new-password-eyebrow">Account recovery</p><h1 id="new-password-title">Create a new password</h1><p class="subtle" id="new-password-description">Choose a password with at least 8 characters.</p>
+          <p class="eyebrow">Account recovery</p><h1>Create a new password</h1><p class="subtle">Choose a password with at least 8 characters.</p>
           <form id="new-password-form"><label>New password<input id="new-password" type="password" required minlength="8" autocomplete="new-password"></label><label>Confirm new password<input id="confirm-password" type="password" required minlength="8" autocomplete="new-password"></label><button class="primary-button" type="submit">Save new password</button></form>
           <p id="new-password-message" class="auth-message" role="status"></p>
         </div>
@@ -40,16 +41,16 @@
     <img src="assets/gotcracked-portal-logo.png" alt="GotCracked" class="brand-logo">
 </a>
         <nav aria-label="Main navigation">
-          <a class="nav-link" href="https://gotcracked.co/"><span>↗</span>Customer site</a>
           <a class="nav-link active" href="#dashboard" data-view="dashboard"><span>▦</span>Dashboard</a>
           <a class="nav-link" href="#repairs" data-view="repairs"><span>⌁</span>Repairs <b id="repair-count">5</b></a>
+          <a class="nav-link" href="#leads" data-view="leads"><span>⌁</span>Leads <b id="lead-count">0</b></a>
           <a class="nav-link" href="#appointments" data-view="appointments"><span>◷</span>Appointments</a>
           <a class="nav-link" href="#customers" data-view="customers"><span>♙</span>Customers</a>
           <a class="nav-link" href="#inventory" data-view="inventory"><span>▤</span>Inventory</a>
           <a class="nav-link" href="#reports" data-view="reports"><span>◫</span>Reports</a>
+          <a class="nav-link" href="#staff" data-view="staff"><span>♟</span>Staff access</a>
         </nav>
         <div class="sidebar-bottom">
-          <a id="staff-accounts-nav" class="nav-link hidden" href="#staff-accounts" data-view="staff-accounts"><span>♙</span>Staff accounts</a>
           <a class="nav-link" href="#settings" data-view="settings"><span>⚙</span>Settings</a>
           <div class="profile"><div id="staff-initials" class="avatar">AC</div><div><strong id="staff-name">Austin C.</strong><small id="staff-role">Owner</small></div><button id="sign-out" class="icon-button" aria-label="Sign out">↪</button></div>
         </div>
@@ -73,30 +74,23 @@
         </section>
 
         <section id="repairs" class="view"><div class="page-heading"><div><p class="eyebrow">Operations</p><h1>Repair tickets</h1><p class="subtle">Track every device from intake through pickup.</p></div><button class="primary-button" data-open-ticket>+ New repair</button></div><div class="card"><div class="toolbar"><div class="search">⌕ <input id="repair-search" placeholder="Search ticket, customer, or device" /></div><select id="status-filter"><option value="all">All statuses</option><option>In diagnosis</option><option>Waiting on parts</option><option>In repair</option><option>Ready for pickup</option></select></div><div class="table-wrap"><table><thead><tr><th>Ticket</th><th>Customer / device</th><th>Service</th><th>Assigned to</th><th>Status</th><th>Updated</th></tr></thead><tbody id="repair-table"></tbody></table></div></div></section>
+        <section id="leads" class="view"><div class="page-heading"><div><p class="eyebrow">Discord-connected pipeline</p><h1>Leads</h1><p class="subtle">The same live lead queue used by the GotCracked bot.</p></div></div><div class="card"><div class="toolbar"><div class="search">⌕ <input id="lead-search" placeholder="Search leads"></div><select id="lead-status"><option value="all">All statuses</option><option value="new">New</option><option value="claimed">Claimed</option><option value="qualified">Qualified</option><option value="won">Won</option><option value="lost">Lost</option></select></div><div id="portal-leads"></div></div></section>
         <section id="appointments" class="view"><div class="page-heading"><div><p class="eyebrow">Scheduling</p><h1>Appointments</h1><p class="subtle">Reserve time without losing room for walk-ins.</p></div><button class="primary-button" data-open-ticket>+ Walk-in repair</button></div><div class="empty-card"><span>◷</span><h2>Appointment calendar is ready for your schedule.</h2><p>Connect your booking page when you’re ready; today’s appointments already appear on the dashboard.</p></div></section>
         <section id="customers" class="view"><div class="page-heading"><div><p class="eyebrow">Relationships</p><h1>Customers</h1><p class="subtle">A complete repair history for every customer.</p></div><button class="primary-button">+ New customer</button></div><div class="empty-card"><span>♙</span><h2>Customer records are linked to every repair ticket.</h2><p>Search, contact, and view devices from one place.</p></div></section>
         <section id="inventory" class="view"><div class="page-heading"><div><p class="eyebrow">Parts & supplies</p><h1>Inventory</h1><p class="subtle">Know what is on hand before you promise a turnaround.</p></div><button class="primary-button">+ Add part</button></div><div class="empty-card"><span>▤</span><h2>Inventory management foundation is in place.</h2><p>Parts will support stock levels, suppliers, reorder points, and ticket reservations.</p></div></section>
         <section id="reports" class="view"><div class="page-heading"><div><p class="eyebrow">Business intelligence</p><h1>Reports</h1><p class="subtle">Repair velocity, sales, margins, and technician workload.</p></div></div><div class="empty-card"><span>◫</span><h2>Your reports will grow with real shop data.</h2><p>The dashboard starts the process with your daily operating picture.</p></div></section>
-        <section id="staff-accounts" class="view">
-          <div class="page-heading"><div><p class="eyebrow">Owner controls</p><h1>Staff accounts</h1><p class="subtle">Create access, issue one-time passwords, and disable accounts without email recovery.</p></div><button id="refresh-staff" class="secondary-button" type="button">Refresh</button></div>
-          <div id="staff-admin-notice" class="staff-admin-notice hidden" role="status"></div>
-          <section class="staff-admin-grid">
-            <article class="card"><h2>Add a staff account</h2><p class="subtle">The portal generates a temporary password you can copy and give to the staff member.</p><form id="create-staff-form" class="settings-list staff-form"><label>Display name<input name="displayName" required maxlength="80" placeholder="Taylor Morgan"></label><label>Login email<input name="email" required type="email" placeholder="taylor@gotcracked.co"></label><label>Role<select name="role"><option value="owner">Owner</option><option value="manager">Manager</option><option value="technician">Technician</option><option value="front_desk">Front desk</option></select></label><button class="primary-button" type="submit">Create account</button></form></article>
-            <article class="card"><h2>Change my password</h2><p class="subtle">Use this anytime you know your current password and are already signed in.</p><form id="change-my-password-form" class="settings-list staff-form"><label>New password<input name="password" required type="password" minlength="8" autocomplete="new-password"></label><label>Confirm password<input name="confirmation" required type="password" minlength="8" autocomplete="new-password"></label><button class="primary-button" type="submit">Update my password</button></form></article>
-          </section>
-          <article class="card staff-list-card"><div class="card-title"><div><h2>Portal users</h2><p>Only active owners can manage staff access.</p></div></div><div class="table-wrap"><table class="staff-table"><thead><tr><th>Staff member</th><th>Role</th><th>Access</th><th>Password</th><th>Last sign-in</th><th>Actions</th></tr></thead><tbody id="staff-account-rows"><tr><td colspan="6">Open this page after signing in to load staff accounts.</td></tr></tbody></table></div></article>
-        </section>
         <section id="settings" class="view"></section>
+        <section id="staff" class="view"><div class="page-heading"><div><p class="eyebrow">Discord + Portal</p><h1>Staff access</h1><p class="subtle">Invite staff and keep Portal access tied to the GotCracked Discord.</p></div></div><div class="two-col"><article class="card"><h2>Invite a staff member</h2><p class="subtle">The link expires in 72 hours and can be used once.</p><form id="staff-invite-form" class="settings-list"><label>Display name<input name="displayName" required placeholder="Jordan Smith"></label><label>Discord user ID (recommended)<input name="discordUserId" placeholder="Right-click user → Copy User ID"></label><label>Portal role<select name="role"><option value="front_desk">Front desk</option><option value="technician">Technician</option><option value="manager">Manager</option></select></label><button class="primary-button" type="submit">Create and copy invite</button><p id="staff-invite-output" class="auth-message" role="status"></p></form></article><article class="card"><h2>Your Discord identity</h2><p>Existing owner accounts should link Discord once. After linking, use Discord for normal sign-in and keep email/password only for recovery.</p><button id="link-discord" class="discord-button" type="button">Link Discord account</button><p class="demo-note">Portal roles remain the final authority. Discord membership is checked at each sign-in.</p></article></div></section>
       </main>
     </div>
     <dialog id="new-ticket"><form method="dialog" id="ticket-form"><div class="modal-head"><div><p class="eyebrow">New intake</p><h2>Create repair ticket</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><div class="form-grid"><label>Customer name<input required name="customer" placeholder="e.g. Taylor Morgan" /></label><label>Phone number<input required name="phone" placeholder="(555) 555-5555" /></label><label>Device<input required name="device" placeholder="e.g. iPhone 15 Pro" /></label><label>Repair type<select name="service"><option>Screen repair</option><option>Battery replacement</option><option>Diagnosis</option><option>Charging issue</option><option>Other repair</option></select></label><label class="full">Customer-reported issue<textarea name="issue" placeholder="What is happening with the device?"></textarea></label></div><div class="modal-actions"><button value="cancel" class="secondary-button">Cancel</button><button class="primary-button" value="default">Create ticket</button></div></form></dialog>
     <dialog id="ticket-detail"><div id="ticket-detail-content"></div></dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase.js"></script>
+    <script src="discord-integration.js"></script>
     <script src="workflow.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
     <script src="app.js"></script>
-    <script src="portal-complete.js"></script>
-    <script src="staff-admin.js"></script>
+    <script src="leads.js"></script>
+    <script src="portal-complete.js?v=2"></script>
   </body>
 </html>

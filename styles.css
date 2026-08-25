@@ -13,6 +13,22 @@
   overflow: visible !important;
 }
 
+.discord-button {
+  width: 100%; border: 0; border-radius: 12px; padding: 13px 16px; cursor: pointer;
+  color: #fff; background: #5865f2; font: inherit; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.discord-button:hover { background: #4752c4; }
+.discord-button:disabled { opacity: .65; cursor: wait; }
+.owner-recovery { margin-top: 18px; color: var(--muted, #78859a); }
+.owner-recovery summary { cursor: pointer; text-align: center; font-size: .86rem; }
+.owner-recovery form { margin-top: 16px; }
+.lead-row { width: 100%; display: grid; grid-template-columns: 90px 1fr 180px 160px 20px; align-items: center; gap: 14px; padding: 16px; border: 0; border-bottom: 1px solid rgba(130,145,170,.16); background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.lead-row:hover { background: rgba(45,135,255,.06); }
+.lead-row small, .lead-timeline small { display: block; color: var(--muted, #78859a); }
+.lead-timeline p { padding: 12px 0; border-bottom: 1px solid rgba(130,145,170,.16); }
+@media (max-width: 800px) { .lead-row { grid-template-columns: 80px 1fr 20px; } .lead-row > :nth-child(3), .lead-row > :nth-child(4) { display: none; } }
+
 .sidebar .brand-logo {
   width: 125px !important;
   height: 80px !important;
