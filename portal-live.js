@@ -49,14 +49,14 @@
       client.from('inventory_items').select('*').eq('active', true).order('name').limit(500),
       client.from('repair_tickets').select('*, customers(first_name,last_name,phone), devices(model,manufacturer), profiles:assigned_user_id(display_name), work_order_items(*)').order('created_at', { ascending: false }).limit(300),
       client.from('leads').select('*').order('created_at', { ascending: false }).limit(300),
-      client.from('profiles').select('id,display_name,role,active').eq('active', true).order('display_name'),
+      canManageStaff ? client.functions.invoke('manage-staff', { body: { action: 'list' } }) : Promise.resolve({ data: { staff: [profile] } }),
       client.from('services').select('*').eq('active', true).order('name'),
       client.from('suppliers').select('*').eq('active', true).order('name'),
       client.from('promo_codes').select('*').order('created_at', { ascending: false }),
       client.from('media_posts').select('*').order('published_at', { ascending: false }),
       client.from('business_settings').select('*').eq('location_id', profile.location_id).maybeSingle()
     ]);
-    cache = { appointments: appointments.data || [], customers: customers.data || [], inventory: inventory.data || [], repairs: repairs.data || [], leads: leads.data || [], staff: staff.data || [], services: services.data || [], suppliers: suppliers.data || [], promos: promos.data || [], media: media.data || [], settings: settings.data || null };
+    cache = { appointments: appointments.data || [], customers: customers.data || [], inventory: inventory.data || [], repairs: repairs.data || [], leads: leads.data || [], staff: staff.data?.staff || [], services: services.data || [], suppliers: suppliers.data || [], promos: promos.data || [], media: media.data || [], settings: settings.data || null };
     renderAll();
   }
 
@@ -133,7 +133,22 @@
     </div>`;
   }
 
-  function renderAll() { renderDashboard(); renderAppointments(); renderCustomers(); renderInventory(); renderReports(); renderSettings(); }
+  function renderStaffAccess() {
+    const host = document.querySelector('#staff-management-list');
+    if (!host) return;
+    if (!['owner', 'manager'].includes(profile.role)) {
+      host.innerHTML = '<p class="empty-state">Only owners and managers can view employee access.</p>';
+      return;
+    }
+    host.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Employee</th><th>Portal role</th><th>Discord</th><th>Status</th><th>Actions</th></tr></thead><tbody>${cache.staff.map(member => {
+      const protectedMember = member.role === 'owner' || (profile.role === 'manager' && member.role === 'manager');
+      const self = member.id === profile.id;
+      const roleOptions = ['front_desk', 'technician', ...(profile.role === 'owner' ? ['manager'] : [])];
+      return `<tr><td><strong>${esc(member.display_name)}</strong>${self ? '<small>You</small>' : ''}</td><td>${protectedMember ? `<span>${esc(friendly(member.role))}</span>` : `<select data-staff-role="${member.id}">${roleOptions.map(role => `<option value="${role}" ${member.role === role ? 'selected' : ''}>${friendly(role)}</option>`).join('')}</select>`}</td><td>${member.discord_user_id ? '<span class="tag confirmed">Linked</span>' : '<span class="tag">Not linked</span>'}</td><td><span class="tag ${member.active ? 'confirmed' : ''}">${member.active ? 'Active' : 'Inactive'}</span></td><td>${protectedMember ? '<small>Protected</small>' : `<button class="secondary-button" data-save-staff="${member.id}">Save role</button> <button class="${member.active ? 'danger-button' : 'secondary-button'}" data-toggle-staff="${member.id}" data-active="${member.active ? 'false' : 'true'}" ${self ? 'disabled' : ''}>${member.active ? 'Deactivate' : 'Reactivate'}</button>`}</td></tr>`;
+    }).join('')}</tbody></table></div>${cache.staff.length ? '' : '<p class="empty-state">No staff profiles found.</p>'}<p id="staff-management-status" class="auth-message" role="status"></p>`;
+  }
+
+  function renderAll() { renderDashboard(); renderAppointments(); renderCustomers(); renderInventory(); renderReports(); renderSettings(); renderStaffAccess(); }
 
   async function createRepair(event) {
     event.preventDefault();
@@ -214,7 +229,36 @@
     if (form.id === 'label-settings-form') payload = { ...payload, label_printer_name: data.label_printer_name.trim() || 'DYMO LabelWriter', label_template: data.label_template, label_show_price: form.elements.label_show_price.checked, label_show_customer_phone: form.elements.label_show_customer_phone.checked };
     const { error } = await client.from('business_settings').upsert(payload, { onConflict: 'location_id' }); message.textContent = error ? error.message : 'Settings saved.'; if (!error) loadData();
   });
-  document.addEventListener('click', event => {
+  document.addEventListener('click', async event => {
+    const saveStaff = event.target.closest('[data-save-staff]');
+    const toggleStaff = event.target.closest('[data-toggle-staff]');
+    if (saveStaff || toggleStaff) {
+      const actionButton = saveStaff || toggleStaff;
+      const targetUserId = actionButton.dataset.saveStaff || actionButton.dataset.toggleStaff;
+      const member = cache.staff.find(item => item.id === targetUserId);
+      const status = document.querySelector('#staff-management-status');
+      const body = { targetUserId };
+      if (saveStaff) body.role = document.querySelector(`[data-staff-role="${targetUserId}"]`)?.value;
+      if (toggleStaff) {
+        body.active = toggleStaff.dataset.active === 'true';
+        body.removeFromDiscord = false;
+        if (!body.active && member?.discord_user_id) {
+          body.removeFromDiscord = confirm(`Also remove ${member.display_name} from the GotCracked Discord server?\n\nOK removes them from Discord and Portal. Cancel deactivates Portal access only.`);
+        }
+        if (!confirm(`${body.active ? 'Reactivate' : 'Deactivate'} Portal access for ${member?.display_name || 'this employee'}?`)) return;
+      }
+      actionButton.disabled = true;
+      if (status) status.textContent = 'Updating employee access…';
+      const { data, error } = await client.functions.invoke('manage-staff', { body });
+      if (error || data?.error) {
+        if (status) status.textContent = data?.error || error?.message || 'Unable to update staff access.';
+        actionButton.disabled = false;
+      } else {
+        if (status) status.textContent = data.warning || 'Employee access updated.';
+        await loadData();
+      }
+      return;
+    }
     const button = event.target.closest('[data-live-action]'); if (button) openOperation(button.dataset.liveAction);
     if (event.target.closest('[data-close-operation]')) document.querySelector('#operation-dialog')?.close();
     const tab = event.target.closest('[data-catalog-tab]'); if (tab) { document.querySelectorAll('[data-catalog-tab]').forEach(item => item.classList.toggle('active', item === tab)); document.querySelector('#parts-catalog').hidden = tab.dataset.catalogTab !== 'parts'; document.querySelector('#services-catalog').hidden = tab.dataset.catalogTab !== 'services'; }
@@ -237,4 +281,3 @@
   setTimeout(loadData, 700);
   client.channel('portal-live').on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, loadData).on('postgres_changes', { event: '*', schema: 'public', table: 'repair_tickets' }, loadData).on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, loadData).subscribe();
 })();
-
