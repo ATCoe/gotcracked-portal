@@ -14,5 +14,12 @@ window.addEventListener('load', () => {
   const script = document.createElement('script');
   script.src = 'operations-v1-core.js?v=20260825-v1ops4';
   script.dataset.gcOperationsV1 = 'true';
+  script.addEventListener('load', () => {
+    if (document.querySelector('script[data-gc-training-guard]')) return;
+    const guard = document.createElement('script');
+    guard.src = 'training-store-guard.js?v=20260825-v1ops4';
+    guard.dataset.gcTrainingGuard = 'true';
+    document.body.appendChild(guard);
+  }, { once: true });
   document.body.appendChild(script);
 }, { once: true });
