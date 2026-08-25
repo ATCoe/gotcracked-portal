@@ -5,10 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="assets/gotcracked-favicon.png" />
     <title>GotCracked | Portal</title>
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="workflow.css" />
-    <link rel="stylesheet" href="complete.css" />
-    <link rel="stylesheet" href="auth-modern.css" />
+
+    <!-- Portal 1.0 deterministic stylesheet stack. portal-v1-release.css is
+         intentionally LAST and owns final responsive/drawer behavior. -->
+    <link rel="stylesheet" href="styles.css?v=20260825-release1" />
+    <link rel="stylesheet" href="workflow.css?v=20260825-release1" />
+    <link rel="stylesheet" href="complete.css?v=20260825-release1" />
+    <link rel="stylesheet" href="auth-modern.css?v=20260825-release1" />
+    <link rel="stylesheet" href="workforce.css?v=20260825-release1" />
+    <link rel="stylesheet" href="hardening.css?v=20260825-release1" />
+    <link rel="stylesheet" href="operations-v1.css?v=20260825-release1" />
+    <link rel="stylesheet" href="operations-v1-extra.css?v=20260825-release1" />
+    <link rel="stylesheet" href="portal-v1-polish.css?v=20260825-release1" data-gc-v1-polish="true" />
+    <link rel="stylesheet" href="master-directory.css?v=20260825-release1" data-gc-master-directory="true" />
+    <link rel="stylesheet" href="portal-v1-release.css?v=20260825-release1" data-gc-v1-final="true" />
   </head>
   <body>
     <section id="login-screen" class="login-screen">
@@ -38,9 +48,9 @@
     </section>
     <div class="app-shell">
       <aside class="sidebar">
-<a class="brand" href="#dashboard" aria-label="GotCracked dashboard">
-    <img src="assets/gotcracked-portal-logo.png" alt="GotCracked" class="brand-logo">
-</a>
+        <a class="brand" href="#dashboard" aria-label="GotCracked dashboard">
+          <img src="assets/gotcracked-portal-logo.png" alt="GotCracked" class="brand-logo">
+        </a>
         <nav aria-label="Main navigation">
           <a class="nav-link active" href="#dashboard" data-view="dashboard"><span>▦</span>Dashboard</a>
           <a class="nav-link" href="#repairs" data-view="repairs"><span>⌁</span>Repairs <b id="repair-count" hidden>0</b></a>
@@ -90,21 +100,18 @@
     <dialog id="ticket-detail"><div id="ticket-detail-content"></div></dialog>
     <dialog id="operation-dialog"><form id="operation-form"><div id="operation-dialog-content"></div></form></dialog>
     <dialog id="inventory-audit-dialog"><div id="inventory-audit-content"></div></dialog>
-    <link rel="stylesheet" href="workforce.css?v=20260825c">
-    <link rel="stylesheet" href="hardening.css?v=20260825-final4">
-    <style id="mobile-drawer-safety">.sidebar-backdrop{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;filter:none!important;-webkit-filter:none!important;background:rgba(5,13,25,.46)!important}body.mobile-nav-open .sidebar,body.mobile-nav-open main,body.mobile-nav-open .app-shell{filter:none!important;-webkit-filter:none!important}@media(max-width:750px){body.mobile-nav-open .sidebar{z-index:60!important;opacity:1!important;background:#111b2b!important}.sidebar-backdrop{inset:0 0 0 min(86vw,290px)!important;z-index:59!important}}</style>
-    <style>.report-metrics{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))!important}.shelf-revenue{border-color:#7fd7ba!important;background:#f1fbf7!important}.shelf-revenue strong{color:#087657}.abandoned-policy{display:flex;justify-content:space-between;gap:14px;margin-top:14px;padding:11px 13px;border-radius:9px;background:#f4f6f8;color:#56677a;font-size:.78rem}</style>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase.js?v=20260825-v1ops6"></script>
-    <script src="discord-integration.js"></script>
-    <script src="workflow.js?v=20260825e"></script>
-    <script src="app.js?v=20260825j"></script>
-    <script src="mobile-nav-safe.js?v=20260825-safe1"></script>
-    <script src="leads.js"></script>
-    <script src="portal-live.js?v=20260825g"></script>
-    <script src="workforce.js?v=20260825b"></script>
-    <script src="analytics.js?v=20260825a"></script>
-    <script src="shipping.js?v=20260825a"></script>
-    <script src="inventory-audit.js?v=20260825a"></script>
+    <script src="supabase.js?v=20260825-release1"></script>
+    <script src="discord-integration.js?v=20260825-release1"></script>
+    <script src="workflow.js?v=20260825-release1"></script>
+    <script src="app.js?v=20260825-release1"></script>
+    <script src="mobile-nav-safe.js?v=20260825-release1"></script>
+    <script src="leads.js?v=20260825-release1"></script>
+    <script src="portal-live.js?v=20260825-release1"></script>
+    <script src="workforce.js?v=20260825-release1"></script>
+    <script src="analytics.js?v=20260825-release1"></script>
+    <script src="shipping.js?v=20260825-release1"></script>
+    <script src="inventory-audit.js?v=20260825-release1"></script>
   </body>
 </html>
