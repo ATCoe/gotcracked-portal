@@ -6,6 +6,10 @@
 
   function statusLabel(value) { return value ? value[0].toUpperCase() + value.slice(1) : 'New'; }
   function render() {
+    if (window.GotCrackedDirectory?.ownsLeadDirectory) {
+      window.GotCrackedDirectory.requestRefresh?.('legacy-leads');
+      return;
+    }
     const host = document.querySelector('#portal-leads');
     if (!host) return;
     const query = document.querySelector('#lead-search')?.value.toLowerCase() || '';
