@@ -5,14 +5,6 @@
   if (!client || window.GotCrackedScheduleBoard) return;
 
   const DAY_MS = 86400000;
-  const state = {
-    weekStart: sundayOf(),
-    summary: null,
-    actuals: null,
-    profile: window.GotCrackedRuntimeProfile || window.GotCrackedOperationsV1?.state?.profile || null,
-    loading: false
-  };
-
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[c]);
   const num = value => Number(value) || 0;
   const money = dollars => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(num(dollars));
@@ -31,6 +23,18 @@
   };
   const initials = value => String(value||'GC').trim().split(/\s+/).slice(0,2).map(x=>x[0]?.toUpperCase()||'').join('')||'GC';
   const label = value => String(value||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
+
+  // Initialize state only after the date helpers exist. Calling sundayOf() before
+  // dateOnly/parseDate were initialized caused the Schedule page to crash during
+  // module startup with "Cannot access 'dateOnly' before initialization".
+  const state = {
+    weekStart: sundayOf(),
+    summary: null,
+    actuals: null,
+    profile: window.GotCrackedRuntimeProfile || window.GotCrackedOperationsV1?.state?.profile || null,
+    loading: false
+  };
+
   const profile = () => state.profile || window.GotCrackedRuntimeProfile || window.GotCrackedOperationsV1?.state?.profile || null;
   const host = () => document.getElementById('schedule-board');
   const active = () => location.hash.slice(1).split('/')[0]==='schedule';
