@@ -35,3 +35,5 @@ jobs:
           git add index.html
           git commit -m 'Force mobile Portal onto release34 bootstrap'
           git push
+
+# Triggered after workflow registration so the one-time patch executes.
