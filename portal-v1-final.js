@@ -30,22 +30,57 @@
     }
   }
 
+  function setBackdropInteractive(backdrop, open) {
+    if (!backdrop) return;
+
+    backdrop.hidden = !open;
+    backdrop.setAttribute('aria-hidden', open ? 'false' : 'true');
+
+    if (open) {
+      backdrop.removeAttribute('inert');
+      backdrop.style.setProperty('display', 'block', 'important');
+      backdrop.style.setProperty('pointer-events', 'auto', 'important');
+    } else {
+      backdrop.setAttribute('inert', '');
+      backdrop.style.setProperty('display', 'none', 'important');
+      backdrop.style.setProperty('pointer-events', 'none', 'important');
+    }
+  }
+
   function syncLeadDrawerState() {
     const rightDrawer = document.getElementById('v1-lead-drawer');
+    const open = Boolean(rightDrawer?.classList.contains('open'));
+
+    document.querySelectorAll('#v1-drawer-backdrop,.v1-drawer-backdrop').forEach(backdrop => {
+      setBackdropInteractive(backdrop, open);
+    });
+
     if (!rightDrawer) {
       document.body.classList.remove('v1-overlay-open');
       return;
     }
-    const open = rightDrawer.classList.contains('open');
+
     rightDrawer.setAttribute('aria-label', 'Lead workflow panel');
     rightDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
     document.body.classList.toggle('v1-overlay-open', open);
   }
 
+  function sanitizeRetiredMobileBackdrops() {
+    document.querySelectorAll('.sidebar-backdrop').forEach(backdrop => {
+      backdrop.hidden = true;
+      backdrop.setAttribute('inert', '');
+      backdrop.style.setProperty('display', 'none', 'important');
+      backdrop.style.setProperty('pointer-events', 'none', 'important');
+    });
+  }
+
   function decorate() {
     decorateFrame = 0;
 
-    document.querySelectorAll('.sidebar-backdrop,.v1-drawer-backdrop').forEach(backdrop => {
+    sanitizeRetiredMobileBackdrops();
+    syncLeadDrawerState();
+
+    document.querySelectorAll('.v1-drawer-backdrop').forEach(backdrop => {
       backdrop.style.backdropFilter = 'none';
       backdrop.style.webkitBackdropFilter = 'none';
       backdrop.style.filter = 'none';
@@ -67,7 +102,6 @@
       button.setAttribute('aria-label', 'Create work order using guided intake');
     });
 
-    syncLeadDrawerState();
     normalizeWorkOrderDrawer();
   }
 
@@ -114,12 +148,10 @@
     }
   });
 
-  /*
-   * Dynamic operational views still insert DOM after authentication, but class
-   * changes (including the mobile hamburger's .open state) must never trigger a
-   * global layout pass. Observe inserted/removed nodes only and coalesce them to
-   * one animation-frame decoration.
-   */
+  /* Dynamic operational views still insert DOM after authentication. Observe
+     inserted/removed nodes only and coalesce them to one frame. The backdrop
+     synchronizer also guarantees that a closed operational drawer can never
+     leave an invisible full-screen hit target over the Portal. */
   const main = document.querySelector('main');
   if (main) {
     const observer = new MutationObserver(scheduleDecorate);
@@ -131,5 +163,11 @@
   document.addEventListener('gc-view-changed', scheduleDecorate);
   document.addEventListener('gc-portal-runtime-ready', scheduleDecorate);
   window.addEventListener('load', scheduleDecorate, { once: true });
+
+  /* Run once immediately because the operational shell may already have created
+     its full-screen backdrop before this release layer loads. */
+  sanitizeRetiredMobileBackdrops();
+  syncLeadDrawerState();
+  setTimeout(scheduleDecorate, 0);
   setTimeout(scheduleDecorate, 1200);
 })();
