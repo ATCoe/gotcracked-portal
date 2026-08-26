@@ -3,6 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const portalUrl = (Deno.env.get('PORTAL_URL') || 'https://portal.gotcracked.co').replace(/\/$/, '');
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const callbackUrl = `${supabaseUrl}/functions/v1/google-integrations?action=callback`;
+const googleClientId = () => (Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') || '').trim();
+const googleClientSecret = () => (Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET') || '').trim();
 const scopes = [
   'openid', 'email',
   'https://www.googleapis.com/auth/business.manage',
@@ -30,15 +32,15 @@ async function actor(request: Request) {
 }
 
 function oauthConfigured() {
-  return Boolean(Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') && Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET'));
+  return Boolean(googleClientId() && googleClientSecret());
 }
 
 async function refreshAccessToken(refreshToken: string) {
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:new URLSearchParams({
-      client_id:Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') || '',
-      client_secret:Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET') || '',
+      client_id:googleClientId(),
+      client_secret:googleClientSecret(),
       refresh_token:refreshToken, grant_type:'refresh_token'
     })
   });
@@ -93,34 +95,64 @@ async function callback(request: Request) {
   const url = new URL(request.url);
   const state = url.searchParams.get('state') || '';
   const code = url.searchParams.get('code') || '';
+  const googleError = url.searchParams.get('error') || '';
+  const googleErrorDescription = url.searchParams.get('error_description') || '';
   const db = admin();
-  const stateResult = await db.from('google_oauth_states').select('*').eq('state',state).maybeSingle();
-  if (stateResult.error || !stateResult.data || new Date(stateResult.data.expires_at).getTime() < Date.now() || !code) {
-    return Response.redirect(`${portalUrl}/?google=error#settings`,302);
+  const stateResult = state ? await db.from('google_oauth_states').select('*').eq('state',state).maybeSingle() : { data:null, error:null } as any;
+
+  if (googleError) {
+    if (stateResult.data) await db.from('google_oauth_states').delete().eq('state',state);
+    console.error(`Google OAuth authorization failed: ${googleError}${googleErrorDescription ? ` - ${googleErrorDescription}` : ''}`);
+    return Response.redirect(`${portalUrl}/?google=error&reason=${encodeURIComponent(googleError)}#settings`,302);
   }
+
+  if (stateResult.error || !stateResult.data || new Date(stateResult.data.expires_at).getTime() < Date.now() || !code) {
+    console.error(`Google OAuth callback rejected: state=${state ? 'present' : 'missing'}, stateRow=${stateResult.data ? 'present' : 'missing'}, code=${code ? 'present' : 'missing'}`);
+    if (stateResult.data) await db.from('google_oauth_states').delete().eq('state',state);
+    return Response.redirect(`${portalUrl}/?google=error&reason=callback_validation#settings`,302);
+  }
+
   await db.from('google_oauth_states').delete().eq('state',state);
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:new URLSearchParams({
-      client_id:Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') || '',
-      client_secret:Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET') || '',
+      client_id:googleClientId(),
+      client_secret:googleClientSecret(),
       code, grant_type:'authorization_code', redirect_uri:callbackUrl
     })
   });
   const token = await tokenResponse.json();
-  if (!tokenResponse.ok || !token.access_token) return Response.redirect(`${portalUrl}/?google=error#settings`,302);
+  if (!tokenResponse.ok || !token.access_token) {
+    const reason = String(token.error || 'token_exchange_failed');
+    console.error(`Google OAuth token exchange failed (${tokenResponse.status}): ${reason}${token.error_description ? ` - ${token.error_description}` : ''}`);
+    return Response.redirect(`${portalUrl}/?google=error&reason=${encodeURIComponent(reason)}#settings`,302);
+  }
+
   const existing = await db.from('google_integrations').select('refresh_token').eq('location_id',stateResult.data.location_id).maybeSingle();
+  if (existing.error) {
+    console.error(`Google OAuth existing connection lookup failed: ${existing.error.message}`);
+    return Response.redirect(`${portalUrl}/?google=error&reason=connection_lookup#settings`,302);
+  }
   const refreshToken = token.refresh_token || existing.data?.refresh_token;
-  if (!refreshToken) return Response.redirect(`${portalUrl}/?google=reauthorize#settings`,302);
+  if (!refreshToken) {
+    console.error('Google OAuth completed without a refresh token. Reauthorization with consent is required.');
+    return Response.redirect(`${portalUrl}/?google=reauthorize#settings`,302);
+  }
+
   let email: string | null = null;
   try {
     const userInfo = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {headers:{Authorization:`Bearer ${token.access_token}`}});
     if (userInfo.ok) email = (await userInfo.json()).email || null;
   } catch {}
-  await db.from('google_integrations').upsert({
+
+  const saved = await db.from('google_integrations').upsert({
     location_id:stateResult.data.location_id, connected_email:email, refresh_token:refreshToken,
     scopes:String(token.scope || '').split(/\s+/).filter(Boolean), connected_at:new Date().toISOString(), updated_at:new Date().toISOString(), last_error:null
   },{onConflict:'location_id'});
+  if (saved.error) {
+    console.error(`Google OAuth connection save failed: ${saved.error.message}`);
+    return Response.redirect(`${portalUrl}/?google=error&reason=connection_save#settings`,302);
+  }
   return Response.redirect(`${portalUrl}/?google=connected#settings`,302);
 }
 
@@ -146,7 +178,7 @@ Deno.serve(async request => {
       const inserted = await db.from('google_oauth_states').insert({state,location_id:staff.location_id,requested_by:staff.id});
       if (inserted.error) throw inserted.error;
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-      authUrl.search = new URLSearchParams({client_id:Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')!,redirect_uri:callbackUrl,response_type:'code',scope:scopes.join(' '),access_type:'offline',prompt:'consent',include_granted_scopes:'true',state}).toString();
+      authUrl.search = new URLSearchParams({client_id:googleClientId(),redirect_uri:callbackUrl,response_type:'code',scope:scopes.join(' '),access_type:'offline',prompt:'consent',include_granted_scopes:'true',state}).toString();
       return json({authUrl:authUrl.toString(),callbackUrl});
     }
     if (action === 'metrics') return json(await metrics(staff.location_id));
