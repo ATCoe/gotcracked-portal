@@ -2,6 +2,7 @@
   'use strict';
 
   const VERSION = '20260826-release34';
+  const MOBILE_TRACE_VERSION = '20260826-touch3';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
@@ -61,7 +62,10 @@
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   const isTraining = () => localStorage.getItem('gc-training-store') === '1';
 
-  function srcFor(file) { return `${file}?v=${VERSION}`; }
+  function srcFor(file) {
+    const version = file === 'mobile-interaction-debug.js' ? MOBILE_TRACE_VERSION : VERSION;
+    return `${file}?v=${version}`;
+  }
 
   function preload(files) {
     for (const file of files) {
