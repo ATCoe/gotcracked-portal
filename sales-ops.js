@@ -22,6 +22,8 @@
   let goalSettings = null;
   let summary = null;
   let workOrderObserver = null;
+  let initialized = false;
+  let initializing = false;
 
   function todayLocal() {
     const d = new Date();
@@ -248,12 +250,15 @@
     const ticket = ops?.state?.currentWorkOrder;
     const totals = document.querySelector('#work-order .v1-ticket-totals');
     if (!ticket || !totals) return;
-    totals.parentElement?.querySelector('.gc-workorder-margin')?.remove();
     const parts = (ticket.work_order_items || []).filter(line => line.item_type === 'part');
     const partCost = parts.reduce((sum,line)=>sum+Math.round((Number(line.quantity)||1)*(Number(line.unit_cost_cents)||0)),0);
     const partRevenue = parts.reduce((sum,line)=>sum+Math.round((Number(line.quantity)||1)*(Number(line.unit_price_cents)||0)),0);
     const partMargin = partRevenue - partCost;
-    totals.insertAdjacentHTML('afterend', `<section class="gc-workorder-margin"><header><strong>Management margin view</strong><small>Parts only · excludes labor/overhead</small></header><div class="gc-margin-grid"><div><small>Part revenue</small><strong>${money(partRevenue)}</strong></div><div><small>Part cost / COGS</small><strong>${money(partCost)}</strong></div><div><small>Part margin</small><strong class="${partMargin<0?'gc-negative':'gc-positive'}">${money(partMargin)}</strong></div></div></section>`);
+    const signature = `${ticket.id}:${partCost}:${partRevenue}`;
+    const existing = totals.parentElement?.querySelector('.gc-workorder-margin');
+    if (existing?.dataset.gcMarginSignature === signature) return;
+    existing?.remove();
+    totals.insertAdjacentHTML('afterend', `<section class="gc-workorder-margin" data-gc-margin-signature="${esc(signature)}"><header><strong>Management margin view</strong><small>Parts only · excludes labor/overhead</small></header><div class="gc-margin-grid"><div><small>Part revenue</small><strong>${money(partRevenue)}</strong></div><div><small>Part cost / COGS</small><strong>${money(partCost)}</strong></div><div><small>Part margin</small><strong class="${partMargin<0?'gc-negative':'gc-positive'}">${money(partMargin)}</strong></div></div></section>`);
   }
 
   function watchWorkOrders() {
@@ -269,13 +274,20 @@
   }
 
   async function initialize() {
-    await loadIdentity();
-    if (!profile?.active) return;
-    await loadSettings();
-    await loadSummary();
-    ensureSettingsPanel();
-    watchWorkOrders();
-    renderWorkOrderMargin();
+    if (initialized || initializing) return;
+    initializing = true;
+    try {
+      await loadIdentity();
+      if (!profile?.active) return;
+      await loadSettings();
+      await loadSummary();
+      ensureSettingsPanel();
+      watchWorkOrders();
+      renderWorkOrderMargin();
+      initialized = true;
+    } finally {
+      initializing = false;
+    }
   }
 
   document.addEventListener('click', event => {
@@ -374,4 +386,3 @@
 
   setTimeout(initialize, 1800);
 })();
-
