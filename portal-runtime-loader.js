@@ -4,6 +4,7 @@
   const VERSION = '20260826-release34';
   const MOBILE_TRACE_VERSION = '20260826-touch3';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
+  const SALES_OPS_VERSION = '20260826-sales-ops2';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
@@ -66,7 +67,8 @@
   function srcFor(file) {
     const versions = {
       'mobile-interaction-debug.js': MOBILE_TRACE_VERSION,
-      'account-page.js': ACCOUNT_PAGE_VERSION
+      'account-page.js': ACCOUNT_PAGE_VERSION,
+      'sales-ops.js': SALES_OPS_VERSION
     };
     return `${file}?v=${versions[file] || VERSION}`;
   }
