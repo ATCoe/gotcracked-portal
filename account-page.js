@@ -5,8 +5,11 @@
   const client = window.supabaseClient;
   if (!client) return;
 
-  const VERSION = '20260826-account-page1';
+  const VERSION = '20260826-account-page2';
   let observer = null;
+  let observedHost = null;
+  let enhanceQueued = false;
+  let enhancing = false;
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[c]);
   const roleLabel = value => String(value || 'staff').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
@@ -91,27 +94,52 @@
     }
   }
 
+  function reconnectObserver(){
+    if (!observer || !observedHost?.isConnected) return;
+    observer.observe(observedHost,{childList:true,subtree:false});
+  }
+
   function enhance(){
+    if (enhancing) return;
     decorateLauncher();
     const host = document.getElementById('gc-profile-view');
     const id = current()?.id;
     if (!host || !id || staffState()?.selected !== id) return;
 
-    const head = host.querySelector('.gc-profile-page-head');
-    const title = head?.querySelector('h1');
-    const description = head?.querySelector('p:not(.eyebrow)');
-    if (title) title.textContent = 'My Account';
-    if (description) description.textContent = 'Manage your staff profile, Portal preferences, and sign-in identity.';
+    enhancing = true;
+    observer?.disconnect();
+    try {
+      const head = host.querySelector('.gc-profile-page-head');
+      const title = head?.querySelector('h1');
+      const description = head?.querySelector('p:not(.eyebrow)');
+      if (title) title.textContent = 'My Account';
+      if (description) description.textContent = 'Manage your staff profile, Portal preferences, and sign-in identity.';
 
-    host.querySelector('.gc-account-settings')?.remove();
-    host.insertAdjacentHTML('beforeend', accountSettingsMarkup(currentRow()));
+      host.querySelector('.gc-account-settings')?.remove();
+      host.insertAdjacentHTML('beforeend', accountSettingsMarkup(currentRow()));
+    } finally {
+      enhancing = false;
+      if (observedHost === host) reconnectObserver();
+    }
+  }
+
+  function scheduleEnhance(){
+    if (enhanceQueued || enhancing) return;
+    enhanceQueued = true;
+    queueMicrotask(() => {
+      enhanceQueued = false;
+      enhance();
+    });
   }
 
   function watchProfileView(){
     const host = document.getElementById('gc-profile-view');
-    if (!host || observer) return;
-    observer = new MutationObserver(() => queueMicrotask(enhance));
-    observer.observe(host,{childList:true,subtree:false});
+    if (!host) return;
+    if (observer && observedHost === host) return;
+    observer?.disconnect();
+    observedHost = host;
+    observer = new MutationObserver(() => scheduleEnhance());
+    reconnectObserver();
   }
 
   async function setTheme(preference){
