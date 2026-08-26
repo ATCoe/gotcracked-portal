@@ -1,0 +1,253 @@
+/* GotCracked Portal theme layer. Loaded by portal-runtime-loader.js.
+   Light mode remains the existing visual system; dark mode overrides only when
+   html[data-theme="dark"] is active. */
+
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --ink:#edf4fb;
+  --muted:#9eafc2;
+  --line:#26384b;
+  --canvas:#09121d;
+  --white:#111d2a;
+  --blue:#4da3ff;
+  --navy:#08111c;
+  --green:#4fd0a1;
+  --amber:#f0b94a;
+  --red:#ff7373;
+  --violet:#a891ff;
+  --v1-ink:#edf4fb;
+  --v1-muted:#9eafc2;
+  --v1-line:#2b3c4f;
+  --v1-soft:#101d2a;
+  --v1-blue:#4da3ff;
+  --v1-blue-dark:#2a8ef7;
+  --v1-navy:#0b1724;
+  --v1-green:#4fd0a1;
+  --v1-amber:#f0b94a;
+  --v1-red:#ff7373;
+  --v1-shadow:0 10px 30px rgba(0,0,0,.22);
+  --v1-shadow-raised:0 18px 46px rgba(0,0,0,.34);
+  background:#09121d;
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] main,
+html[data-theme="dark"] .view{
+  background:#09121d!important;
+  color:#edf4fb!important;
+}
+
+html[data-theme="dark"] main{
+  background:radial-gradient(circle at 82% 0,rgba(77,163,255,.055),transparent 31%),#09121d!important;
+}
+
+html[data-theme="dark"] .topbar,
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .empty-card,
+html[data-theme="dark"] .metrics article,
+html[data-theme="dark"] .v1-ops-card,
+html[data-theme="dark"] .v1-right-drawer,
+html[data-theme="dark"] .v1-workflow-panel,
+html[data-theme="dark"] .v1-device-card,
+html[data-theme="dark"] .v1-guide,
+html[data-theme="dark"] .v1-permission-person,
+html[data-theme="dark"] .gc-directory,
+html[data-theme="dark"] dialog,
+html[data-theme="dark"] #v1-intake-dialog,
+html[data-theme="dark"] #v1-po-dialog,
+html[data-theme="dark"] #portal-v1-lead-dialog,
+html[data-theme="dark"] .gc-sales-dialog{
+  background:#111d2a!important;
+  color:#edf4fb!important;
+  border-color:#2b3c4f!important;
+  box-shadow:0 10px 30px rgba(0,0,0,.24)!important;
+}
+
+html[data-theme="dark"] .topbar{border-bottom-color:#26384b!important}
+html[data-theme="dark"] .location,
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] h4,
+html[data-theme="dark"] strong,
+html[data-theme="dark"] .page-heading h1,
+html[data-theme="dark"] .v1-workorder-head h1,
+html[data-theme="dark"] .v1-table td strong,
+html[data-theme="dark"] .repair-customer strong,
+html[data-theme="dark"] .gc-sales-primary strong,
+html[data-theme="dark"] .gc-sales-fact strong{
+  color:#edf4fb!important;
+}
+
+html[data-theme="dark"] p,
+html[data-theme="dark"] small,
+html[data-theme="dark"] .subtle,
+html[data-theme="dark"] .v1-muted,
+html[data-theme="dark"] .gc-sales-note,
+html[data-theme="dark"] .gc-sales-primary span,
+html[data-theme="dark"] .gc-sales-fact small,
+html[data-theme="dark"] .repair-customer small,
+html[data-theme="dark"] td small{
+  color:#9eafc2!important;
+}
+
+html[data-theme="dark"] .eyebrow,
+html[data-theme="dark"] .v1-kicker{
+  color:#7fbaff!important;
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] .search,
+html[data-theme="dark"] .v1-table-tools input,
+html[data-theme="dark"] .v1-table-tools select,
+html[data-theme="dark"] .v1-reference-search input,
+html[data-theme="dark"] .v1-line-search input,
+html[data-theme="dark"] .gc-sales-dialog input,
+html[data-theme="dark"] .gc-sales-dialog select,
+html[data-theme="dark"] .gc-sales-dialog textarea,
+html[data-theme="dark"] #v1-intake-dialog input,
+html[data-theme="dark"] #v1-intake-dialog select,
+html[data-theme="dark"] #v1-intake-dialog textarea{
+  background:#0c1723!important;
+  border-color:#33485f!important;
+  color:#edf4fb!important;
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder{color:#74879c!important}
+
+html[data-theme="dark"] .secondary-button,
+html[data-theme="dark"] .icon-button,
+html[data-theme="dark"] .help{
+  background:#152333!important;
+  border-color:#33485f!important;
+  color:#dbe8f5!important;
+}
+html[data-theme="dark"] .secondary-button:hover,
+html[data-theme="dark"] .icon-button:hover,
+html[data-theme="dark"] .help:hover{background:#1a2c40!important}
+html[data-theme="dark"] .primary-button{background:#2388f5!important;color:#fff!important}
+html[data-theme="dark"] .primary-button:hover{background:#3696fa!important}
+
+html[data-theme="dark"] .v1-ops-card-head,
+html[data-theme="dark"] .v1-drawer-head,
+html[data-theme="dark"] .v1-intake-head,
+html[data-theme="dark"] .v1-intake-actions,
+html[data-theme="dark"] .modal-actions,
+html[data-theme="dark"] #portal-v1-lead-dialog .v1-lead-dialog-actions{
+  background:#111d2a!important;
+  border-color:#2b3c4f!important;
+}
+
+html[data-theme="dark"] .v1-table-wrap,
+html[data-theme="dark"] .table-wrap{background:#111d2a!important}
+html[data-theme="dark"] table,
+html[data-theme="dark"] .v1-table{color:#dce7f2!important}
+html[data-theme="dark"] th,
+html[data-theme="dark"] .v1-table th{
+  background:#0e1925!important;
+  color:#8fa4b9!important;
+  border-color:#26384b!important;
+  box-shadow:0 1px 0 #26384b!important;
+}
+html[data-theme="dark"] td,
+html[data-theme="dark"] .v1-table td{border-color:#223244!important}
+html[data-theme="dark"] .v1-table tbody tr:nth-child(even){background:#0e1925!important}
+html[data-theme="dark"] .v1-table tbody tr:hover{background:#16283b!important}
+
+html[data-theme="dark"] .v1-drawer-section,
+html[data-theme="dark"] .v1-meta-block,
+html[data-theme="dark"] .v1-summary,
+html[data-theme="dark"] .v1-suggestion,
+html[data-theme="dark"] .v1-review-card,
+html[data-theme="dark"] .v1-choice,
+html[data-theme="dark"] .v1-check-group,
+html[data-theme="dark"] .gc-sales-fact,
+html[data-theme="dark"] .gc-sales-empty,
+html[data-theme="dark"] .gc-closeout-preview,
+html[data-theme="dark"] .gc-settings-switch,
+html[data-theme="dark"] .gc-workorder-margin,
+html[data-theme="dark"] .gc-margin-grid div,
+html[data-theme="dark"] .v1-permission-note{
+  background:#0e1925!important;
+  border-color:#2b3c4f!important;
+  color:#dce7f2!important;
+}
+
+html[data-theme="dark"] .v1-choice.selected{
+  background:#102943!important;
+  border-color:#4da3ff!important;
+  box-shadow:0 0 0 2px rgba(77,163,255,.18)!important;
+}
+html[data-theme="dark"] .v1-check-group h4,
+html[data-theme="dark"] .v1-stepper{background:#0e1925!important;border-color:#2b3c4f!important}
+html[data-theme="dark"] .v1-check-row{border-color:#223244!important}
+
+html[data-theme="dark"] #v1-intake-dialog .v1-intake-shell,
+html[data-theme="dark"] #v1-intake-dialog .v1-intake-body,
+html[data-theme="dark"] #v1-intake-dialog .v1-intake-head,
+html[data-theme="dark"] #v1-intake-dialog .v1-intake-actions{
+  background:#111d2a!important;
+  color:#edf4fb!important;
+}
+html[data-theme="dark"] #v1-intake-dialog .v1-intake-body h3,
+html[data-theme="dark"] #v1-intake-dialog .v1-intake-head h2,
+html[data-theme="dark"] #v1-intake-dialog .v1-choice,
+html[data-theme="dark"] #v1-intake-dialog .v1-choice strong{color:#edf4fb!important}
+html[data-theme="dark"] #v1-intake-dialog .v1-intake-body>p,
+html[data-theme="dark"] #v1-intake-dialog .v1-choice small,
+html[data-theme="dark"] #v1-intake-dialog .v1-customer-results>p,
+html[data-theme="dark"] #v1-intake-dialog .v1-muted{color:#9eafc2!important}
+html[data-theme="dark"] #v1-intake-dialog .v1-form label,
+html[data-theme="dark"] #v1-intake-dialog .v1-form-grid label{color:#bdd0e3!important}
+
+html[data-theme="dark"] .gc-sales-card{background:#111d2a!important;border-color:#2b3c4f!important}
+html[data-theme="dark"] .gc-sales-progress{background:#1a2a3a!important;border-color:#34495e!important;box-shadow:inset 0 1px 3px rgba(0,0,0,.35)!important}
+html[data-theme="dark"] .gc-sales-goal-marker{background:rgba(225,239,252,.4)!important}
+html[data-theme="dark"] .gc-sales-status{background:#143052!important;color:#81bdff!important}
+html[data-theme="dark"] .gc-sales-status.closed{background:#10372c!important;color:#68ddb1!important}
+html[data-theme="dark"] .gc-sales-card.is-over-goal .gc-sales-progress{background:#159052!important;border-color:#35c985!important}
+
+html[data-theme="dark"] .v1-status.need_to_contact,
+html[data-theme="dark"] .v1-status.need_to_order_part,
+html[data-theme="dark"] .v1-status.need_to_order_parts,
+html[data-theme="dark"] .v1-status.awaiting_repair{background:#472022!important;color:#ff8b86!important}
+html[data-theme="dark"] .v1-status.awaiting_device,
+html[data-theme="dark"] .v1-status.awaiting_customer,
+html[data-theme="dark"] .v1-status.awaiting_callback,
+html[data-theme="dark"] .v1-status.awaiting_parts{background:#493a15!important;color:#ffd36f!important}
+html[data-theme="dark"] .v1-status.repaired,
+html[data-theme="dark"] .v1-status.ready_for_pickup,
+html[data-theme="dark"] .v1-status.converted,
+html[data-theme="dark"] .v1-status.customer_declined,
+html[data-theme="dark"] .v1-status.unrepairable{background:#123c30!important;color:#70dfb3!important}
+html[data-theme="dark"] .v1-status.sale_complete{background:#12365d!important;color:#82bdff!important}
+
+html[data-theme="dark"] .metric-icon.blue{background:#12365d!important;color:#82bdff!important}
+html[data-theme="dark"] .metric-icon.amber{background:#493a15!important;color:#ffd36f!important}
+html[data-theme="dark"] .metric-icon.green{background:#123c30!important;color:#70dfb3!important}
+html[data-theme="dark"] .metric-icon.violet{background:#302758!important;color:#beaaff!important}
+
+html[data-theme="dark"] .v1-training-banner{
+  background:#3d3212!important;
+  border-color:#6a561b!important;
+  color:#ffe39a!important;
+}
+html[data-theme="dark"] .v1-training-banner button{background:#4a3c13!important;border-color:#806920!important;color:#ffe7a8!important}
+
+html[data-theme="dark"] .theme-toggle{
+  background:transparent!important;
+  border:0!important;
+  color:#dce8f5!important;
+}
+html[data-theme="dark"] .theme-toggle:hover{background:#17283a!important}
+.theme-toggle{display:grid!important;place-items:center!important;font-size:19px!important}
+.theme-toggle .theme-icon{line-height:1}
+
+@media(max-width:750px){
+  html[data-theme="dark"] .topbar{background:#101c29!important}
+  html[data-theme="dark"] .gc-mobile-nav-group>summary:focus-visible,
+  html[data-theme="dark"] .gc-mobile-nav-group:has(.nav-link.active)>summary{background:#21354c!important}
+}
