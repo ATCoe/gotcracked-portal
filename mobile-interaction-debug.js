@@ -76,6 +76,13 @@
     return `modal=${modal} pop=${popover} fs=${fullscreen}`;
   }
 
+  function earlyInputSummary() {
+    const trace = window.__gcEarlyInputTrace;
+    if (!trace) return 'EARLY=missing';
+    const tail = trace.history?.slice(-4).join(' | ') || 'none';
+    return `EARLY v=${trace.version||'-'} seq=${trace.seq||0} last=${trace.last||'none'} tail=${tail}`;
+  }
+
   function ensurePanel() {
     let panel = document.getElementById('gc-mobile-touch-debug');
     if (panel) return panel;
@@ -104,6 +111,7 @@
     const perm = ops?.state?.permissions instanceof Map ? ops.state.permissions.get('repairs.intake') : undefined;
     const lines = [
       `#${++state.seq} ${label} last=${state.last}`,
+      earlyInputSummary(),
       `EVENT target=${state.eventTarget} top=${state.eventTop} stack=${state.eventStack}`,
       hitSummary('[data-v1-walkin]','WALK'),
       hitSummary('[data-open-ticket]','WORK'),
@@ -202,7 +210,7 @@
   setTimeout(()=>paint('debug ready'),0);
 
   window.GotCrackedMobileInteractionDebug = {
-    version:'20260826-touch2',
+    version:'20260826-touch3',
     state,
     paint:()=>paint('manual'),
     stop(){ clearInterval(wrapTimer); clearInterval(scanTimer); dialogObserver.disconnect(); document.getElementById('gc-mobile-touch-debug')?.remove(); }
