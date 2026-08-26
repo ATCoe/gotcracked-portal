@@ -7,6 +7,7 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
   const friendly = value => String(value || '').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
   const delay = ms => new Promise(resolve => setTimeout(resolve,ms));
+  const DIRECT_HASH = /^#(work-order|repairs|leads|appointments)\/[0-9a-f-]+$/i;
   let handling = false;
   let lastHandled = '';
 
@@ -143,6 +144,18 @@
       window.GotCrackedDiagnostics?.error?.(error,{context:'Unable to open linked Portal record',duration:16000});
     } finally { handling = false; }
   }
+
+  document.addEventListener('click',event=>{
+    const anchor = event.target instanceof Element ? event.target.closest('a[href^="#"]') : null;
+    const href = anchor?.getAttribute('href') || '';
+    if (!DIRECT_HASH.test(href)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const dialog = document.getElementById('ticket-detail');
+    if (dialog?.open) dialog.close();
+    if (location.hash === href) handle({force:true});
+    else location.hash = href;
+  },true);
 
   window.addEventListener('hashchange',()=>handle({force:true}));
   window.addEventListener('popstate',()=>handle({force:true}));
