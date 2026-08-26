@@ -67,6 +67,9 @@ jobs:
           sales = Path('sales-ops.js').read_text(encoding='utf-8')
           sales_css = Path('sales-ops.css').read_text(encoding='utf-8')
           supabase_js = Path('supabase.js').read_text(encoding='utf-8')
+          schedule = Path('schedule-board.js').read_text(encoding='utf-8')
+          timeclock = Path('time-clock.js').read_text(encoding='utf-8')
+          theme_bootstrap = Path('theme-bootstrap.js').read_text(encoding='utf-8')
           migration = Path('supabase/migrations/0011_portal_realtime_publication.sql').read_text(encoding='utf-8')
 
           if re.search(r'<style(?:\s|>)', html, re.I):
@@ -78,7 +81,10 @@ jobs:
               'styles.css', 'workflow.css', 'complete.css', 'auth-modern.css',
               'workforce.css', 'hardening.css', 'operations-v1.css',
               'operations-v1-extra.css', 'portal-v1-polish.css',
-              'master-directory.css', 'portal-v1-release.css'
+              'master-directory.css', 'portal-v1-release.css',
+              'portal-theme.css', 'portal-dark-components.css', 'theme-switch.css',
+              'intake-modal-release.css', 'sales-ops.css', 'checkout-receipts.css',
+              'schedule-board.css', 'time-clock.css'
           ]
           positions = []
           for name in required_order:
@@ -86,9 +92,18 @@ jobs:
                   raise SystemExit(f'Missing required stylesheet: {name}')
               positions.append(css_files.index(name))
           if positions != sorted(positions):
-              raise SystemExit('Portal stylesheet order changed; release cascade is no longer deterministic.')
-          if css_files[-1] != 'portal-v1-release.css':
-              raise SystemExit('portal-v1-release.css must be the final stylesheet in index.html.')
+              raise SystemExit('Portal stylesheet order changed; first-paint cascade is no longer deterministic.')
+          if css_files[-1] != 'time-clock.css':
+              raise SystemExit('time-clock.css must remain the final first-paint component stylesheet.')
+          if html.index('theme-bootstrap.js') > html.index('styles.css'):
+              raise SystemExit('Theme bootstrap must run before the first stylesheet paints.')
+          for name in ['portal-theme.css','portal-dark-components.css','theme-switch.css']:
+              if name not in html:
+                  raise SystemExit(f'First-paint theme stylesheet missing from index.html: {name}')
+          if 'portal-theme.css' in runtime or 'createElement(\'link\')' in runtime and 'gc-theme-style' in runtime:
+              raise SystemExit('Authenticated runtime must not inject visually critical theme CSS after paint.')
+          if 'prefers-color-scheme: dark' not in theme_bootstrap or 'gc-portal-theme' not in theme_bootstrap:
+              raise SystemExit('Theme bootstrap must resolve saved/system theme before paint.')
 
           if "overflow-y:auto" in mobile.replace(' ', ''):
               raise SystemExit('Mobile left navigation must not be vertically scrollable.')
@@ -96,9 +111,11 @@ jobs:
               raise SystemExit('mobile-nav-safe.js must not inject CSS.')
           if 'MutationObserver' in mobile:
               raise SystemExit('Mobile hamburger controller must not use MutationObserver.')
+          if "['schedule', '▦', 'Schedule']" not in mobile:
+              raise SystemExit('Schedule must remain a first-class mobile navigation destination.')
           if 'mobileMenu?.addEventListener' in app or "document.querySelector('.mobile-menu')" in app:
               raise SystemExit('app.js must not own the hamburger; mobile-nav-safe.js is the sole controller.')
-          if "classList.toggle('mobile-nav-open'" in app or 'classList.toggle("mobile-nav-open"' in app:
+          if "classList.toggle('mobile-nav-open' in app or 'classList.toggle("mobile-nav-open"' in app:
               raise SystemExit('app.js must not restore the legacy body-lock mobile state.')
           if 'sidebarBackdrop' in app or "createElement('button')" in app and 'sidebar-backdrop' in app:
               raise SystemExit('app.js must not recreate the retired full-screen mobile backdrop.')
@@ -116,23 +133,28 @@ jobs:
 
           script_refs = re.findall(r'<script[^>]+src=["\']([^"\']+)', html, re.I)
           script_files = [ref.split('?',1)[0] for ref in script_refs]
-          critical = ['supabase.js','discord-integration.js','workflow.js','app.js','mobile-nav-safe.js','portal-runtime-loader.js']
+          critical = ['theme-bootstrap.js','supabase.js','discord-integration.js','workflow.js','app.js','mobile-nav-safe.js','portal-runtime-loader.js']
           for name in critical:
               if name not in script_files:
                   raise SystemExit(f'Missing critical shell script: {name}')
-          heavy = ['leads.js','portal-live.js','workforce.js','analytics.js','shipping.js','inventory-audit.js','operations-v1-core.js']
+          heavy = ['leads.js','portal-live.js','workforce.js','analytics.js','shipping.js','inventory-audit.js','operations-v1-core.js','schedule-board.js','time-clock.js']
           leaked = [name for name in heavy if name in script_files]
           if leaked:
               raise SystemExit('Heavy operational scripts must load after authentication: ' + ', '.join(leaked))
 
           required_runtime = [
-              'leads.js','portal-live.js','workforce.js','analytics.js','shipping.js','inventory-audit.js',
+              'leads.js','portal-live.js','analytics.js','shipping.js','inventory-audit.js',
               'operations-v1-core.js','training-store-guard.js','operations-v1-arrival.js',
-              'portal-v1-polish.js','portal-v1-final.js','master-directory.js'
+              'portal-v1-polish.js','portal-v1-final.js','master-directory.js',
+              'time-clock.js','schedule-board.js'
           ]
           for name in required_runtime:
               if name not in runtime:
                   raise SystemExit(f'Authenticated runtime loader missing: {name}')
+          if "schedule: ['schedule-board.js']" not in runtime:
+              raise SystemExit('Schedule runtime must be view-scoped.')
+          if 'workforce.js' in runtime:
+              raise SystemExit('Retired Monday-based workforce scheduler must not load in the Portal runtime.')
 
           required_release_fragments = [
               '.sidebar.gc-mobile-nav-ready>nav:not(.gc-mobile-nav)',
@@ -172,5 +194,11 @@ jobs:
           if 'gc-sales-goal-marker' not in sales:
               raise SystemExit('Sales goal progress markup missing.')
 
-          print('Portal 1.0 architecture checks passed.')
+          if 'function sundayOf' not in schedule or "client.rpc('get_schedule_planning_summary'" not in schedule:
+              raise SystemExit('Schedule must use Sunday-Saturday and the connected planning summary.')
+          if "client.rpc('time_clock_action'" not in timeclock or "client.rpc('get_time_clock_state'" not in timeclock:
+              raise SystemExit('Dashboard/sidebar time clock must use authoritative database RPCs.')
+          if 'id="schedule"' not in html or 'id="sidebar-time-clock"' not in html or 'id="dashboard-time-clock"' not in html:
+              raise SystemExit('Schedule or always-available time-clock shell is missing.')
 
+          print('Portal 1.0 architecture checks passed.')
