@@ -21,6 +21,15 @@ const isNeweggUrl = (value: unknown) => {
     return url.protocol === 'https:' && (url.hostname === 'newegg.com' || url.hostname === 'www.newegg.com' || url.hostname.endsWith('.newegg.com'));
   } catch { return false; }
 };
+const isStatefulNeweggBuilderUrl = (value: unknown) => {
+  try {
+    const url = new URL(String(value || ''));
+    if (!isNeweggUrl(url.href) || !url.pathname.startsWith('/tools/custom-pc-builder/pl/ID-')) return false;
+    const temporaryBuild = clean(url.searchParams.get('tempPcbId'), 220);
+    const wishlist = clean(url.searchParams.get('diywishlist'), 80);
+    return Boolean(temporaryBuild || (wishlist && wishlist !== '0'));
+  } catch { return false; }
+};
 
 const partCategories = ['CPU','CPU Cooler','Motherboard','Memory','Storage','GPU','Case','Power Supply','Operating System','Monitor','Other'];
 const builderCategories = ['CPU','CPU Cooler','Motherboard','Memory','Storage','GPU','Case','Power Supply'];
@@ -105,7 +114,7 @@ function publicRecommendation(raw: any) {
     performance: raw.performance_summary,
     upgradePath: raw.upgrade_summary,
     compatibility: raw.compatibility_summary,
-    compatibilityMethod: 'Cross-checked against Newegg PC Builder compatibility filtering and manufacturer specifications.',
+    compatibilityMethod: 'Cross-checked in Newegg PC Builder and against manufacturer specifications.',
     budgetNote: raw.budget_note,
     budgetFit: raw.budget_fit,
     estimatedWattage: raw.estimated_wattage,
@@ -117,7 +126,7 @@ function validateCompatibility(raw: any) {
   const audit = raw.newegg_compatibility || {};
   const specs = raw.spec_checks || {};
   if (audit.status !== 'verified') throw new Error('Newegg PC Builder compatibility could not be verified.');
-  if (!isNeweggUrl(audit.builder_url) || !new URL(audit.builder_url).pathname.startsWith('/tools/custom-pc-builder')) throw new Error('Newegg PC Builder evidence URL is missing.');
+  if (!isStatefulNeweggBuilderUrl(audit.builder_url)) throw new Error('A stateful Newegg PC Builder verification link is required; a generic Builder page is not accepted.');
 
   const categories = new Set((raw.parts || []).map((part: any) => part.category));
   for (const required of ['CPU','Motherboard','Memory','Storage','Case','Power Supply']) if (!categories.has(required)) throw new Error(`Complete build is missing ${required}.`);
@@ -145,7 +154,7 @@ function validateCompatibility(raw: any) {
 
   return {
     status: 'verified',
-    method: 'Newegg PC Builder + manufacturer specification cross-check + server assertions',
+    method: 'Interactive Newegg PC Builder + manufacturer specification cross-check + server assertions',
     builder_url: audit.builder_url,
     newegg_min_wattage_estimate: minWattage,
     selected_builder_categories: selectedBuilderCategories,
@@ -172,16 +181,19 @@ async function researchBuild(survey: Record<string, unknown>, partBudgetCents: n
   const model = Deno.env.get('PC_BUILD_RESEARCH_MODEL') || 'gpt-5.4-mini';
   const prompt = `You are the sourcing and compatibility engine for GotCracked, an electronics repair and custom-PC shop in Blacksburg, Virginia. Build a CURRENT new-parts PC recommendation for the customer survey below.
 
-NON-NEGOTIABLE COMPATIBILITY WORKFLOW:
-1. Use Newegg's current Custom PC Builder (https://www.newegg.com/tools/custom-pc-builder) as a required compatibility checker. Newegg's builder filters later component choices based on selections. Start from CPU, then verify that the exact motherboard, memory, GPU (when used), case, power supply, storage, and CPU cooler remain compatible selections in that builder flow.
-2. For each selected core hardware part, return the exact Newegg product URL for the same model in newegg_product_url even if a different retailer has the best price.
-3. Return the Newegg Custom PC Builder URL used during validation in newegg_compatibility.builder_url. If you cannot establish Newegg Builder compatibility for the proposed exact build, set newegg_compatibility.status to manual_review. Never claim verified based only on general knowledge.
-4. Record Newegg's minimum wattage estimate when available and check the PSU against it.
-5. Newegg itself says its builder is an aid, not a manufacturer guarantee, so ALSO verify manufacturer/product specifications: CPU socket/chipset/BIOS support, RAM generation, motherboard/case form factor, GPU length clearance, cooler/radiator fit, M.2/SATA interfaces, PSU capacity/connectors, and any special power adapters.
-6. Fill spec_checks with the concrete values used for those checks. Do not guess dimensions or socket values. If a value cannot be verified from current product/manufacturer information, set Newegg status manual_review.
+NON-NEGOTIABLE NEWEGG COMPATIBILITY WORKFLOW:
+1. Use the computer tool to open Newegg's current Custom PC Builder at https://www.newegg.com/tools/custom-pc-builder and actually configure the proposed core components in the interactive Builder. Do not merely read or cite the generic Builder landing page.
+2. Start with the CPU. Select or validate the exact CPU, motherboard, memory, GPU when used, case, power supply, storage, and CPU cooler. Confirm the Builder continues to accept each exact model as the configuration is assembled.
+3. Capture a stateful Newegg Builder URL for the configured build. A generic /tools/custom-pc-builder URL is NOT evidence. The returned builder_url must be a Newegg /tools/custom-pc-builder/pl/ID-... URL containing a tempPcbId or a non-zero diywishlist parameter representing the configured state.
+4. For each selected core hardware part, return the exact Newegg product URL for the same model in newegg_product_url even if another retailer has the best current price.
+5. Record Newegg's minimum wattage estimate from the configured build when available and check the PSU against it.
+6. If the computer tool cannot interact with the Builder, any exact part cannot be selected in the compatibility-filtered flow, a stateful Builder URL cannot be captured, or the wattage estimate cannot be verified, set newegg_compatibility.status to manual_review. Never fabricate Builder state or claim verification from general product knowledge.
+7. Browsing safety: do NOT sign in to Newegg, do NOT add products to a cart, do NOT begin checkout, do NOT place an order, and do NOT submit any personal information. The Builder is used only for compatibility verification and reading public product/build information.
+8. Newegg states its Builder is an aid rather than a manufacturer guarantee. ALSO verify current manufacturer/product specifications for CPU socket/chipset/BIOS support, RAM generation, motherboard/case form factor, GPU length clearance, cooler/radiator fit, M.2/SATA interfaces, PSU capacity/connectors, and any special power adapters.
+9. Fill spec_checks with the concrete values used for those checks. Do not guess dimensions, sockets, connectors, or BIOS support. If a required value cannot be verified from current product/manufacturer information, set Newegg status manual_review.
 
 SOURCING AND PERFORMANCE RULES:
-- Use live web search before choosing parts. Prioritize current US listings from Newegg and Amazon; use Micro Center, B&H, Best Buy, manufacturer stores, or other reputable US retailers only when materially better/current.
+- Use web search for current US retail availability and pricing. Prioritize Newegg and Amazon; use Micro Center, B&H, Best Buy, manufacturer stores, or other reputable US retailers only when materially better/current.
 - New components only. No auctions, used/refurbished listings, questionable marketplace fulfillment, or out-of-stock placeholder prices.
 - Every price_cents must be a current price from source_url. Never invent MSRP or historical pricing.
 - Available PARTS budget: ${money(partBudgetCents)}. GotCracked service labor is added separately by the server.
@@ -201,7 +213,8 @@ ${JSON.stringify(survey)}`;
     body: JSON.stringify({
       model,
       store: false,
-      tools: [{ type:'web_search' }],
+      max_tool_calls: 28,
+      tools: [{ type:'web_search' }, { type:'computer' }],
       input: prompt,
       text: { format: { type:'json_schema', name:'pc_build_recommendation', strict:true, schema:recommendationSchema } }
     })
@@ -259,12 +272,20 @@ Deno.serve(async request => {
 
     const survey={primaryUse:clean(body.primaryUse,80),secondaryUses:clean(body.secondaryUses,400),games:clean(body.games,800),creativeApps:clean(body.creativeApps,500),resolution:clean(body.resolution,40),targetFps:clean(body.targetFps,40),imageQuality:clean(body.imageQuality,60),rayTracing:clean(body.rayTracing,40),budget:budgetDollars,budgetScope:clean(body.budgetScope,60),rgb:clean(body.rgb,60),color:clean(body.color,40),caseSize:clean(body.caseSize,60),noise:clean(body.noise,60),storage:clean(body.storage,60),wifi:clean(body.wifi,20),osNeeded:clean(body.osNeeded,20),upgradePriority:clean(body.upgradePriority,60),longevity:clean(body.longevity,40),existingParts:clean(body.existingParts,800),notes:clean(body.notes,1000)};
     const reference=`GCP-${crypto.randomUUID().replaceAll('-','').slice(0,8).toUpperCase()}`;
-    const leadNotes=['Custom PC build survey',`Budget: ${money(budgetCents)}`,`Primary use: ${survey.primaryUse||'Not specified'}`,survey.games?`Games: ${survey.games}`:null,survey.resolution?`Target: ${survey.resolution} · ${survey.targetFps||'FPS flexible'} · ${survey.imageQuality||'quality flexible'}`:null,`Aesthetics: ${survey.color||'any'} · ${survey.rgb||'RGB flexible'}`,survey.notes||null].filter(Boolean).join('\n');
+    const leadNotes=['Custom PC build survey',`Budget: ${money(budgetCents)}`,`Primary use: ${survey.primaryUse||'Not specified'}`,survey.games?`Games: ${survey.games}`:null,survey.resolution?`Target: ${survey.resolution} · ${survey.targetFps||'FPS flexible'} · ${survey.imageQuality||'quality flexible'}`:null,`Aesthetics: ${survey.color||'any'} · ${survey.rgb||'RGB flexible'}`,survey.existingParts?`Customer-owned/reused parts: ${survey.existingParts}`:null,survey.notes||null].filter(Boolean).join('\n');
 
     const leadResult=await admin.from('leads').insert({external_id:`pcbuild-${crypto.randomUUID()}`,public_reference:reference,location_id:locationId,name:customerName,phone:customerPhone,email:customerEmail,service:'Custom PC build',source:'gotcracked.co/custom-pc-build',notes:leadNotes,status:'new'}).select().single();
     if(leadResult.error) throw leadResult.error;
     const requestResult=await admin.from('pc_build_requests').insert({location_id:locationId,lead_id:leadResult.data.id,public_reference:reference,customer_name:customerName,customer_email:customerEmail,customer_phone:customerPhone,preferred_contact:preferredContact,survey,service_charge_cents:serviceChargeCents,status:'research_pending',compatibility_status:'pending',research_provider:'openai'}).select().single();
     if(requestResult.error) throw requestResult.error;
+
+    if (survey.existingParts) {
+      const reason='Customer-owned or reused components require exact-model and physical-condition verification before GotCracked can release an automated build price.';
+      await admin.from('pc_build_requests').update({status:'manual_review',compatibility_status:'manual_review',research_error:reason,updated_at:new Date().toISOString()}).eq('id',requestResult.data.id);
+      await admin.from('lead_events').insert({lead_id:leadResult.data.id,event_type:'note',message:reason});
+      await notifyLead({...leadResult.data,notes:leadNotes},reference,null,'Customer-owned parts require manual review');
+      return json(origin,{ok:true,reference,status:'manual_review',message:'Your build survey was received. Because you listed existing components to reuse, GotCracked will verify their exact model, condition, and compatibility before preparing the estimate. No automated price was released.'},202);
+    }
 
     try {
       const researched=await researchBuild(survey,partBudgetCents),raw=researched.recommendation;
@@ -272,16 +293,16 @@ Deno.serve(async request => {
       const internalParts=raw.parts,sourceUrls=[...new Set(raw.parts.flatMap((part:any)=>[part.source_url,part.newegg_product_url]).filter(Boolean))],customer=publicRecommendation(raw);
       const update=await admin.from('pc_build_requests').update({recommendation:customer,internal_parts:internalParts,source_urls:sourceUrls,parts_cost_cents:partsCostCents,estimated_total_cents:totalCents,estimate_valid_until:validUntil,status:'estimated',compatibility_status:'verified',compatibility_audit:researched.compatibilityAudit,research_model:researched.model,research_error:null,updated_at:new Date().toISOString()}).eq('id',requestResult.data.id);
       if(update.error) throw update.error;
-      await admin.from('lead_events').insert({lead_id:leadResult.data.id,event_type:'note',message:`Automated custom-PC research completed. Newegg PC Builder + manufacturer compatibility verified. Customer estimate: ${money(totalCents)}. Internal sourcing is stored on PC build request ${reference}.`});
-      await notifyLead({...leadResult.data,notes:leadNotes},reference,totalCents,'Newegg + manufacturer verified');
-      return json(origin,{ok:true,reference,status:'estimated',recommendation:customer,estimatedTotalCents:totalCents,estimateValidUntil:validUntil,compatibilityVerified:true,compatibilityMethod:'Newegg PC Builder + manufacturer specifications',ramMarketNotice:'Memory prices are unusually high as AI/data-center demand and HBM production consume more global DRAM capacity. Industry forecasts expect supply to remain constrained through 2027, with more meaningful relief potentially arriving in late 2027 into 2028 as new capacity ramps. This estimate uses current market pricing and may change.'},201);
+      await admin.from('lead_events').insert({lead_id:leadResult.data.id,event_type:'note',message:`Automated custom-PC research completed. Interactive Newegg PC Builder + manufacturer compatibility verified. Customer estimate: ${money(totalCents)}. Internal sourcing is stored on PC build request ${reference}.`});
+      await notifyLead({...leadResult.data,notes:leadNotes},reference,totalCents,'Interactive Newegg + manufacturer verified');
+      return json(origin,{ok:true,reference,status:'estimated',recommendation:customer,estimatedTotalCents:totalCents,estimateValidUntil:validUntil,compatibilityVerified:true,compatibilityMethod:'Interactive Newegg PC Builder + manufacturer specifications',ramMarketNotice:'Memory prices are unusually high as AI/data-center demand and HBM production consume more global DRAM capacity. Industry forecasts expect supply to remain constrained through 2027, with more meaningful relief potentially arriving in late 2027 into 2028 as new capacity ramps. This estimate uses current market pricing and may change.'},201);
     } catch(researchError) {
       console.error('Custom PC research/compatibility failed:',researchError);
       const message=researchError instanceof Error?researchError.message:'Automated research failed.';
       await admin.from('pc_build_requests').update({status:'manual_review',compatibility_status:'manual_review',research_error:message.slice(0,1000),updated_at:new Date().toISOString()}).eq('id',requestResult.data.id);
       await admin.from('lead_events').insert({lead_id:leadResult.data.id,event_type:'note',message:`Automated custom-PC estimate held for manual review: ${message.slice(0,500)}`});
       await notifyLead({...leadResult.data,notes:leadNotes},reference,null,'Manual compatibility review required');
-      return json(origin,{ok:true,reference,status:'manual_review',message:'Your build survey was received. Automated pricing was held because the complete configuration could not be verified through Newegg PC Builder and manufacturer specifications. A GotCracked specialist will review it before an estimate is shown.'},202);
+      return json(origin,{ok:true,reference,status:'manual_review',message:'Your build survey was received. Automated pricing was held because the complete configuration could not be verified in Newegg PC Builder and against manufacturer specifications. A GotCracked specialist will review it before an estimate is shown.'},202);
     }
   } catch(error) {
     console.error(error);
