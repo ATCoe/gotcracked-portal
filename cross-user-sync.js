@@ -56,6 +56,7 @@
 
       const jobs = [];
       if (typeof ops?.reload === 'function') jobs.push(Promise.resolve(ops.reload()));
+      if (typeof window.GotCrackedStaffProfiles?.load === 'function') jobs.push(Promise.resolve(window.GotCrackedStaffProfiles.load()));
       window.GotCrackedDirectory?.requestRefresh?.();
 
       document.dispatchEvent(new CustomEvent('gc-cross-user-sync', {
@@ -172,7 +173,7 @@
   setTimeout(pollNow, 100);
 
   window.GotCrackedCrossUserSync = {
-    version:'20260825-sync1',
+    version:'20260826-sync2',
     pollNow,
     refreshNow:() => refreshAll('manual', lastRevision),
     get status(){ return { lastRevision, locationId, realtimeStatus, pollBusy, refreshBusy }; },
