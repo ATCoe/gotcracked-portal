@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-release25';
+  const VERSION = '20260826-release26';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
@@ -11,6 +11,7 @@
     'time-clock.js',
     'timesheets.js',
     'portal-live.js',
+    'avatar-presets.js',
     'staff-profiles.js',
     'training-store-guard.js',
     'operations-v1-arrival.js',
