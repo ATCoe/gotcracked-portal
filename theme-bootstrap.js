@@ -9,6 +9,51 @@
   const root = document.documentElement;
   root.dataset.gcPortalBoot = 'loading';
 
+  // Earliest possible, zero-interference input trace. This is registered before
+  // every other Portal script so we can prove exactly how far a browser event
+  // propagates before later application listeners get a chance to act on it.
+  // These listeners never preventDefault(), stopPropagation(), or mutate the UI.
+  const earlyTrace = window.__gcEarlyInputTrace = {
+    version: '20260826-early1',
+    seq: 0,
+    last: 'none',
+    history: []
+  };
+
+  const describeTarget = node => {
+    if (!(node instanceof Element)) return String(node?.nodeName || 'none');
+    const id = node.id ? `#${node.id}` : '';
+    const classes = [...node.classList].slice(0, 3).map(value => `.${value}`).join('');
+    const flags = [
+      node.hasAttribute('data-v1-walkin') ? '[walkin]' : '',
+      node.hasAttribute('data-open-ticket') ? '[open-ticket]' : '',
+      node.classList.contains('mobile-menu') ? '[menu]' : '',
+      node.hasAttribute('data-v1-new-lead') ? '[new-lead]' : ''
+    ].filter(Boolean).join('');
+    return `${node.tagName.toLowerCase()}${id}${classes}${flags}`;
+  };
+
+  const markEarlyInput = (stage, event) => {
+    let x = Number.isFinite(event.clientX) ? Math.round(event.clientX) : null;
+    let y = Number.isFinite(event.clientY) ? Math.round(event.clientY) : null;
+    if ((x === null || y === null) && event.touches?.[0]) {
+      x = Math.round(event.touches[0].clientX);
+      y = Math.round(event.touches[0].clientY);
+    }
+    const row = `${++earlyTrace.seq}:${stage}:${event.type}:${describeTarget(event.target)}${x === null ? '' : `@${x},${y}`} dp=${event.defaultPrevented ? 1 : 0}`;
+    earlyTrace.last = row;
+    earlyTrace.history.push(row);
+    if (earlyTrace.history.length > 16) earlyTrace.history.shift();
+  };
+
+  const inputTypes = ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click'];
+  for (const type of inputTypes) {
+    window.addEventListener(type, event => markEarlyInput('W-CAP', event), true);
+    document.addEventListener(type, event => markEarlyInput('D-CAP', event), true);
+    document.addEventListener(type, event => markEarlyInput('D-BUB', event), false);
+    window.addEventListener(type, event => markEarlyInput('W-BUB', event), false);
+  }
+
   // This is a synchronous pre-paint guard, not a late visual override. Keeping
   // it here prevents the legacy static shell from flashing before the 1.0
   // runtime has finished replacing/hydrating its content.
