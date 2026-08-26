@@ -6,6 +6,12 @@
   Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://cdn.discordapp.com https://uvpmmbioerejeyybfntb.supabase.co; connect-src 'self' https://uvpmmbioerejeyybfntb.supabase.co wss://uvpmmbioerejeyybfntb.supabase.co https://discord.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 
+/
+  Cache-Control: no-cache, max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: no-cache, max-age=0, must-revalidate
+
 /theme-bootstrap.js
   Cache-Control: no-store, max-age=0
 
