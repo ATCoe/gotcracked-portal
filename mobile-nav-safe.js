@@ -12,6 +12,7 @@
       ['ready-pickup', '✓', 'Ready for Pickup'],
       ['leads', '⌁', 'Leads'],
       ['appointments', '◷', 'Appointments'],
+      ['schedule', '▦', 'Schedule'],
       ['customers', '♙', 'Customers']
     ],
     more: [
