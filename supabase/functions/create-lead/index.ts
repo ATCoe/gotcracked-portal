@@ -30,7 +30,7 @@ async function sendDiscordAlert(lead: Record<string, any>) {
       }],
       components: [
         { type: 1, components: [{ type: 2, style: 1, label: 'Claim', custom_id: `lead:claim:${lead.id}` }, { type: 2, style: 2, label: 'Add note', custom_id: `lead:note:${lead.id}` }, { type: 2, style: 3, label: 'Qualified', custom_id: `lead:qualified:${lead.id}` }, { type: 2, style: 3, label: 'Won', custom_id: `lead:won:${lead.id}` }, { type: 2, style: 4, label: 'Lost', custom_id: `lead:lost:${lead.id}` }] },
-        { type: 1, components: [{ type: 2, style: 5, label: 'Open in Portal', url: `${portalUrl}/#leads/${lead.id}` }] }
+        { type: 1, components: [{ type: 2, style: 5, label: 'Open Lead', url: `${portalUrl}/#leads/${lead.id}` }] }
       ]
     })
   });
@@ -65,13 +65,14 @@ Deno.serve(async request => {
     const inserted = await admin.from('leads').insert({ external_id: externalId, location_id: profile.data.location_id, name, phone: clean(body.phone,40) || null, email: clean(body.email,160).toLowerCase() || null, service, source: clean(body.source,80) || 'portal', notes: clean(body.notes,1200) || null, status: 'new' }).select().single();
     if (inserted.error) throw inserted.error;
     const botUrl = Deno.env.get('BOT_LEAD_WEBHOOK_URL'), botSecret = Deno.env.get('LEAD_WEBHOOK_SECRET');
+    const directUrl = `https://portal.gotcracked.co/#leads/${inserted.data.id}`;
     let discordDelivered = false;
     try { discordDelivered = await sendDiscordAlert(inserted.data); }
     catch (error) { console.error(error); }
     if (botUrl && botSecret) {
-      const delivered = await fetch(botUrl, { method: 'POST', headers: { Authorization: `Bearer ${botSecret}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: externalId, locationId: profile.data.location_id, name, phone: inserted.data.phone, email: inserted.data.email, service, source: inserted.data.source, notes: inserted.data.notes }) });
+      const delivered = await fetch(botUrl, { method: 'POST', headers: { Authorization: `Bearer ${botSecret}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: externalId, leadId:inserted.data.id, portalUrl:directUrl, locationId: profile.data.location_id, name, phone: inserted.data.phone, email: inserted.data.email, service, source: inserted.data.source, notes: inserted.data.notes }) });
       discordDelivered = delivered.ok || discordDelivered;
     }
-    return json(origin, { lead: inserted.data, discordDelivered }, 201);
+    return json(origin, { lead: inserted.data, portalUrl:directUrl, discordDelivered }, 201);
   } catch (error) { console.error(error); return json(origin, { error: 'Unable to create the lead.' }, 500); }
 });
