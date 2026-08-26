@@ -18,7 +18,7 @@ Deno.serve(async request => {
     const location = await admin.from('locations').select('id').order('created_at').limit(1).single();
     if (location.error) throw location.error;
     const [settings, posts] = await Promise.all([
-      admin.from('business_settings').select('youtube_channel_url,tiktok_profile_url,store_hours,warranty_months,accepts_mail_in_repairs').eq('location_id', location.data.id).maybeSingle(),
+      admin.from('business_settings').select('youtube_channel_url,tiktok_profile_url,store_hours,store_timezone,warranty_months,accepts_mail_in_repairs,google_analytics_measurement_id').eq('location_id', location.data.id).maybeSingle(),
       admin.from('media_posts').select('platform,external_id,title,thumbnail_url,public_url,published_at').eq('location_id', location.data.id).eq('active', true).order('published_at', { ascending: false }).limit(12)
     ]);
     if (settings.error || posts.error) throw settings.error || posts.error;
