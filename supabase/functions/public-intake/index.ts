@@ -7,7 +7,35 @@ const headers = (origin: string | null) => ({
   'Content-Type': 'application/json', 'Vary': 'Origin'
 });
 const clean = (value: unknown, max = 500) => String(value || '').trim().slice(0, max);
+const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] || c));
 const json = (origin: string | null, body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: headers(origin) });
+const hex = (buffer: ArrayBuffer) => [...new Uint8Array(buffer)].map(value => value.toString(16).padStart(2,'0')).join('');
+const hash = async (value: string) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+const clientKey = (request: Request) => request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || `ua:${request.headers.get('user-agent') || 'unknown'}`;
+
+async function consumeRateLimit(admin: ReturnType<typeof createClient>, request: Request) {
+  const keyHash = await hash(clientKey(request));
+  const result = await admin.rpc('consume_public_rate_limit', { p_kind:'public-intake', p_key_hash:keyHash, p_limit:20, p_window_seconds:900 });
+  if (result.error) { console.error('Public intake rate limiter unavailable:', result.error.message); return true; }
+  return result.data === true;
+}
+
+async function sendConfirmationEmail(data: Record<string, any>) {
+  const apiKey = Deno.env.get('RESEND_API_KEY');
+  if (!apiKey || !data.email) return false;
+  const from = Deno.env.get('CUSTOMER_FROM_EMAIL') || Deno.env.get('RECEIPT_FROM_EMAIL') || 'GotCracked <hello@gotcracked.co>';
+  const mailIn = data.intake_method === 'mail_in';
+  const subject = mailIn ? `GotCracked mail-in request ${data.public_reference}` : `GotCracked repair request ${data.public_reference}`;
+  const schedule = [data.preferred_date, data.preferred_time].filter(Boolean).join(' · ');
+  const html = `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#111827;background:#f6f8fb;padding:24px"><div style="max-width:680px;margin:auto;background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:28px"><h1 style="margin:0;color:#0a2342">GotCracked</h1><p style="color:#4b5563">Repair request ${esc(data.public_reference)}</p><p>Hi ${esc(data.first_name)},</p><p>We received your ${mailIn ? 'mail-in repair request' : 'repair request'}. This confirms receipt of the request; it is not a final repair estimate or appointment confirmation.</p><div style="background:#f3f6fa;border-radius:10px;padding:16px;margin:20px 0"><strong>${esc(data.device_type)} · ${esc(data.device_model)}</strong><p style="margin:8px 0 0">${esc(data.issue)}</p>${schedule ? `<p style="margin:8px 0 0"><strong>Requested time:</strong> ${esc(schedule)}</p>` : ''}${data.timing_note ? `<p style="margin:8px 0 0"><strong>Timing note:</strong> ${esc(data.timing_note)}</p>` : ''}<p style="margin:8px 0 0"><strong>Preferred contact:</strong> ${esc(data.preferred_contact)}</p></div>${mailIn ? '<p><strong>Do not ship your device yet.</strong> We will review the request and contact you before you send it.</p>' : '<p>We will review the request and contact you to confirm timing, availability, and next steps.</p>'}<p style="color:#4b5563">Keep request number <strong>${esc(data.public_reference)}</strong> with your records.</p><p style="color:#4b5563">GotCracked · 700 North Main St, Ste D · Blacksburg, VA 24060</p></div></body></html>`;
+  const response = await fetch('https://api.resend.com/emails', {
+    method:'POST',
+    headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},
+    body:JSON.stringify({from,to:[data.email],subject,html})
+  });
+  if (!response.ok) { console.error(`Request confirmation email failed (${response.status}): ${await response.text()}`); return false; }
+  return true;
+}
 
 async function sendDiscordAlert(lead: Record<string, any>) {
   const token = Deno.env.get('DISCORD_BOT_TOKEN');
@@ -61,6 +89,9 @@ Deno.serve(async request => {
   if (request.method !== 'POST') return json(origin, { error: 'Method not allowed.' }, 405);
   if (!allowedOrigins.has(origin || '')) return json(origin, { error: 'Origin not allowed.' }, 403);
   try {
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    if (!(await consumeRateLimit(admin, request))) return json(origin, { error:'Too many requests. Please wait a few minutes and try again.' }, 429);
+
     const body = await request.json();
     if (clean(body.companyWebsite, 100)) return json(origin, { error: 'Unable to submit the request.' }, 400);
     const startedAt = Number(body.formStartedAt || 0);
@@ -76,7 +107,6 @@ Deno.serve(async request => {
     if (intakeMethod === 'mail_in' && (!shippingAddress?.line1 || !shippingAddress.city || !shippingAddress.state || !shippingAddress.postal_code)) return json(origin, { error: 'Complete the return shipping address.' }, 400);
     if (!/^\S+@\S+\.\S+$/.test(email)) return json(origin, { error: 'Enter a valid email address.' }, 400);
 
-    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const locationId = Deno.env.get('DEFAULT_LOCATION_ID')!;
     if (!locationId) throw new Error('DEFAULT_LOCATION_ID is not configured.');
     const reference = `GCR-${crypto.randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
@@ -85,17 +115,15 @@ Deno.serve(async request => {
     const leadRecord = {
       external_id: externalId, public_reference: reference, location_id: locationId,
       name: `${firstName} ${lastName}`, phone, email, service: issue.slice(0, 180), source: 'gotcracked.co', notes,
-      customer_issue: issue, preferred_contact: preferredContact, timing_note: timingNote || null,
-      device_type: deviceType, device_model: model, intake_method: intakeMethod, shipping_address: shippingAddress, preferred_date: intakeMethod === 'walk_in' ? clean(body.date, 10) || null : null,
-      preferred_time: intakeMethod === 'walk_in' ? clean(body.time, 80) || null : null, consent_at: new Date().toISOString(), status: 'new'
+      device_type: deviceType, device_model: model, intake_method: intakeMethod, shipping_address: shippingAddress,
+      preferred_date: intakeMethod === 'walk_in' ? clean(body.date, 10) || null : null,
+      preferred_time: intakeMethod === 'walk_in' ? clean(body.time, 80) || null : null,
+      consent_at: new Date().toISOString(), status: 'new'
     };
-    const insertRecord = { ...leadRecord };
-    delete insertRecord.customer_issue;
-    delete insertRecord.preferred_contact;
-    delete insertRecord.timing_note;
-    const leadResult = await admin.from('leads').insert(insertRecord).select().single();
+    const leadResult = await admin.from('leads').insert(leadRecord).select().single();
     if (leadResult.error) throw leadResult.error;
     const alertRecord = { ...leadResult.data, customer_issue: issue, preferred_contact: preferredContact, timing_note: timingNote || null };
+
     if (intakeMethod === 'walk_in') {
       const appointmentResult = await admin.from('appointments').insert({
         location_id: locationId, lead_id: leadResult.data.id, device_description: `${deviceType} · ${model}`,
@@ -106,8 +134,9 @@ Deno.serve(async request => {
     }
 
     let discordDelivered = false;
-    try { discordDelivered = await sendDiscordAlert(alertRecord); }
-    catch (error) { console.error(error); }
+    try { discordDelivered = await sendDiscordAlert(alertRecord); } catch (error) { console.error(error); }
+    let emailDelivered = false;
+    try { emailDelivered = await sendConfirmationEmail({ public_reference:reference, first_name:firstName, email, intake_method:intakeMethod, device_type:deviceType, device_model:model, issue, preferred_date:leadRecord.preferred_date, preferred_time:leadRecord.preferred_time, preferred_contact:preferredContact, timing_note:timingNote }); } catch (error) { console.error(error); }
 
     const botUrl = Deno.env.get('BOT_LEAD_WEBHOOK_URL');
     const botSecret = Deno.env.get('LEAD_WEBHOOK_SECRET');
@@ -115,6 +144,6 @@ Deno.serve(async request => {
       method: 'POST', headers: { Authorization: `Bearer ${botSecret}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: externalId, locationId, name: leadRecord.name, phone, email, service: leadRecord.service, source: leadRecord.source, notes: `${intakeMethod === 'mail_in' ? '[MAIL-IN] ' : ''}${deviceType} ${model}: ${notes}` })
     }).catch(console.error);
-    return json(origin, { ok: true, reference, discordDelivered }, 201);
+    return json(origin, { ok: true, reference, discordDelivered, emailDelivered }, 201);
   } catch (error) { console.error(error); return json(origin, { error: 'Unable to submit the repair request. Please contact the shop.' }, 500); }
 });
