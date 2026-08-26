@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-production4';
+  const VERSION = '20260826-production5';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260826-sales-ops2';
   const PROFILE_READY_TIMEOUT_MS = 15000;
@@ -10,6 +10,7 @@
     'theme-controller.js',
     'training-shared-sync.js',
     'operations-v1-core.js',
+    'payment-center.js',
     'mobile-dialog-compat.js',
     'action-launchers.js',
     'account-sync.js',
