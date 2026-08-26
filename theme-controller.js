@@ -4,7 +4,17 @@
   if (window.GotCrackedTheme) return;
 
   const KEY = 'gc-portal-theme';
+  const COMPONENT_STYLE_VERSION = '20260825-dark2';
   const media = window.matchMedia?.('(prefers-color-scheme: dark)');
+
+  function ensureComponentStyles() {
+    if (document.querySelector('link[data-gc-dark-components]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `portal-dark-components.css?v=${COMPONENT_STYLE_VERSION}`;
+    link.dataset.gcDarkComponents = 'true';
+    document.head.appendChild(link);
+  }
 
   function savedPreference() {
     const saved = localStorage.getItem(KEY);
@@ -19,6 +29,7 @@
   function apply(preference = savedPreference(), { persist = false } = {}) {
     if (!['light','dark','system'].includes(preference)) preference = 'system';
     if (persist) localStorage.setItem(KEY, preference);
+    ensureComponentStyles();
     const resolved = resolvedTheme(preference);
     document.documentElement.dataset.theme = resolved;
     document.documentElement.dataset.themePreference = preference;
@@ -68,6 +79,7 @@
     if (savedPreference() === 'system') apply('system');
   });
 
+  ensureComponentStyles();
   document.addEventListener('gc-portal-runtime-ready', ensureButton, { once:false });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureButton, { once:true });
   else ensureButton();
