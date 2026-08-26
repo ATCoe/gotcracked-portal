@@ -23,8 +23,7 @@
       </button>`).join('') : '<div class="empty-card"><h2>No matching leads</h2><p>New webhook leads will appear here and in Discord.</p></div>';
     const badge = document.querySelector('#lead-count');
     const activeCount = leads.filter(lead => ['new', 'claimed', 'qualified'].includes(lead.status)).length;
-    badge.textContent = activeCount;
-    badge.hidden = activeCount === 0;
+    if (badge) { badge.textContent = activeCount; badge.hidden = activeCount === 0; }
   }
 
   async function load() {
@@ -39,6 +38,8 @@
     if (!lead) return;
     const { data: events } = await client.from('lead_events').select('*, profiles:actor_user_id(display_name)').eq('lead_id', id).order('created_at');
     const dialog = document.querySelector('#ticket-detail');
+    if (!dialog) return;
+    if (dialog.open) dialog.close();
     dialog.querySelector('#ticket-detail-content').innerHTML = `
       <div class="modal-head"><div><p class="eyebrow">Shared with Discord</p><h2>${esc(lead.name)}</h2></div><button class="icon-button" id="close-lead">×</button></div>
       <span class="status ${lead.status}">${statusLabel(lead.status)}</span>
@@ -52,13 +53,19 @@
   function openLinkedLead() {
     const match = location.hash.match(/^#leads\/([0-9a-f-]+)$/i);
     if (!match) return;
-    document.querySelector('[data-view="leads"]')?.click();
+    window.GotCrackedUI?.activateView?.('leads',{updateHash:false});
     showLead(match[1]);
   }
 
   document.querySelector('#lead-search')?.addEventListener('input', render);
   document.querySelector('#lead-status')?.addEventListener('change', render);
-  document.addEventListener('click', event => { const row = event.target.closest('[data-lead-id]'); if (row) showLead(row.dataset.leadId); });
+  document.addEventListener('click', event => {
+    const row = event.target.closest?.('[data-lead-id]');
+    if (!row) return;
+    const hash = `#leads/${row.dataset.leadId}`;
+    if (location.hash !== hash) history.pushState(null,'',hash);
+    showLead(row.dataset.leadId);
+  });
   document.addEventListener('submit', async event => {
     if (event.target.id !== 'lead-update-form') return;
     event.preventDefault();
@@ -70,6 +77,7 @@
     if (update.error) { message.textContent = update.error.message; button.disabled = false; return; }
     document.querySelector('#ticket-detail').close(); await load();
   });
+  window.addEventListener('hashchange', openLinkedLead);
   client.auth.onAuthStateChange(event => { if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') setTimeout(load, 0); });
   setTimeout(load, 1000);
 })();
