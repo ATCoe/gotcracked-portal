@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260825-release12';
+  const VERSION = '20260825-release13';
 
   // Only the modules needed to make the primary repair/dashboard workspace
   // useful belong on the critical post-auth path. Everything else is deferred
@@ -14,6 +14,7 @@
     'portal-v1-polish.js',
     'portal-v1-final.js',
     'master-directory.js',
+    'cross-user-sync.js',
     'sales-ops-bootstrap.js',
     'sales-ops.js',
     'checkout-receipts.js'
@@ -172,4 +173,3 @@
     watchLoginState();
   }
 })();
-
