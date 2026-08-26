@@ -4,6 +4,7 @@
   const MOBILE_MAX = 750;
   const NAV_CLASS = 'gc-mobile-nav';
   const mobileQuery = window.matchMedia(`(max-width: ${MOBILE_MAX}px)`);
+  let lastPointerToggleAt = 0;
 
   const navItems = {
     primary: [
@@ -104,9 +105,6 @@
     forcePanelVisualState(panel, shouldOpen);
     syncButtons(shouldOpen);
 
-    /* Reassert once after the current event/layout turn. Some authenticated
-       modules finish rendering immediately after the tap; the mobile controller
-       remains the authority for whether the drawer is open. */
     if (shouldOpen) {
       requestAnimationFrame(() => {
         if (document.documentElement.dataset.gcMobileNavOpen !== 'true') return;
@@ -135,23 +133,61 @@
     });
   }
 
+  function visibleModalOpen() {
+    return Array.from(document.querySelectorAll('dialog[open]')).some(dialog => {
+      const style = getComputedStyle(dialog);
+      const rect = dialog.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || 1) > 0.01 && rect.width > 8 && rect.height > 8;
+    });
+  }
+
+  function toggleAtPoint(event) {
+    if (!mobileQuery.matches || (typeof event.button === 'number' && event.button !== 0)) return false;
+    const direct = event.target instanceof Element ? event.target.closest('.mobile-menu') : null;
+    let toggle = direct;
+
+    if (!toggle && !visibleModalOpen() && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+      for (const element of document.elementsFromPoint(event.clientX, event.clientY)) {
+        const candidate = element instanceof Element ? element.closest('.mobile-menu') : null;
+        if (candidate) { toggle = candidate; break; }
+      }
+    }
+
+    if (!toggle) return false;
+    const panel = sidebar();
+    if (!panel) return false;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    lastPointerToggleAt = performance.now();
+    setOpen(panel.dataset.mobileOpen !== 'true');
+    return true;
+  }
+
   function bind() {
     if (document.documentElement.dataset.gcMobileNavBound === 'true') return;
     document.documentElement.dataset.gcMobileNavBound = 'true';
 
-    /* Delegation keeps the hamburger working even if an authenticated module
-       replaces the visible button. Capture ownership prevents later Portal
-       handlers from consuming the same tap first. */
+    /* Android can cancel a synthesized click when late Portal rendering changes
+       the DOM during a tap. Own the hamburger on pointerdown at window capture,
+       before document-level runtime handlers or overlays can consume it. */
+    window.addEventListener('pointerdown', event => {
+      toggleAtPoint(event);
+    }, true);
+
+    /* Keyboard activation and browsers without Pointer Events keep a click
+       fallback. Suppress the compatibility click after a handled pointer tap. */
     document.addEventListener('click', event => {
       const target = event.target instanceof Element ? event.target : null;
       const toggle = target?.closest('.mobile-menu');
       if (!toggle || !mobileQuery.matches) return;
 
-      const panel = sidebar();
-      if (!panel) return;
-
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (performance.now() - lastPointerToggleAt < 900) return;
+
+      const panel = sidebar();
+      if (!panel) return;
       setOpen(panel.dataset.mobileOpen !== 'true');
     }, true);
 
@@ -176,9 +212,6 @@
       syncActive();
     });
 
-    /* A background render may announce the current view while the user is
-       opening the menu. That event must not close the drawer. Navigation itself
-       is already handled by the nav-link and hashchange paths above. */
     document.addEventListener('gc-view-changed', syncActive);
 
     document.addEventListener('gc-portal-runtime-ready', () => {
