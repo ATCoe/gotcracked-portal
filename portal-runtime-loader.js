@@ -1,7 +1,8 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260825-release17';
+  const VERSION = '20260825-release18';
+  const PROFILE_READY_TIMEOUT_MS = 15000;
 
   // Apply the remembered/system theme before the authenticated runtime starts so
   // returning staff do not see the Portal flash between light and dark modes.
@@ -24,14 +25,15 @@
     document.head.appendChild(theme);
   }
 
-  // Only the modules needed to make the primary repair/dashboard workspace
-  // useful belong on the critical post-auth path. Everything else is deferred
-  // until idle time or until its view is requested.
+  // Runtime order is intentional. Training Store synchronization must hydrate
+  // before Operations reads sandbox state. Operations must then finish profile
+  // hydration before any older/live module that dereferences profile.location_id
+  // is allowed to attach its handlers.
   const criticalScripts = [
     'theme-controller.js',
-    'portal-live.js',
     'training-shared-sync.js',
     'operations-v1-core.js',
+    'portal-live.js',
     'training-store-guard.js',
     'operations-v1-arrival.js',
     'portal-v1-polish.js',
@@ -63,7 +65,10 @@
 
   let started = false;
   let deferredStarted = false;
+  let profileReady = null;
   const loading = new Map();
+
+  const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
   function srcFor(file) {
     return `${file}?v=${VERSION}`;
@@ -99,11 +104,39 @@
     return promise;
   }
 
+  async function waitForOperationsProfile() {
+    if (profileReady?.id && profileReady?.location_id) return profileReady;
+
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < PROFILE_READY_TIMEOUT_MS) {
+      const profile = window.GotCrackedOperationsV1?.state?.profile || null;
+      if (profile?.id && profile?.location_id && profile.active !== false) {
+        profileReady = profile;
+        window.GotCrackedRuntimeProfile = profile;
+        document.documentElement.dataset.gcProfileReady = 'true';
+        return profile;
+      }
+      await delay(100);
+    }
+
+    throw new Error('Staff profile did not finish loading. Refresh the Portal and try again.');
+  }
+
   async function loadSequence(files) {
     for (const file of files) {
+      // Any module after Operations is profile-dependent. Never let it attach
+      // handlers while the shared staff profile is still null.
+      if (file !== 'theme-controller.js' && file !== 'training-shared-sync.js' && file !== 'operations-v1-core.js') {
+        await waitForOperationsProfile();
+      }
+
       await loadScript(file);
+
       if (file === 'training-shared-sync.js' && window.GotCrackedTrainingSync?.ready) {
         await window.GotCrackedTrainingSync.ready;
+      }
+      if (file === 'operations-v1-core.js') {
+        await waitForOperationsProfile();
       }
     }
   }
@@ -111,14 +144,18 @@
   async function startCriticalRuntime() {
     if (started) return;
     started = true;
+    document.documentElement.dataset.gcRuntimeState = 'starting';
     preload(criticalScripts);
 
     try {
       await loadSequence(criticalScripts);
-      document.dispatchEvent(new CustomEvent('gc-portal-runtime-ready'));
+      document.documentElement.dataset.gcRuntimeState = 'ready';
+      document.dispatchEvent(new CustomEvent('gc-portal-runtime-ready', { detail:{ profile:profileReady } }));
       scheduleDeferredRuntime();
     } catch (error) {
       console.error('Portal critical runtime load failed:', error);
+      document.documentElement.dataset.gcRuntimeState = 'error';
+      window.GotCrackedDiagnostics?.error?.(error, { context:'Portal staff profile initialization failed', duration:20000 });
       started = false;
     }
   }
@@ -127,6 +164,7 @@
     if (deferredStarted) return;
     deferredStarted = true;
     try {
+      await waitForOperationsProfile();
       await loadSequence(deferredScripts);
       document.dispatchEvent(new CustomEvent('gc-portal-secondary-runtime-ready'));
     } catch (error) {
@@ -144,8 +182,13 @@
   async function ensureViewRuntime(view) {
     const files = viewDependencies[view] || [];
     if (!files.length) return;
-    try { await loadSequence(files); }
-    catch (error) { console.error(`Portal ${view} runtime load failed:`, error); }
+    try {
+      await waitForOperationsProfile();
+      await loadSequence(files);
+    } catch (error) {
+      console.error(`Portal ${view} runtime load failed:`, error);
+      window.GotCrackedDiagnostics?.error?.(error, { context:`Unable to open ${view}` });
+    }
   }
 
   function scheduleCriticalStart() {
@@ -177,7 +220,12 @@
     if (view) ensureViewRuntime(view);
   });
 
-  window.GotCrackedRuntime = { ensureView: ensureViewRuntime, startDeferred: startDeferredRuntime };
+  window.GotCrackedRuntime = {
+    ensureView: ensureViewRuntime,
+    startDeferred: startDeferredRuntime,
+    waitForProfile: waitForOperationsProfile,
+    get profile(){ return profileReady; }
+  };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchLoginState, { once: true });
   else watchLoginState();
