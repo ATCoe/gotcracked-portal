@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260825-release15';
+  const VERSION = '20260825-release16';
 
   // Only the modules needed to make the primary repair/dashboard workspace
   // useful belong on the critical post-auth path. Everything else is deferred
@@ -14,6 +14,7 @@
     'operations-v1-arrival.js',
     'portal-v1-polish.js',
     'portal-v1-final.js',
+    'intake-modal-release.js',
     'master-directory.js',
     'cross-user-sync.js',
     'sales-ops-bootstrap.js',
