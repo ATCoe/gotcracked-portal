@@ -1,0 +1,40 @@
+/* GotCracked My Account */
+.gc-account-launcher{position:relative;cursor:pointer;outline:0;transition:background .16s ease,border-color .16s ease,transform .16s ease}
+.gc-account-launcher:hover,.gc-account-launcher:focus-visible{background:rgba(66,145,208,.10);box-shadow:inset 0 0 0 1px rgba(78,157,220,.22)}
+.gc-account-launcher:active{transform:translateY(1px)}
+.gc-account-launcher #sign-out{position:relative;z-index:2}
+.gc-account-open-indicator{display:grid;place-items:center;flex:0 0 auto;width:24px;height:24px;border-radius:8px;color:#7c8ea1;font-size:22px;font-weight:700;line-height:1}
+.gc-account-launcher:hover .gc-account-open-indicator,.gc-account-launcher:focus-visible .gc-account-open-indicator{color:#2d8ed0;background:rgba(45,142,208,.10)}
+
+.gc-account-settings{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.gc-account-card{padding:16px;border:1px solid #dfe6ee;border-radius:16px;background:#fff;box-shadow:0 8px 22px rgba(17,34,51,.045);min-width:0}
+.gc-account-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:13px}
+.gc-account-card-head .eyebrow{margin:0 0 3px}.gc-account-card-head h2{margin:0;color:#172a3f;font-size:18px}.gc-account-card-head p:not(.eyebrow){margin:5px 0 0;color:#6f7f91;font-size:11px;line-height:1.45}
+.gc-account-theme-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.gc-account-theme-options button{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;gap:1px 8px;align-items:center;min-width:0;padding:11px;border:1px solid #dbe4ed;border-radius:12px;background:#f8fafc;color:#506173;text-align:left;cursor:pointer;transition:border-color .16s ease,background .16s ease,box-shadow .16s ease}
+.gc-account-theme-options button>span{grid-row:1/3;display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#eaf2f8;color:#347fae;font-size:16px}
+.gc-account-theme-options button strong{color:#203247;font-size:12px}.gc-account-theme-options button small{color:#7a8999;font-size:9px}
+.gc-account-theme-options button:hover{border-color:#9fcce7;background:#f3f9fd}.gc-account-theme-options button.selected{border-color:#2f91d2;background:#eaf6ff;box-shadow:0 0 0 2px rgba(47,145,210,.10)}
+.gc-account-theme-options button.selected>span{background:#d8efff;color:#1978ba}
+.gc-account-pref-note{margin:11px 0 0;color:#7a8999;font-size:10px;line-height:1.45}
+
+.gc-account-access-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.gc-account-access-grid>div{min-width:0;padding:11px;border:1px solid #e2e8ef;border-radius:12px;background:#f8fafc}
+.gc-account-access-grid .wide{grid-column:1/-1}.gc-account-access-grid small{display:block;color:#7a8999;font-size:9px;text-transform:uppercase;letter-spacing:.045em;font-weight:900}.gc-account-access-grid strong{display:block;margin-top:4px;color:#203247;font-size:12px;overflow-wrap:anywhere}
+.gc-account-inline-action{margin-top:9px;padding:7px 10px!important;min-height:34px!important;font-size:10px!important}
+.gc-account-admin-note{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:flex-start;margin-top:10px;padding:10px 11px;border:1px solid #dce6ef;border-radius:12px;background:#f3f7fa;color:#667789}
+.gc-account-admin-note>span{font-size:14px;line-height:1.25}.gc-account-admin-note p{margin:0!important;font-size:10px!important;line-height:1.45!important;color:#667789!important}.gc-account-admin-note strong{color:#40566c!important}
+.gc-account-actions{display:flex;justify-content:flex-end;margin-top:11px}
+
+html[data-theme="dark"] .gc-account-launcher:hover,html[data-theme="dark"] .gc-account-launcher:focus-visible{background:rgba(84,167,226,.10);box-shadow:inset 0 0 0 1px rgba(84,167,226,.20)}
+html[data-theme="dark"] .gc-account-open-indicator{color:#7890a6}html[data-theme="dark"] .gc-account-launcher:hover .gc-account-open-indicator,html[data-theme="dark"] .gc-account-launcher:focus-visible .gc-account-open-indicator{color:#7cc5f4;background:#183148}
+html[data-theme="dark"] .gc-account-card{background:#111d2a;border-color:#2c3d4e;box-shadow:none}
+html[data-theme="dark"] .gc-account-card-head h2{color:#eef5fb}html[data-theme="dark"] .gc-account-card-head p:not(.eyebrow),html[data-theme="dark"] .gc-account-pref-note{color:#94a8ba}
+html[data-theme="dark"] .gc-account-theme-options button,html[data-theme="dark"] .gc-account-access-grid>div{background:#0e1925;border-color:#304253;color:#b9c9d8}
+html[data-theme="dark"] .gc-account-theme-options button:hover{background:#14283a;border-color:#426b88}html[data-theme="dark"] .gc-account-theme-options button.selected{background:#17324a;border-color:#55b7ef;box-shadow:0 0 0 2px rgba(85,183,239,.10)}
+html[data-theme="dark"] .gc-account-theme-options button>span{background:#17283a;color:#8bcaef}html[data-theme="dark"] .gc-account-theme-options button.selected>span{background:#20415e;color:#a7dcfb}
+html[data-theme="dark"] .gc-account-theme-options button strong,html[data-theme="dark"] .gc-account-access-grid strong{color:#eaf3fb}html[data-theme="dark"] .gc-account-theme-options button small,html[data-theme="dark"] .gc-account-access-grid small{color:#8fa4b8}
+html[data-theme="dark"] .gc-account-admin-note{background:#0d1823;border-color:#2d4051;color:#99acbd}html[data-theme="dark"] .gc-account-admin-note p{color:#99acbd!important}html[data-theme="dark"] .gc-account-admin-note strong{color:#d5e4f0!important}
+
+@media(max-width:900px){.gc-account-settings{grid-template-columns:1fr}}
+@media(max-width:750px){.gc-account-open-indicator{margin-left:auto}.gc-account-settings{gap:12px}.gc-account-card{padding:14px}.gc-account-theme-options{grid-template-columns:1fr}.gc-account-theme-options button{grid-template-columns:auto 1fr}.gc-account-access-grid{grid-template-columns:1fr}.gc-account-access-grid .wide{grid-column:auto}.gc-account-actions .secondary-button{width:100%}}
