@@ -32,7 +32,6 @@ jobs:
           if 'Clear-Site-Data' in headers:
               raise SystemExit('Clear-Site-Data must not be used by the Portal; it previously broke the Android installed shortcut.')
 
-          # Keep the user-visible red bottom error reporter while removing temporary tracers.
           for token in ['window.GotCrackedDiagnostics = diagnostics','gc-diagnostic-stack','unhandledrejection','data-gc-copy-diagnostic']:
               if token not in app:
                   raise SystemExit(f'Portal production error reporting invariant missing: {token}')
@@ -40,14 +39,14 @@ jobs:
           required_functions = [
               'public-chat','public-intake','public-media','track-repair','staff-invite',
               'create-lead','manage-staff','send-receipt','sync-media',
-              'discord-verify','discord-interactions'
+              'discord-verify','discord-interactions','custom-pc-build'
           ]
           for name in required_functions:
               entry = Path('supabase/functions') / name / 'index.ts'
               if not entry.exists():
                   raise SystemExit(f'Deployed Edge Function is not source-controlled: {name}')
 
-          for name in ['public-chat','public-intake','track-repair']:
+          for name in ['public-chat','public-intake','track-repair','custom-pc-build']:
               source = (Path('supabase/functions') / name / 'index.ts').read_text(encoding='utf-8')
               if 'consume_public_rate_limit' not in source:
                   raise SystemExit(f'Public endpoint lost server-side rate limiting: {name}')
@@ -56,11 +55,34 @@ jobs:
           if 'RESEND_API_KEY' not in intake or 'emailDelivered' not in intake:
               raise SystemExit('Public intake confirmation email flow is missing.')
 
+          pc = Path('supabase/functions/custom-pc-build/index.ts').read_text(encoding='utf-8')
+          for token in [
+              "https://www.newegg.com/tools/custom-pc-builder",
+              "Newegg PC Builder compatibility could not be verified",
+              "manufacturer specifications",
+              "psu_connectors_verified",
+              "bios_support_verified",
+              "case_gpu_clearance_mm",
+              "compatibility_status:'verified'"
+          ]:
+              if token not in pc:
+                  raise SystemExit(f'Custom-PC compatibility gate weakened or missing: {token}')
+          if "status:'manual_review'" not in pc or 'No automated estimate' in pc:
+              pass
+          if 'pc-builds.js' not in runtime or not Path('pc-builds.js').exists() or not Path('pc-builds.css').exists():
+              raise SystemExit('Portal custom-PC workspace is not loaded or source-controlled.')
+          if 'custom_pc_build_service_charge_cents' not in Path('pricing-settings.js').read_text(encoding='utf-8'):
+              raise SystemExit('Custom-PC build service charge is no longer manager-configurable.')
+
           migration = Path('supabase/migrations/0024_public_endpoint_rate_limiting.sql')
           if not migration.exists():
               raise SystemExit('Public endpoint rate-limit migration is missing.')
           rate_sql = migration.read_text(encoding='utf-8')
           if 'grant execute' not in rate_sql.lower() or 'service_role' not in rate_sql:
               raise SystemExit('Rate limiter must remain service-role-only.')
+
+          for migration_name in ['0025_custom_pc_build_intake.sql','0026_custom_pc_newegg_compatibility_audit.sql']:
+              if not (Path('supabase/migrations') / migration_name).exists():
+                  raise SystemExit(f'Custom-PC migration is missing: {migration_name}')
 
           print('Portal production guard passed.')
