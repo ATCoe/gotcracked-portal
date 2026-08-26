@@ -7,7 +7,8 @@
   const TARGET_IDS = new Set([
     'v1-intake-dialog',
     'gc-lead-create-dialog',
-    'portal-v1-lead-dialog'
+    'portal-v1-lead-dialog',
+    'gc-pcbuild-dialog'
   ]);
 
   const proto = window.HTMLDialogElement?.prototype;
@@ -66,7 +67,7 @@
   }, true);
 
   window.GotCrackedMobileDialogCompat = {
-    version: '20260826-dialog1',
+    version: '20260826-dialog2',
     isActive: () => mobile.matches
   };
 })();
