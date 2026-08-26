@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-release24';
+  const VERSION = '20260826-release25';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
@@ -18,6 +18,7 @@
     'portal-mobile-audit.js',
     'portal-v1-final.js',
     'intake-modal-release.js',
+    'directory-advanced.js',
     'master-directory.js',
     'cross-user-sync.js',
     'sales-ops-bootstrap.js',
