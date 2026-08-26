@@ -1,7 +1,7 @@
 (()=>{'use strict';
   const client=window.supabaseClient;if(!client)return;
   const training=()=>localStorage.getItem('gc-training-store')==='1';
-  const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);
+  const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=cents=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format((Number(cents)||0)/100);
   const date=value=>{const d=value?new Date(value):null;return d&&!Number.isNaN(d.getTime())?d.toLocaleString():'—'};
   const safeUrl=value=>{try{const u=new URL(value);return u.protocol==='https:'?u.href:'#'}catch{return '#'}};
