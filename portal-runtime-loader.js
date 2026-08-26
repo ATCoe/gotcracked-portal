@@ -1,13 +1,14 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-release28';
+  const VERSION = '20260826-release29';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
     'theme-controller.js',
     'training-shared-sync.js',
     'operations-v1-core.js',
+    'action-launchers.js',
     'account-sync.js',
     'time-clock.js',
     'timesheets.js',
