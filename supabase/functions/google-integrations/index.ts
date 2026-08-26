@@ -5,9 +5,10 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const callbackUrl = `${supabaseUrl}/functions/v1/google-integrations?action=callback`;
 const googleClientId = () => (Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') || '').trim();
 const googleClientSecret = () => (Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET') || '').trim();
-const scopes = [
-  'openid', 'email',
-  'https://www.googleapis.com/auth/business.manage',
+const businessScope = 'https://www.googleapis.com/auth/business.manage';
+const coreScopes = [
+  'openid',
+  'email',
   'https://www.googleapis.com/auth/webmasters.readonly',
   'https://www.googleapis.com/auth/analytics.readonly'
 ];
@@ -41,7 +42,8 @@ async function refreshAccessToken(refreshToken: string) {
     body:new URLSearchParams({
       client_id:googleClientId(),
       client_secret:googleClientSecret(),
-      refresh_token:refreshToken, grant_type:'refresh_token'
+      refresh_token:refreshToken,
+      grant_type:'refresh_token'
     })
   });
   const data = await response.json();
@@ -61,9 +63,14 @@ async function metrics(locationId: string) {
   if (!connectionResult.data) return { connected:false };
   const accessToken = await refreshAccessToken(connectionResult.data.refresh_token);
   const settings = settingsResult.data || {};
+  const grantedScopes = Array.isArray(connectionResult.data.scopes) ? connectionResult.data.scopes : [];
   const end = new Date(); end.setUTCDate(end.getUTCDate()-1);
   const start = new Date(end); start.setUTCDate(start.getUTCDate()-27);
-  const output: Record<string,unknown> = { connected:true, period:{start:isoDate(start),end:isoDate(end)} };
+  const output: Record<string,unknown> = {
+    connected:true,
+    period:{start:isoDate(start),end:isoDate(end)},
+    businessProfileAuthorized:grantedScopes.includes(businessScope)
+  };
 
   if (settings.google_search_console_property) {
     const response = await fetch(`https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(settings.google_search_console_property)}/searchAnalytics/query`, {
@@ -84,9 +91,14 @@ async function metrics(locationId: string) {
     output.analytics = response.ok ? {sessions:Number(values[0]?.value||0),activeUsers:Number(values[1]?.value||0),pageViews:Number(values[2]?.value||0)} : { error:data.error?.message || 'Analytics data unavailable.' };
   }
 
-  const business = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts?pageSize=20', { headers:{Authorization:`Bearer ${accessToken}`} });
-  const businessData = await business.json();
-  output.businessProfile = business.ok ? {accounts:(businessData.accounts || []).map((item:any)=>({name:item.name,accountName:item.accountName,type:item.type}))} : {error:businessData.error?.message || 'Business Profile API unavailable.'};
+  if (grantedScopes.includes(businessScope)) {
+    const business = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts?pageSize=20', { headers:{Authorization:`Bearer ${accessToken}`} });
+    const businessData = await business.json();
+    output.businessProfile = business.ok ? {accounts:(businessData.accounts || []).map((item:any)=>({name:item.name,accountName:item.accountName,type:item.type}))} : {error:businessData.error?.message || 'Business Profile API unavailable.'};
+  } else {
+    output.businessProfile = {authorized:false,requiresAdditionalAuthorization:true};
+  }
+
   await db.from('google_integrations').update({last_sync_at:new Date().toISOString(),last_error:null,updated_at:new Date().toISOString()}).eq('location_id',locationId);
   return output;
 }
@@ -118,7 +130,9 @@ async function callback(request: Request) {
     body:new URLSearchParams({
       client_id:googleClientId(),
       client_secret:googleClientSecret(),
-      code, grant_type:'authorization_code', redirect_uri:callbackUrl
+      code,
+      grant_type:'authorization_code',
+      redirect_uri:callbackUrl
     })
   });
   const token = await tokenResponse.json();
@@ -146,14 +160,40 @@ async function callback(request: Request) {
   } catch {}
 
   const saved = await db.from('google_integrations').upsert({
-    location_id:stateResult.data.location_id, connected_email:email, refresh_token:refreshToken,
-    scopes:String(token.scope || '').split(/\s+/).filter(Boolean), connected_at:new Date().toISOString(), updated_at:new Date().toISOString(), last_error:null
+    location_id:stateResult.data.location_id,
+    connected_email:email,
+    refresh_token:refreshToken,
+    scopes:String(token.scope || '').split(/\s+/).filter(Boolean),
+    connected_at:new Date().toISOString(),
+    updated_at:new Date().toISOString(),
+    last_error:null
   },{onConflict:'location_id'});
   if (saved.error) {
     console.error(`Google OAuth connection save failed: ${saved.error.message}`);
     return Response.redirect(`${portalUrl}/?google=error&reason=connection_save#settings`,302);
   }
   return Response.redirect(`${portalUrl}/?google=connected#settings`,302);
+}
+
+async function startAuthorization(staff:any, requestedScopes:string[]) {
+  if (!oauthConfigured()) return json({error:'Google OAuth server credentials are not configured.',setupRequired:true,callbackUrl},409);
+  const db = admin();
+  await db.from('google_oauth_states').delete().lt('expires_at',new Date().toISOString());
+  const state = crypto.randomUUID();
+  const inserted = await db.from('google_oauth_states').insert({state,location_id:staff.location_id,requested_by:staff.id});
+  if (inserted.error) throw inserted.error;
+  const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  authUrl.search = new URLSearchParams({
+    client_id:googleClientId(),
+    redirect_uri:callbackUrl,
+    response_type:'code',
+    scope:requestedScopes.join(' '),
+    access_type:'offline',
+    prompt:'consent',
+    include_granted_scopes:'true',
+    state
+  }).toString();
+  return json({authUrl:authUrl.toString(),callbackUrl,requestedScopes});
 }
 
 Deno.serve(async request => {
@@ -169,18 +209,21 @@ Deno.serve(async request => {
     const db = admin();
     if (action === 'status') {
       const result = await db.from('google_integrations').select('connected_email,scopes,connected_at,last_sync_at,last_error').eq('location_id',staff.location_id).maybeSingle();
-      return json({connected:Boolean(result.data),setupRequired:!oauthConfigured(),callbackUrl,email:result.data?.connected_email||null,scopes:result.data?.scopes||[],connectedAt:result.data?.connected_at||null,lastSyncAt:result.data?.last_sync_at||null,lastError:result.data?.last_error||null});
+      const grantedScopes = Array.isArray(result.data?.scopes) ? result.data.scopes : [];
+      return json({
+        connected:Boolean(result.data),
+        setupRequired:!oauthConfigured(),
+        callbackUrl,
+        email:result.data?.connected_email||null,
+        scopes:grantedScopes,
+        businessProfileAuthorized:grantedScopes.includes(businessScope),
+        connectedAt:result.data?.connected_at||null,
+        lastSyncAt:result.data?.last_sync_at||null,
+        lastError:result.data?.last_error||null
+      });
     }
-    if (action === 'start') {
-      if (!oauthConfigured()) return json({error:'Google OAuth server credentials are not configured.',setupRequired:true,callbackUrl},409);
-      await db.from('google_oauth_states').delete().lt('expires_at',new Date().toISOString());
-      const state = crypto.randomUUID();
-      const inserted = await db.from('google_oauth_states').insert({state,location_id:staff.location_id,requested_by:staff.id});
-      if (inserted.error) throw inserted.error;
-      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-      authUrl.search = new URLSearchParams({client_id:googleClientId(),redirect_uri:callbackUrl,response_type:'code',scope:scopes.join(' '),access_type:'offline',prompt:'consent',include_granted_scopes:'true',state}).toString();
-      return json({authUrl:authUrl.toString(),callbackUrl});
-    }
+    if (action === 'start') return startAuthorization(staff,coreScopes);
+    if (action === 'start_business') return startAuthorization(staff,[businessScope]);
     if (action === 'metrics') return json(await metrics(staff.location_id));
     if (action === 'disconnect') {
       const current = await db.from('google_integrations').select('refresh_token').eq('location_id',staff.location_id).maybeSingle();
