@@ -18,13 +18,13 @@ Deno.serve(async request => {
     const location = await admin.from('locations').select('id').order('created_at').limit(1).single();
     if (location.error) throw location.error;
     const [settings, posts] = await Promise.all([
-      admin.from('business_settings').select('youtube_channel_url,tiktok_profile_url').eq('location_id', location.data.id).maybeSingle(),
+      admin.from('business_settings').select('youtube_channel_url,tiktok_profile_url,store_hours,warranty_months,accepts_mail_in_repairs').eq('location_id', location.data.id).maybeSingle(),
       admin.from('media_posts').select('platform,external_id,title,thumbnail_url,public_url,published_at').eq('location_id', location.data.id).eq('active', true).order('published_at', { ascending: false }).limit(12)
     ]);
     if (settings.error || posts.error) throw settings.error || posts.error;
     return new Response(JSON.stringify({ settings: settings.data || {}, posts: posts.data || [] }), { headers: cors(origin) });
   } catch (error) {
     console.error(error);
-    return new Response(JSON.stringify({ error: 'Media feed is temporarily unavailable.' }), { status: 500, headers: cors(origin) });
+    return new Response(JSON.stringify({ error: 'Public site information is temporarily unavailable.' }), { status: 500, headers: cors(origin) });
   }
 });
