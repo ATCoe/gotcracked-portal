@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260825-release14';
+  const VERSION = '20260825-release15';
 
   // Only the modules needed to make the primary repair/dashboard workspace
   // useful belong on the critical post-auth path. Everything else is deferred
