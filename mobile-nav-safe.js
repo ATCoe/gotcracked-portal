@@ -29,7 +29,7 @@
   };
 
   const sidebar = () => document.querySelector('.sidebar');
-  const button = () => document.querySelector('.mobile-menu');
+  const buttons = () => Array.from(document.querySelectorAll('.mobile-menu'));
   const currentView = () => window.location.hash.slice(1).split('/')[0] || 'dashboard';
 
   function linkMarkup([view, icon, label]) {
@@ -41,6 +41,31 @@
       <summary>${label}</summary>
       <div class="gc-mobile-nav-group-links">${items.map(linkMarkup).join('')}</div>
     </details>`;
+  }
+
+  function syncButtons(open) {
+    const panel = sidebar();
+    for (const toggle of buttons()) {
+      toggle.type = 'button';
+      toggle.setAttribute('aria-expanded', String(Boolean(open)));
+      toggle.setAttribute('aria-controls', panel?.id || 'portal-sidebar');
+      toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+  }
+
+  function forcePanelVisualState(panel, open) {
+    if (!panel) return;
+    if (open) {
+      panel.style.setProperty('transform', 'translateX(0)', 'important');
+      panel.style.setProperty('visibility', 'visible', 'important');
+      panel.style.setProperty('pointer-events', 'auto', 'important');
+      panel.style.setProperty('opacity', '1', 'important');
+    } else {
+      panel.style.removeProperty('transform');
+      panel.style.removeProperty('visibility');
+      panel.style.removeProperty('pointer-events');
+      panel.style.removeProperty('opacity');
+    }
   }
 
   function buildOnce() {
@@ -69,19 +94,29 @@
 
   function setOpen(open) {
     const panel = sidebar();
-    const toggle = button();
     if (!panel) return;
 
     const shouldOpen = Boolean(open) && mobileQuery.matches;
+    document.documentElement.dataset.gcMobileNavOpen = shouldOpen ? 'true' : 'false';
     panel.classList.toggle('open', shouldOpen);
     panel.dataset.mobileOpen = shouldOpen ? 'true' : 'false';
     panel.setAttribute('aria-hidden', shouldOpen ? 'false' : String(mobileQuery.matches));
+    forcePanelVisualState(panel, shouldOpen);
+    syncButtons(shouldOpen);
 
-    if (toggle) {
-      toggle.type = 'button';
-      toggle.setAttribute('aria-expanded', String(shouldOpen));
-      toggle.setAttribute('aria-controls', panel.id || 'portal-sidebar');
-      toggle.setAttribute('aria-label', shouldOpen ? 'Close menu' : 'Open menu');
+    /* Reassert once after the current event/layout turn. Some authenticated
+       modules finish rendering immediately after the tap; the mobile controller
+       remains the authority for whether the drawer is open. */
+    if (shouldOpen) {
+      requestAnimationFrame(() => {
+        if (document.documentElement.dataset.gcMobileNavOpen !== 'true') return;
+        const current = sidebar();
+        if (!current) return;
+        current.classList.add('open');
+        current.dataset.mobileOpen = 'true';
+        forcePanelVisualState(current, true);
+        syncButtons(true);
+      });
     }
   }
 
@@ -104,13 +139,9 @@
     if (document.documentElement.dataset.gcMobileNavBound === 'true') return;
     document.documentElement.dataset.gcMobileNavBound = 'true';
 
-    /*
-     * Own the hamburger through event delegation instead of binding to one DOM
-     * node. Authenticated Portal modules can update/rebuild shell content; a
-     * delegated controller continues to work even if the visible hamburger is a
-     * fresh element. This also lets this early shell controller win before any
-     * later capture-phase operational handlers can consume the tap.
-     */
+    /* Delegation keeps the hamburger working even if an authenticated module
+       replaces the visible button. Capture ownership prevents later Portal
+       handlers from consuming the same tap first. */
     document.addEventListener('click', event => {
       const target = event.target instanceof Element ? event.target : null;
       const toggle = target?.closest('.mobile-menu');
@@ -129,8 +160,8 @@
       if (!panel || !mobileQuery.matches || panel.dataset.mobileOpen !== 'true') return;
 
       const target = event.target instanceof Node ? event.target : null;
-      const toggle = button();
-      if (!target || panel.contains(target) || toggle?.contains(target)) return;
+      const toggle = target instanceof Element ? target.closest?.('.mobile-menu') : null;
+      if (!target || panel.contains(target) || toggle) return;
       setOpen(false);
     }, true);
 
@@ -144,17 +175,35 @@
       setOpen(false);
       syncActive();
     });
-    document.addEventListener('gc-view-changed', () => {
-      setOpen(false);
+
+    /* A background render may announce the current view while the user is
+       opening the menu. That event must not close the drawer. Navigation itself
+       is already handled by the nav-link and hashchange paths above. */
+    document.addEventListener('gc-view-changed', syncActive);
+
+    document.addEventListener('gc-portal-runtime-ready', () => {
+      buildOnce();
       syncActive();
+      syncButtons(document.documentElement.dataset.gcMobileNavOpen === 'true');
     });
+
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') setOpen(false);
     });
+
     mobileQuery.addEventListener?.('change', event => {
       if (!event.matches) setOpen(false);
+      else {
+        buildOnce();
+        syncButtons(false);
+      }
     });
+
     window.addEventListener('orientationchange', () => setOpen(false));
+    window.addEventListener('pageshow', () => {
+      buildOnce();
+      setOpen(false);
+    });
   }
 
   function init() {
