@@ -1,2 +1,5 @@
 [functions.manage-staff]
 verify_jwt = true
+
+[functions.public-chat]
+verify_jwt = false
