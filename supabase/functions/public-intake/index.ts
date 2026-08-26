@@ -45,6 +45,11 @@ async function sendDiscordAlert(lead: Record<string, any>) {
   const contact = [lead.phone, lead.email].filter(Boolean).join(' · ') || 'No contact details';
   const preferredContact = lead.preferred_contact || 'No preference';
   const timing = lead.timing_note || 'No timing constraint provided';
+  const linkButtons: Record<string, unknown>[] = [
+    { type: 2, style: 5, label: 'Open Lead', url: `${portalUrl}/#leads/${lead.id}` }
+  ];
+  if (lead.appointment_id) linkButtons.push({ type: 2, style: 5, label: 'Open Appointment', url: `${portalUrl}/#appointments/${lead.appointment_id}` });
+
   const message = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
@@ -68,7 +73,7 @@ async function sendDiscordAlert(lead: Record<string, any>) {
       }],
       components: [
         { type: 1, components: [{ type: 2, style: 1, label: 'Claim', custom_id: `lead:claim:${lead.id}` }, { type: 2, style: 2, label: 'Add note', custom_id: `lead:note:${lead.id}` }, { type: 2, style: 3, label: 'Qualified', custom_id: `lead:qualified:${lead.id}` }, { type: 2, style: 3, label: 'Won', custom_id: `lead:won:${lead.id}` }, { type: 2, style: 4, label: 'Lost', custom_id: `lead:lost:${lead.id}` }] },
-        { type: 1, components: [{ type: 2, style: 5, label: 'Open in Portal', url: `${portalUrl}/#leads/${lead.id}` }] }
+        { type: 1, components: linkButtons }
       ]
     })
   });
@@ -122,17 +127,21 @@ Deno.serve(async request => {
     };
     const leadResult = await admin.from('leads').insert(leadRecord).select().single();
     if (leadResult.error) throw leadResult.error;
-    const alertRecord = { ...leadResult.data, customer_issue: issue, preferred_contact: preferredContact, timing_note: timingNote || null };
 
+    let appointmentId: string | null = null;
     if (intakeMethod === 'walk_in') {
       const appointmentResult = await admin.from('appointments').insert({
         location_id: locationId, lead_id: leadResult.data.id, device_description: `${deviceType} · ${model}`,
         service_requested: issue, preferred_date: leadRecord.preferred_date, preferred_time: leadRecord.preferred_time,
         service_mode: 'walk_in', status: 'requested', notes: ['Submitted through gotcracked.co', `Preferred contact: ${preferredContact}`, timingNote ? `Timing/deadline: ${timingNote}` : null].filter(Boolean).join(' · ')
-      });
+      }).select('id').single();
       if (appointmentResult.error) throw appointmentResult.error;
+      appointmentId = appointmentResult.data.id;
+      const leadLink = await admin.from('leads').update({ appointment_id: appointmentId }).eq('id',leadResult.data.id);
+      if (leadLink.error) throw leadLink.error;
     }
 
+    const alertRecord = { ...leadResult.data, appointment_id:appointmentId, customer_issue: issue, preferred_contact: preferredContact, timing_note: timingNote || null };
     let discordDelivered = false;
     try { discordDelivered = await sendDiscordAlert(alertRecord); } catch (error) { console.error(error); }
     let emailDelivered = false;
@@ -142,8 +151,8 @@ Deno.serve(async request => {
     const botSecret = Deno.env.get('LEAD_WEBHOOK_SECRET');
     if (botUrl && botSecret) fetch(botUrl, {
       method: 'POST', headers: { Authorization: `Bearer ${botSecret}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: externalId, locationId, name: leadRecord.name, phone, email, service: leadRecord.service, source: leadRecord.source, notes: `${intakeMethod === 'mail_in' ? '[MAIL-IN] ' : ''}${deviceType} ${model}: ${notes}` })
+      body: JSON.stringify({ id: externalId, leadId:leadResult.data.id, appointmentId, portalUrl:`https://portal.gotcracked.co/#leads/${leadResult.data.id}`, appointmentUrl:appointmentId?`https://portal.gotcracked.co/#appointments/${appointmentId}`:null, locationId, name: leadRecord.name, phone, email, service: leadRecord.service, source: leadRecord.source, notes: `${intakeMethod === 'mail_in' ? '[MAIL-IN] ' : ''}${deviceType} ${model}: ${notes}` })
     }).catch(console.error);
-    return json(origin, { ok: true, reference, discordDelivered, emailDelivered }, 201);
+    return json(origin, { ok: true, reference, appointmentId, discordDelivered, emailDelivered }, 201);
   } catch (error) { console.error(error); return json(origin, { error: 'Unable to submit the repair request. Please contact the shop.' }, 500); }
 });
