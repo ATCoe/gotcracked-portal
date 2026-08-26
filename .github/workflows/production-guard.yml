@@ -1,0 +1,66 @@
+name: Portal Production Guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  production-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Production-only invariants
+        shell: python
+        run: |
+          from pathlib import Path
+
+          runtime = Path('portal-runtime-loader.js').read_text(encoding='utf-8')
+          index = Path('index.html').read_text(encoding='utf-8')
+          app = Path('app.js').read_text(encoding='utf-8')
+          headers = Path('_headers').read_text(encoding='utf-8')
+
+          if Path('mobile-interaction-debug.js').exists():
+              raise SystemExit('Temporary mobile interaction tracer must not ship to production.')
+          for token in ['mobile-interaction-debug.js','20260826-touch3','GotCrackedMobileInteractionDebug']:
+              if token in runtime or token in index:
+                  raise SystemExit(f'Temporary mobile diagnostic reference returned: {token}')
+          if 'Clear-Site-Data' in headers:
+              raise SystemExit('Clear-Site-Data must not be used by the Portal; it previously broke the Android installed shortcut.')
+
+          # Keep the user-visible red bottom error reporter while removing temporary tracers.
+          for token in ['window.GotCrackedDiagnostics = diagnostics','gc-diagnostic-stack','unhandledrejection','data-gc-copy-diagnostic']:
+              if token not in app:
+                  raise SystemExit(f'Portal production error reporting invariant missing: {token}')
+
+          required_functions = [
+              'public-chat','public-intake','public-media','track-repair','staff-invite',
+              'create-lead','manage-staff','send-receipt','sync-media',
+              'discord-verify','discord-interactions'
+          ]
+          for name in required_functions:
+              entry = Path('supabase/functions') / name / 'index.ts'
+              if not entry.exists():
+                  raise SystemExit(f'Deployed Edge Function is not source-controlled: {name}')
+
+          for name in ['public-chat','public-intake','track-repair']:
+              source = (Path('supabase/functions') / name / 'index.ts').read_text(encoding='utf-8')
+              if 'consume_public_rate_limit' not in source:
+                  raise SystemExit(f'Public endpoint lost server-side rate limiting: {name}')
+
+          intake = Path('supabase/functions/public-intake/index.ts').read_text(encoding='utf-8')
+          if 'RESEND_API_KEY' not in intake or 'emailDelivered' not in intake:
+              raise SystemExit('Public intake confirmation email flow is missing.')
+
+          migration = Path('supabase/migrations/0024_public_endpoint_rate_limiting.sql')
+          if not migration.exists():
+              raise SystemExit('Public endpoint rate-limit migration is missing.')
+          rate_sql = migration.read_text(encoding='utf-8')
+          if 'grant execute' not in rate_sql.lower() or 'service_role' not in rate_sql:
+              raise SystemExit('Rate limiter must remain service-role-only.')
+
+          print('Portal production guard passed.')
