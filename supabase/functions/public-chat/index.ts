@@ -10,6 +10,13 @@ const json = (origin: string | null, body: unknown, status = 200) => new Respons
 const clean = (value: unknown, max = 1600) => String(value || '').trim().slice(0, max);
 const hex = (buffer: ArrayBuffer) => [...new Uint8Array(buffer)].map(value => value.toString(16).padStart(2, '0')).join('');
 const hashToken = async (token: string) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)));
+const clientKey = (request: Request) => request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || `ua:${request.headers.get('user-agent') || 'unknown'}`;
+
+async function allow(admin: ReturnType<typeof createClient>, request: Request, kind: string, limit: number, seconds: number) {
+  const result = await admin.rpc('consume_public_rate_limit', { p_kind:kind, p_key_hash:await hashToken(clientKey(request)), p_limit:limit, p_window_seconds:seconds });
+  if (result.error) { console.error('Public chat rate limiter unavailable:', result.error.message); return true; }
+  return result.data === true;
+}
 
 async function discord(path: string, init: RequestInit = {}) {
   const token = Deno.env.get('DISCORD_BOT_TOKEN');
@@ -34,6 +41,7 @@ Deno.serve(async request => {
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     if (action === 'start') {
+      if (!(await allow(admin,request,'public-chat-start',10,3600))) return json(origin,{error:'Too many new chat requests. Please wait and try again.'},429);
       const startedAt = Number(body.formStartedAt || 0);
       if (!startedAt || Date.now() - startedAt < 1500 || Date.now() - startedAt > 86400000) return json(origin, { error: 'Please reopen chat and try again.' }, 400);
       const name = clean(body.name, 100), email = clean(body.email, 160).toLowerCase(), message = clean(body.message);
@@ -59,6 +67,7 @@ Deno.serve(async request => {
     if (session.error || !session.data) return json(origin, { error:'Chat session not found.' }, 404);
 
     if (action === 'send') {
+      if (!(await allow(admin,request,'public-chat-send',60,900))) return json(origin,{error:'Too many chat messages. Please wait and try again.'},429);
       const message = clean(body.message);
       if (!message) return json(origin, { error:'Enter a message.' }, 400);
       const recent = await admin.from('website_chat_messages').select('created_at').eq('session_id',sessionId).eq('sender','customer').order('created_at',{ascending:false}).limit(1).maybeSingle();
@@ -66,6 +75,8 @@ Deno.serve(async request => {
       const posted = await discord(`/channels/${session.data.discord_thread_id}/messages`, { method:'POST', body:JSON.stringify({ allowed_mentions:{parse:[]}, content:`**Customer · ${session.data.customer_name}**\n${message}` }) });
       const saved = await admin.from('website_chat_messages').insert({ session_id:sessionId, sender:'customer', body:message, discord_message_id:posted.id });
       if (saved.error) throw saved.error;
+    } else if (action !== 'poll') {
+      return json(origin,{error:'Unsupported chat action.'},400);
     }
 
     if (session.data.discord_thread_id) {
