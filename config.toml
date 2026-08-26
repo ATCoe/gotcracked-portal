@@ -3,3 +3,6 @@ verify_jwt = true
 
 [functions.public-chat]
 verify_jwt = false
+
+[functions.staff-invite]
+verify_jwt = false

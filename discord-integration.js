@@ -94,9 +94,11 @@
   async function createInvite(form) {
     const fields = Object.fromEntries(new FormData(form));
     const { data, error } = await client.functions.invoke('staff-invite', { body: fields });
-    if (error || !data?.url) throw new Error(data?.error || error?.message || 'Unable to create invite.');
-    await navigator.clipboard.writeText(data.url);
-    return data.url;
+    if (error || !data?.ok) throw new Error(data?.error || error?.message || 'Unable to onboard the employee.');
+    const packageText = `GotCracked staff onboarding\nPortal: https://portal.gotcracked.co\nLogin: ${data.staff.portalEmail}\nTemporary password: ${data.temporaryPassword}\nDiscord invite: ${data.discordInviteUrl}\nDiscord username: @${data.staff.discordUsername}\n\nChange the temporary password after first sign-in.`;
+    let copied = false;
+    try { await navigator.clipboard.writeText(packageText); copied = true; } catch {}
+    return { ...data, packageText, copied };
   }
 
   function showOnboardingMessage(message) {
@@ -150,8 +152,9 @@
       event.preventDefault();
       const output = document.querySelector('#staff-invite-output');
       try {
-        const url = await createInvite(event.target);
-        output.textContent = `Invite copied: ${url}`;
+        const result = await createInvite(event.target);
+        event.target.reset();
+        output.innerHTML = `<strong>Onboarding package ${result.copied?'copied':'created'}.</strong><br>Login: ${result.staff.portalEmail}<br>Temporary password: <code>${result.temporaryPassword}</code><br>Discord invite: <a href="${result.discordInviteUrl}" target="_blank" rel="noopener">${result.discordInviteUrl}</a><br><small>The invite expires in seven days and can be used once. Copy these details before leaving this page.</small>`;
       } catch (error) { output.textContent = error.message; }
     });
   }
