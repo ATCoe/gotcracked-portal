@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-release31';
+  const VERSION = '20260826-release32';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
@@ -53,8 +53,11 @@
   let profileReady = null;
   let accountSyncReady = null;
   let accountSyncWaited = false;
+  let trainingSyncReady = null;
+  let trainingResyncWired = false;
   const loading = new Map();
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const isTraining = () => localStorage.getItem('gc-training-store') === '1';
 
   function srcFor(file) { return `${file}?v=${VERSION}`; }
 
@@ -102,6 +105,30 @@
     throw new Error('Staff profile did not finish loading. Refresh the Portal and try again.');
   }
 
+  function captureTrainingSyncReady(){
+    if(trainingSyncReady) return trainingSyncReady;
+    const ready=window.GotCrackedTrainingSync?.ready;
+    if(!ready) return null;
+    trainingSyncReady=Promise.resolve(ready).catch(error=>{
+      console.warn('Shared Training Store sync did not finish during startup; local sandbox data remains available.',error);
+      return null;
+    });
+    return trainingSyncReady;
+  }
+
+  function wireTrainingResyncAfterOperations(){
+    if(trainingResyncWired) return;
+    const ready=captureTrainingSyncReady();
+    if(!ready) return;
+    trainingResyncWired=true;
+    ready.then(()=>{
+      if(!isTraining()) return;
+      const ops=window.GotCrackedOperationsV1;
+      if(typeof ops?.reload!=='function') return;
+      requestAnimationFrame(()=>Promise.resolve(ops.reload()).catch(error=>console.warn('Training Store post-sync refresh failed:',error)));
+    });
+  }
+
   function captureAccountSyncReady(){
     if(accountSyncReady) return accountSyncReady;
     const ready=window.GotCrackedAccountSync?.ready;
@@ -124,17 +151,23 @@
     for(const file of files){
       if(file!=='theme-controller.js'&&file!=='training-shared-sync.js'&&file!=='operations-v1-core.js') await waitForOperationsProfile();
 
-      /* Account preference sync starts as soon as possible but must not block the
-         dashboard, time clock, profiles, or operational UI. We only wait at the
-         point where persisted directory filters are about to read their caches. */
       if(file==='directory-advanced.js'||file==='master-directory.js') await waitForAccountSyncBeforeDirectory();
 
       await loadScript(file);
-      if(file==='training-shared-sync.js'&&window.GotCrackedTrainingSync?.ready) await window.GotCrackedTrainingSync.ready;
-      if(file==='operations-v1-core.js') await waitForOperationsProfile();
+      if(file==='training-shared-sync.js') captureTrainingSyncReady();
+      if(file==='operations-v1-core.js') {
+        await waitForOperationsProfile();
+        wireTrainingResyncAfterOperations();
+      }
       if(file==='account-sync.js') captureAccountSyncReady();
       if(file==='account-page.js'&&window.GotCrackedAccountPage?.ready) await window.GotCrackedAccountPage.ready;
     }
+  }
+
+  async function ensureStoreModeRuntime(){
+    if(isTraining()) return;
+    try { await loadScript('portal-live.js'); }
+    catch(error){ console.error('Portal live-data runtime load failed:',error); }
   }
 
   async function startCriticalRuntime(){
@@ -142,9 +175,10 @@
     started=true;
     document.documentElement.dataset.gcRuntimeState='starting';
     document.documentElement.dataset.gcPortalBoot='loading';
-    preload(criticalScripts);
+    const files=isTraining() ? criticalScripts.filter(file=>file!=='portal-live.js') : criticalScripts;
+    preload(files);
     try{
-      await loadSequence(criticalScripts);
+      await loadSequence(files);
       const currentView=location.hash.slice(1).split('/')[0]||'dashboard';
       await ensureViewRuntime(currentView);
       document.documentElement.dataset.gcRuntimeState='ready';
@@ -213,6 +247,12 @@
     const view=target?.dataset.view;
     if(view)ensureViewRuntime(view);
   },true);
+
+  document.addEventListener('gc-view-changed',event=>{
+    const view=typeof event.detail==='string'?event.detail:(location.hash.slice(1).split('/')[0]||'dashboard');
+    if(view)ensureViewRuntime(view);
+    if(!isTraining()) ensureStoreModeRuntime();
+  });
 
   window.addEventListener('hashchange',()=>{
     const view=location.hash.slice(1).split('/')[0];
