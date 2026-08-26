@@ -1,0 +1,58 @@
+/* GotCracked always-available staff time clock */
+.gc-timeclock-mini{display:grid;gap:7px;padding:10px 11px;margin:0 8px 8px;border:1px solid #dce4ec;border-radius:13px;background:#f7f9fc;min-width:0}
+.gc-timeclock-mini-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.gc-timeclock-state{display:inline-flex;align-items:center;gap:6px;min-width:0;color:#617184;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.04em}
+.gc-timeclock-state::before{content:"";width:8px;height:8px;border-radius:50%;background:#8996a5;box-shadow:0 0 0 3px rgba(137,150,165,.12)}
+.gc-timeclock-mini[data-state="working"] .gc-timeclock-state::before{background:#2ca65a;box-shadow:0 0 0 3px rgba(44,166,90,.14)}
+.gc-timeclock-mini[data-state="on_break"] .gc-timeclock-state::before{background:#dda719;box-shadow:0 0 0 3px rgba(221,167,25,.15)}
+.gc-timeclock-mini strong{color:#16293e;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.gc-timeclock-mini-actions{display:flex;gap:6px;min-width:0}
+.gc-timeclock-mini-actions button{flex:1 1 0;min-width:0;min-height:32px;border-radius:9px;padding:6px 7px;font-size:10px;font-weight:900;white-space:nowrap}
+.gc-timeclock-mini .gc-clock-primary{border:1px solid #1d78ba;background:#1d78ba;color:#fff}
+.gc-timeclock-mini .gc-clock-secondary{border:1px solid #cbd6e1;background:#fff;color:#31506a}
+.gc-timeclock-mini .gc-clock-danger{border:1px solid #efc1bc;background:#fff4f2;color:#a33931}
+.gc-timeclock-mini-note{color:#7a8898;font-size:9px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.gc-dashboard-clock{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 16px;padding:14px 16px;border:1px solid #dfe6ed;border-radius:16px;background:#fff;box-shadow:0 8px 24px rgba(19,42,64,.05)}
+.gc-dashboard-clock-main{display:flex;align-items:center;gap:12px;min-width:0}
+.gc-dashboard-clock-icon{width:42px;height:42px;flex:0 0 42px;border-radius:13px;display:grid;place-items:center;background:#eef4fa;color:#286b9f;font-size:19px}
+.gc-dashboard-clock-copy{min-width:0}
+.gc-dashboard-clock-copy small{display:block;color:#708092;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.04em}
+.gc-dashboard-clock-copy strong{display:block;margin-top:2px;color:#14283d;font-size:16px}
+.gc-dashboard-clock-copy span{display:block;margin-top:2px;color:#748395;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gc-dashboard-clock-time{display:flex;align-items:center;gap:13px;margin-left:auto}
+.gc-dashboard-clock-time>strong{font-size:22px;color:#14283d;font-variant-numeric:tabular-nums;white-space:nowrap}
+.gc-dashboard-clock-actions{display:flex;align-items:center;gap:7px}
+.gc-dashboard-clock-actions button{min-height:38px;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:900}
+.gc-dashboard-clock[data-state="working"] .gc-dashboard-clock-icon{background:#e9f8ef;color:#23844a}
+.gc-dashboard-clock[data-state="on_break"] .gc-dashboard-clock-icon{background:#fff5d9;color:#a47708}
+.gc-dashboard-clock[data-state="off_clock"] .gc-dashboard-clock-icon{background:#eef2f6;color:#728092}
+.gc-timeclock-busy{opacity:.64;pointer-events:none}
+
+html[data-theme="dark"] .gc-timeclock-mini{background:#101923;border-color:#2a3948}
+html[data-theme="dark"] .gc-timeclock-mini strong{color:#eef5fb}
+html[data-theme="dark"] .gc-timeclock-state,html[data-theme="dark"] .gc-timeclock-mini-note{color:#92a4b6}
+html[data-theme="dark"] .gc-timeclock-mini .gc-clock-secondary{background:#172431;border-color:#344758;color:#c5d5e4}
+html[data-theme="dark"] .gc-timeclock-mini .gc-clock-danger{background:#291918;border-color:#5b3430;color:#f0a79f}
+html[data-theme="dark"] .gc-dashboard-clock{background:#111a25;border-color:#2b3a49;box-shadow:0 8px 24px rgba(0,0,0,.16)}
+html[data-theme="dark"] .gc-dashboard-clock-copy small,html[data-theme="dark"] .gc-dashboard-clock-copy span{color:#91a4b6}
+html[data-theme="dark"] .gc-dashboard-clock-copy strong,html[data-theme="dark"] .gc-dashboard-clock-time>strong{color:#f0f6fb}
+html[data-theme="dark"] .gc-dashboard-clock-icon{background:#182634;color:#8dbddd}
+html[data-theme="dark"] .gc-dashboard-clock[data-state="working"] .gc-dashboard-clock-icon{background:#163021;color:#74d396}
+html[data-theme="dark"] .gc-dashboard-clock[data-state="on_break"] .gc-dashboard-clock-icon{background:#382f14;color:#f1cf6d}
+
+@media (max-width:900px){
+  .gc-dashboard-clock{align-items:stretch;flex-direction:column;gap:11px}
+  .gc-dashboard-clock-time{width:100%;margin-left:0;justify-content:space-between}
+}
+@media (max-width:750px){
+  .gc-timeclock-mini{margin:0 7px 7px;padding:9px}
+  .gc-dashboard-clock{margin-bottom:12px;padding:12px}
+  .gc-dashboard-clock-main{gap:10px}
+  .gc-dashboard-clock-icon{width:38px;height:38px;flex-basis:38px;border-radius:11px}
+  .gc-dashboard-clock-copy strong{font-size:14px}
+  .gc-dashboard-clock-time{align-items:stretch;flex-direction:column;gap:8px}
+  .gc-dashboard-clock-time>strong{font-size:19px}
+  .gc-dashboard-clock-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .gc-dashboard-clock-actions button:only-child{grid-column:1/-1}
+}
