@@ -3,7 +3,9 @@
 
   if (window.GotCrackedActionLaunchers) return;
   const client = window.supabaseClient;
-  const STYLE_VERSION = '20260826-actions1';
+  const STYLE_VERSION = '20260826-actions2';
+  let lastPointerActionAt = 0;
+  let lastPointerAction = '';
 
   function ensureStyle() {
     if (document.querySelector('link[data-gc-action-launchers]')) return;
@@ -137,6 +139,18 @@
     window.GotCrackedCrossUserSync?.pollNow?.();
   }
 
+  function closeInvisibleDialogs(exceptId = '') {
+    for (const dialog of document.querySelectorAll('dialog[open]')) {
+      if (dialog.id === exceptId) continue;
+      const style = getComputedStyle(dialog);
+      const rect = dialog.getBoundingClientRect();
+      const visiblyOpen = style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || 1) > 0.01 && rect.width > 8 && rect.height > 8;
+      if (!visiblyOpen) {
+        try { dialog.close(); } catch {}
+      }
+    }
+  }
+
   function openGuidedIntake() {
     const ops = operations();
     if (typeof ops?.openIntake !== 'function') {
@@ -144,6 +158,7 @@
       return;
     }
 
+    closeInvisibleDialogs('v1-intake-dialog');
     const current = document.getElementById('v1-intake-dialog');
     if (current?.open) return;
 
@@ -152,18 +167,63 @@
 
     try {
       ops.openIntake();
+      requestAnimationFrame(() => {
+        const dialog = document.getElementById('v1-intake-dialog');
+        if (!dialog?.open) return;
+        dialog.style.setProperty('visibility', 'visible', 'important');
+        dialog.style.setProperty('opacity', '1', 'important');
+        dialog.style.setProperty('pointer-events', 'auto', 'important');
+      });
     } catch (error) {
       console.error('Unable to open guided intake:', error);
       window.GotCrackedDiagnostics?.error?.(error, { context: 'Unable to open intake' });
     }
   }
 
-  /*
-   * Canonical launch ownership. This capture-phase listener intentionally runs
-   * before legacy document bubble listeners in app.js / operations-v1-core.js.
-   * Each entry point is handled exactly once, then propagation is stopped so an
-   * obsolete prompt/modal handler cannot fire underneath the current UI.
-   */
+  function visibleModalOpen() {
+    return Array.from(document.querySelectorAll('dialog[open]')).some(dialog => {
+      const style = getComputedStyle(dialog);
+      const rect = dialog.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || 1) > 0.01 && rect.width > 8 && rect.height > 8;
+    });
+  }
+
+  function controlFromPointer(event, selector) {
+    const direct = event.target instanceof Element ? event.target.closest(selector) : null;
+    if (direct) return direct;
+    if (visibleModalOpen() || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return null;
+    for (const element of document.elementsFromPoint(event.clientX, event.clientY)) {
+      const candidate = element instanceof Element ? element.closest(selector) : null;
+      if (candidate) return candidate;
+    }
+    return null;
+  }
+
+  function handlePointerAction(event) {
+    if (typeof event.button === 'number' && event.button !== 0) return false;
+
+    const lead = controlFromPointer(event, '[data-v1-new-lead],[data-live-action="lead"]');
+    const intake = lead ? null : controlFromPointer(event, '[data-open-ticket],[data-v1-walkin]');
+    if (!lead && !intake) return false;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    lastPointerActionAt = performance.now();
+    lastPointerAction = lead ? 'lead' : 'intake';
+
+    if (lead) openLeadDialog();
+    else openGuidedIntake();
+    return true;
+  }
+
+  /* Own coarse/mobile activation at window capture on pointerdown. This fires
+     before document-level legacy handlers and before Android can cancel the
+     later synthesized click because a runtime render replaced the touched DOM. */
+  window.addEventListener('pointerdown', event => {
+    handlePointerAction(event);
+  }, true);
+
+  /* Keyboard activation and non-PointerEvent browsers keep a click fallback. */
   document.addEventListener('click', event => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
@@ -172,6 +232,7 @@
     if (lead) {
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (lastPointerAction === 'lead' && performance.now() - lastPointerActionAt < 900) return;
       openLeadDialog();
       return;
     }
@@ -180,6 +241,7 @@
     if (intake) {
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (lastPointerAction === 'intake' && performance.now() - lastPointerActionAt < 900) return;
       openGuidedIntake();
     }
   }, true);
