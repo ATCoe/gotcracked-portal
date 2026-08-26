@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-release29';
+  const VERSION = '20260826-release30';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
@@ -51,6 +51,8 @@
   let started = false;
   let deferredStarted = false;
   let profileReady = null;
+  let accountSyncReady = null;
+  let accountSyncWaited = false;
   const loading = new Map();
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -100,13 +102,37 @@
     throw new Error('Staff profile did not finish loading. Refresh the Portal and try again.');
   }
 
+  function captureAccountSyncReady(){
+    if(accountSyncReady) return accountSyncReady;
+    const ready=window.GotCrackedAccountSync?.ready;
+    if(!ready) return null;
+    accountSyncReady=Promise.resolve(ready).catch(error=>{
+      console.warn('Account preference sync did not finish during startup; local Portal preferences remain available.',error);
+      return null;
+    });
+    return accountSyncReady;
+  }
+
+  async function waitForAccountSyncBeforeDirectory(){
+    if(accountSyncWaited) return;
+    accountSyncWaited=true;
+    const ready=captureAccountSyncReady();
+    if(ready) await ready;
+  }
+
   async function loadSequence(files) {
     for(const file of files){
       if(file!=='theme-controller.js'&&file!=='training-shared-sync.js'&&file!=='operations-v1-core.js') await waitForOperationsProfile();
+
+      /* Account preference sync starts as soon as possible but must not block the
+         dashboard, time clock, profiles, or operational UI. We only wait at the
+         point where persisted directory filters are about to read their caches. */
+      if(file==='directory-advanced.js'||file==='master-directory.js') await waitForAccountSyncBeforeDirectory();
+
       await loadScript(file);
       if(file==='training-shared-sync.js'&&window.GotCrackedTrainingSync?.ready) await window.GotCrackedTrainingSync.ready;
       if(file==='operations-v1-core.js') await waitForOperationsProfile();
-      if(file==='account-sync.js'&&window.GotCrackedAccountSync?.ready) await window.GotCrackedAccountSync.ready;
+      if(file==='account-sync.js') captureAccountSyncReady();
       if(file==='account-page.js'&&window.GotCrackedAccountPage?.ready) await window.GotCrackedAccountPage.ready;
     }
   }
