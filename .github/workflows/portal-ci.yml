@@ -38,17 +38,18 @@ jobs:
               if text.count('{') != text.count('}'):
                   raise SystemExit(f'Unbalanced CSS braces: {path}')
 
-          html = Path('index.html').read_text(encoding='utf-8')
-          refs = re.findall(r'(?:src|href)=["\']([^"\']+)["\']', html)
-          missing = []
-          for ref in refs:
-              ref = ref.split('?', 1)[0].split('#', 1)[0]
-              if not ref or ref.startswith(('http://','https://','mailto:','tel:','#')):
-                  continue
-              if not Path(ref).exists():
-                  missing.append(ref)
-          if missing:
-              raise SystemExit('Missing local references: ' + ', '.join(sorted(set(missing))))
+          for page in ['index.html', 'schedule-print.html']:
+              html = Path(page).read_text(encoding='utf-8')
+              refs = re.findall(r'(?:src|href)=["\']([^"\']+)["\']', html)
+              missing = []
+              for ref in refs:
+                  ref = ref.split('?', 1)[0].split('#', 1)[0]
+                  if not ref or ref.startswith(('http://','https://','mailto:','tel:','#')):
+                      continue
+                  if not Path(ref).exists():
+                      missing.append(ref)
+              if missing:
+                  raise SystemExit(f'Missing local references in {page}: ' + ', '.join(sorted(set(missing))))
 
       - name: Portal 1.0 architecture invariants
         shell: python
@@ -68,6 +69,9 @@ jobs:
           sales_css = Path('sales-ops.css').read_text(encoding='utf-8')
           supabase_js = Path('supabase.js').read_text(encoding='utf-8')
           schedule = Path('schedule-board.js').read_text(encoding='utf-8')
+          schedule_print = Path('schedule-print.js').read_text(encoding='utf-8')
+          schedule_print_page = Path('schedule-print-page.js').read_text(encoding='utf-8')
+          schedule_print_css = Path('schedule-print.css').read_text(encoding='utf-8')
           timeclock = Path('time-clock.js').read_text(encoding='utf-8')
           theme_bootstrap = Path('theme-bootstrap.js').read_text(encoding='utf-8')
           migration = Path('supabase/migrations/0011_portal_realtime_publication.sql').read_text(encoding='utf-8')
@@ -100,12 +104,12 @@ jobs:
           for name in ['portal-theme.css','portal-dark-components.css','theme-switch.css']:
               if name not in html:
                   raise SystemExit(f'First-paint theme stylesheet missing from index.html: {name}')
-          if 'portal-theme.css' in runtime or 'createElement(\'link\')' in runtime and 'gc-theme-style' in runtime:
+          if 'portal-theme.css' in runtime or ('gc-theme-style' in runtime and "createElement('link')" in runtime):
               raise SystemExit('Authenticated runtime must not inject visually critical theme CSS after paint.')
           if 'prefers-color-scheme: dark' not in theme_bootstrap or 'gc-portal-theme' not in theme_bootstrap:
               raise SystemExit('Theme bootstrap must resolve saved/system theme before paint.')
 
-          if "overflow-y:auto" in mobile.replace(' ', ''):
+          if 'overflow-y:auto' in mobile.replace(' ', ''):
               raise SystemExit('Mobile left navigation must not be vertically scrollable.')
           if "createElement('style')" in mobile or 'createElement("style")' in mobile:
               raise SystemExit('mobile-nav-safe.js must not inject CSS.')
@@ -115,9 +119,9 @@ jobs:
               raise SystemExit('Schedule must remain a first-class mobile navigation destination.')
           if 'mobileMenu?.addEventListener' in app or "document.querySelector('.mobile-menu')" in app:
               raise SystemExit('app.js must not own the hamburger; mobile-nav-safe.js is the sole controller.')
-          if "classList.toggle('mobile-nav-open' in app or 'classList.toggle("mobile-nav-open"' in app:
+          if "classList.toggle('mobile-nav-open'" in app or 'classList.toggle("mobile-nav-open"' in app:
               raise SystemExit('app.js must not restore the legacy body-lock mobile state.')
-          if 'sidebarBackdrop' in app or "createElement('button')" in app and 'sidebar-backdrop' in app:
+          if 'sidebarBackdrop' in app or ("createElement('button')" in app and 'sidebar-backdrop' in app):
               raise SystemExit('app.js must not recreate the retired full-screen mobile backdrop.')
           if 'hardening.css' in app:
               raise SystemExit('app.js must not dynamically inject hardening.css.')
@@ -146,13 +150,13 @@ jobs:
               'leads.js','portal-live.js','analytics.js','shipping.js','inventory-audit.js',
               'operations-v1-core.js','training-store-guard.js','operations-v1-arrival.js',
               'portal-v1-polish.js','portal-v1-final.js','master-directory.js',
-              'time-clock.js','schedule-board.js'
+              'time-clock.js','schedule-board.js','schedule-print.js'
           ]
           for name in required_runtime:
               if name not in runtime:
                   raise SystemExit(f'Authenticated runtime loader missing: {name}')
-          if "schedule: ['schedule-board.js']" not in runtime:
-              raise SystemExit('Schedule runtime must be view-scoped.')
+          if "schedule: ['schedule-board.js','schedule-print.js']" not in runtime:
+              raise SystemExit('Schedule and its print action must remain view-scoped.')
           if 'workforce.js' in runtime:
               raise SystemExit('Retired Monday-based workforce scheduler must not load in the Portal runtime.')
 
@@ -194,11 +198,21 @@ jobs:
           if 'gc-sales-goal-marker' not in sales:
               raise SystemExit('Sales goal progress markup missing.')
 
-          if 'function sundayOf' not in schedule or "client.rpc('get_schedule_planning_summary'" not in schedule:
-              raise SystemExit('Schedule must use Sunday-Saturday and the connected planning summary.')
+          if 'function sundayOf' not in schedule:
+              raise SystemExit('Schedule must use a Sunday-Saturday work week.')
+          for rpc in ['get_schedule_management_summary','get_staff_schedule_week','get_schedule_actuals']:
+              if rpc not in schedule:
+                  raise SystemExit(f'Schedule data boundary missing RPC: {rpc}')
           if "client.rpc('time_clock_action'" not in timeclock or "client.rpc('get_time_clock_state'" not in timeclock:
               raise SystemExit('Dashboard/sidebar time clock must use authoritative database RPCs.')
           if 'id="schedule"' not in html or 'id="sidebar-time-clock"' not in html or 'id="dashboard-time-clock"' not in html:
               raise SystemExit('Schedule or always-available time-clock shell is missing.')
+
+          if 'schedule-print.html' not in schedule_print or 'gc-schedule-print:' not in schedule_print:
+              raise SystemExit('Schedule print action must open the dedicated print document.')
+          if '@page{size:letter landscape' not in schedule_print_css.replace(' ',''):
+              raise SystemExit('Schedule print template must target Letter landscape paper.')
+          if 'window.print()' not in schedule_print_page or 'schedule-print-table' not in schedule_print_page:
+              raise SystemExit('Dedicated printable schedule rendering is incomplete.')
 
           print('Portal 1.0 architecture checks passed.')
