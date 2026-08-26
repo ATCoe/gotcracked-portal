@@ -39,10 +39,19 @@
     button.setAttribute('aria-pressed', resolved === 'dark' ? 'true' : 'false');
   }
 
+  function removeDeadTopbarControls(actions) {
+    actions?.querySelector('.icon-button[aria-label="Notifications"]')?.remove();
+    actions?.querySelector('.help')?.remove();
+  }
+
   function ensureButton() {
-    if (document.getElementById('gc-theme-toggle')) return;
     const actions = document.querySelector('.top-actions');
     if (!actions) return;
+    removeDeadTopbarControls(actions);
+    if (document.getElementById('gc-theme-toggle')) {
+      updateButton();
+      return;
+    }
     const button = document.createElement('button');
     button.id = 'gc-theme-toggle';
     button.className = 'icon-button theme-toggle';
