@@ -103,7 +103,7 @@ function outputText(response: any) {
 
 async function allow(admin: ReturnType<typeof createClient>, request: Request) {
   const result = await admin.rpc('consume_public_rate_limit', { p_kind:'custom-pc-build', p_key_hash:await hash(clientKey(request)), p_limit:6, p_window_seconds:3600 });
-  if (result.error) { console.error('PC build rate limiter unavailable:', result.error.message); return true; }
+  if (result.error) { console.error('PC build rate limiter unavailable:', result.error.message); throw new Error('PC build rate limiter unavailable.'); }
   return result.data === true;
 }
 
