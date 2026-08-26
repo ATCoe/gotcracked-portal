@@ -11,6 +11,7 @@
   let updateLoaded = false;
   let decorateTimer = null;
   let decorating = false;
+  let ignoreObserverUntil = 0;
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[c]);
 
@@ -18,7 +19,7 @@
     if (document.querySelector('link[data-gc-directory-advanced]')) return;
     const link=document.createElement('link');
     link.rel='stylesheet';
-    link.href='directory-advanced.css?v=20260826-dir1';
+    link.href='directory-advanced.css?v=20260826-dir2';
     link.dataset.gcDirectoryAdvanced='true';
     document.head.appendChild(link);
   }
@@ -118,6 +119,15 @@
     return Number.isFinite(time) ? time : 0;
   }
 
+  function windowStart(value){
+    const now=Date.now();
+    if(value==='24h') return now-86400000;
+    if(value==='7d') return now-(7*86400000);
+    if(value==='30d') return now-(30*86400000);
+    if(value==='today') { const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(); }
+    return null;
+  }
+
   function bucketFor(time){
     if (!time) return ['unknown','No update timestamp'];
     const now=new Date();
@@ -143,8 +153,9 @@
     const results=host?.querySelector('[data-gc-results]');
     if (!host || !results) return;
     const state=readState(scope);
-    const from=dayStart(state.updatedFrom);
-    const to=dayEnd(state.updatedTo);
+    const relativeFrom=windowStart(state.updatedWindow||'');
+    const from=relativeFrom ?? dayStart(state.updatedFrom);
+    const to=state.updatedWindow && state.updatedWindow!=='custom' ? null : dayEnd(state.updatedTo);
 
     unwrapGroups(results);
     const columns=results.querySelector(':scope > .gc-dir-columns');
@@ -161,16 +172,13 @@
     if (state.sort==='updated_desc' || state.sort==='updated_asc') {
       const direction=state.sort==='updated_asc' ? 1 : -1;
       rows.sort((a,b)=>(updatedMsForRow(a)-updatedMsForRow(b))*direction);
-      const anchor=columns || null;
-      rows.forEach(row=>anchor ? anchor.insertAdjacentElement('afterend',row) : results.appendChild(row));
-      // insertAdjacentElement reverses when repeatedly using the same anchor; normalize order.
       rows.forEach(row=>results.appendChild(row));
     }
 
     rows=[...results.querySelectorAll(':scope > .gc-dir-row')];
     const visible=rows.filter(row=>row.dataset.gcAdvancedHidden!=='true');
     const summary=host.querySelector('[data-gc-summary]');
-    if ((state.updatedFrom || state.updatedTo) && summary) {
+    if ((state.updatedWindow || state.updatedFrom || state.updatedTo) && summary) {
       const work=visible.filter(row=>row.dataset.gcRecord?.startsWith('work_order:')).length;
       const leads=visible.filter(row=>row.dataset.gcRecord?.startsWith('lead:')).length;
       summary.innerHTML=`<strong>${visible.length}</strong> records shown after last-updated filter${scope==='dashboard'?` · ${work} work order${work===1?'':'s'} · ${leads} lead${leads===1?'':'s'}`:''}`;
@@ -195,7 +203,14 @@
       members.forEach(row=>group.appendChild(row));
       results.appendChild(group);
     }
-    rows.filter(row=>row.dataset.gcAdvancedHidden==='true').forEach(row=>results.appendChild(row));
+    const hidden=rows.filter(row=>row.dataset.gcAdvancedHidden==='true');
+    if(hidden.length){
+      const group=document.createElement('section');
+      group.className='gc-dir-update-group gc-dir-update-hidden';
+      hidden.forEach(row=>group.appendChild(row));
+      results.appendChild(group);
+    }
+    if(columns) results.insertAdjacentElement('afterbegin',columns);
   }
 
   function savedSelectMarkup(scope){
@@ -218,7 +233,7 @@
     if (panel && !panel.querySelector('.gc-dir-advanced-row')) {
       const row=document.createElement('div');
       row.className='gc-dir-advanced-row';
-      row.innerHTML=`<label>Last updated after<input type="date" data-gc-advanced="updatedFrom" value="${esc(state.updatedFrom || '')}"></label><label>Last updated before<input type="date" data-gc-advanced="updatedTo" value="${esc(state.updatedTo || '')}"></label><label>Group results by<select data-gc-advanced="groupBy"><option value="none" ${state.groupBy!=='updated'?'selected':''}>No grouping</option><option value="updated" ${state.groupBy==='updated'?'selected':''}>Last updated</option></select></label>`;
+      row.innerHTML=`<label>Last updated<select data-gc-advanced="updatedWindow"><option value="" ${!state.updatedWindow?'selected':''}>Any time</option><option value="today" ${state.updatedWindow==='today'?'selected':''}>Today</option><option value="24h" ${state.updatedWindow==='24h'?'selected':''}>Last 24 hours</option><option value="7d" ${state.updatedWindow==='7d'?'selected':''}>Last 7 days</option><option value="30d" ${state.updatedWindow==='30d'?'selected':''}>Last 30 days</option><option value="custom" ${state.updatedWindow==='custom'?'selected':''}>Custom range</option></select></label><label>Updated after<input type="date" data-gc-advanced="updatedFrom" value="${esc(state.updatedFrom || '')}"></label><label>Updated before<input type="date" data-gc-advanced="updatedTo" value="${esc(state.updatedTo || '')}"></label><label>Group results by<select data-gc-advanced="groupBy"><option value="none" ${state.groupBy!=='updated'?'selected':''}>No grouping</option><option value="updated" ${state.groupBy==='updated'?'selected':''}>Last updated</option></select></label>`;
       const clear=panel.querySelector('[data-gc-action="clear"]');
       if (clear) clear.insertAdjacentElement('beforebegin',row); else panel.appendChild(row);
     }
@@ -244,6 +259,7 @@
         injectControls(scope);
         applyAdvanced(scope);
       }
+      ignoreObserverUntil=Date.now()+80;
     } finally { decorating=false; }
   }
 
@@ -294,8 +310,10 @@
     if (target.matches('[data-gc-advanced]')) {
       const state=readState(scope);
       state[target.dataset.gcAdvanced]=target.value;
+      if(['updatedFrom','updatedTo'].includes(target.dataset.gcAdvanced)&&target.value) state.updatedWindow='custom';
       state.preset='custom';
       writeState(scope,state);
+      injectControls(scope);
       applyAdvanced(scope);
       return;
     }
@@ -320,7 +338,7 @@
     setTimeout(()=>{syncPersistent(scope);scheduleDecorate();},0);
   });
 
-  const observer=new MutationObserver(()=>scheduleDecorate());
+  const observer=new MutationObserver(()=>{if(Date.now()<ignoreObserverUntil)return;scheduleDecorate();});
   const startObserver=()=>observer.observe(document.body,{childList:true,subtree:true});
   if (document.body) startObserver(); else document.addEventListener('DOMContentLoaded',startObserver,{once:true});
 
