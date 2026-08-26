@@ -96,11 +96,6 @@ const recommendationSchema = {
   required: ['build_name','customer_summary','performance_summary','upgrade_summary','compatibility_summary','budget_note','budget_fit','estimated_wattage','newegg_compatibility','spec_checks','parts']
 };
 
-function outputText(response: any) {
-  for (const item of response?.output || []) for (const content of item?.content || []) if (content?.type === 'output_text' && typeof content.text === 'string') return content.text;
-  return '';
-}
-
 async function allow(admin: ReturnType<typeof createClient>, request: Request) {
   const result = await admin.rpc('consume_public_rate_limit', { p_kind:'custom-pc-build', p_key_hash:await hash(clientKey(request)), p_limit:6, p_window_seconds:3600 });
   if (result.error) { console.error('PC build rate limiter unavailable:', result.error.message); throw new Error('PC build rate limiter unavailable.'); }
@@ -176,54 +171,19 @@ function validateCompatibility(raw: any) {
 }
 
 async function researchBuild(survey: Record<string, unknown>, partBudgetCents: number) {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.');
-  const model = Deno.env.get('PC_BUILD_RESEARCH_MODEL') || 'gpt-5.4-mini';
-  const prompt = `You are the sourcing and compatibility engine for GotCracked, an electronics repair and custom-PC shop in Blacksburg, Virginia. Build a CURRENT new-parts PC recommendation for the customer survey below.
-
-NON-NEGOTIABLE NEWEGG COMPATIBILITY WORKFLOW:
-1. Use the computer tool to open Newegg's current Custom PC Builder at https://www.newegg.com/tools/custom-pc-builder and actually configure the proposed core components in the interactive Builder. Do not merely read or cite the generic Builder landing page.
-2. Start with the CPU. Select or validate the exact CPU, motherboard, memory, GPU when used, case, power supply, storage, and CPU cooler. Confirm the Builder continues to accept each exact model as the configuration is assembled.
-3. Capture a stateful Newegg Builder URL for the configured build. A generic /tools/custom-pc-builder URL is NOT evidence. The returned builder_url must be a Newegg /tools/custom-pc-builder/pl/ID-... URL containing a tempPcbId or a non-zero diywishlist parameter representing the configured state.
-4. For each selected core hardware part, return the exact Newegg product URL for the same model in newegg_product_url even if another retailer has the best current price.
-5. Record Newegg's minimum wattage estimate from the configured build when available and check the PSU against it.
-6. If the computer tool cannot interact with the Builder, any exact part cannot be selected in the compatibility-filtered flow, a stateful Builder URL cannot be captured, or the wattage estimate cannot be verified, set newegg_compatibility.status to manual_review. Never fabricate Builder state or claim verification from general product knowledge.
-7. Browsing safety: do NOT sign in to Newegg, do NOT add products to a cart, do NOT begin checkout, do NOT place an order, and do NOT submit any personal information. The Builder is used only for compatibility verification and reading public product/build information.
-8. Newegg states its Builder is an aid rather than a manufacturer guarantee. ALSO verify current manufacturer/product specifications for CPU socket/chipset/BIOS support, RAM generation, motherboard/case form factor, GPU length clearance, cooler/radiator fit, M.2/SATA interfaces, PSU capacity/connectors, and any special power adapters.
-9. Fill spec_checks with the concrete values used for those checks. Do not guess dimensions, sockets, connectors, or BIOS support. If a required value cannot be verified from current product/manufacturer information, set Newegg status manual_review.
-
-SOURCING AND PERFORMANCE RULES:
-- Use web search for current US retail availability and pricing. Prioritize Newegg and Amazon; use Micro Center, B&H, Best Buy, manufacturer stores, or other reputable US retailers only when materially better/current.
-- New components only. No auctions, used/refurbished listings, questionable marketplace fulfillment, or out-of-stock placeholder prices.
-- Every price_cents must be a current price from source_url. Never invent MSRP or historical pricing.
-- Available PARTS budget: ${money(partBudgetCents)}. GotCracked service labor is added separately by the server.
-- Optimize for the customer's actual games/apps, resolution, FPS, image quality, ray tracing, noise, aesthetics, longevity, and upgrade goals.
-- Use a quality PSU with at least 20% or 100 W headroom (whichever is greater) above Newegg's minimum estimate.
-- If goals cannot honestly fit the budget, return the closest practical build and budget_fit=false.
-- RAM is currently unusually expensive. Do not under-spec memory below practical workload needs simply to hide the market price.
-- Include Windows only if needed. Include a monitor only when the customer's budget scope includes it.
-- Keep customer-facing explanations concise and do not mention individual part prices.
-
-Customer survey JSON:
-${JSON.stringify(survey)}`;
-
-  const response = await fetch('https://api.openai.com/v1/responses', {
+  const workerUrl = Deno.env.get('PC_BUILD_RESEARCH_WORKER_URL');
+  const workerToken = Deno.env.get('PC_BUILD_RESEARCH_TOKEN');
+  if (!workerUrl || !workerToken) throw new ResearchProviderError('Cloudflare PC-build research is not configured.');
+  const response = await fetch(workerUrl, {
     method: 'POST',
-    headers: { Authorization:`Bearer ${apiKey}`, 'Content-Type':'application/json' },
-    body: JSON.stringify({
-      model,
-      store: false,
-      max_tool_calls: 28,
-      tools: [{ type:'web_search' }, { type:'computer' }],
-      input: prompt,
-      text: { format: { type:'json_schema', name:'pc_build_recommendation', strict:true, schema:recommendationSchema } }
-    })
+    headers: { Authorization:`Bearer ${workerToken}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ survey, partBudgetCents })
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data?.error?.message || `Research provider failed (${response.status}).`);
-  const text = outputText(data);
-  if (!text) throw new Error('Research provider returned no structured recommendation.');
-  const recommendation = JSON.parse(text);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new ResearchProviderError(data?.error || `Cloudflare research provider failed (${response.status}).`);
+  const recommendation = data?.recommendation;
+  const model = clean(data?.model, 120) || 'cloudflare-workers-ai';
+  if (!recommendation || typeof recommendation !== 'object') throw new ResearchProviderError('Cloudflare research provider returned no structured recommendation.');
   if (!Array.isArray(recommendation.parts) || recommendation.parts.length < 7) throw new Error('Recommendation did not contain a complete parts list.');
   for (const part of recommendation.parts) {
     const price = Number(part.price_cents);
@@ -234,6 +194,10 @@ ${JSON.stringify(survey)}`;
   }
   const compatibilityAudit = validateCompatibility(recommendation);
   return { recommendation, compatibilityAudit, model };
+}
+
+class ResearchProviderError extends Error {
+  constructor(message: string) { super(message); this.name = 'ResearchProviderError'; }
 }
 
 async function notifyLead(lead: Record<string, any>, reference: string, totalCents: number | null, compatibility = 'manual review') {
@@ -276,7 +240,7 @@ Deno.serve(async request => {
 
     const leadResult=await admin.from('leads').insert({external_id:`pcbuild-${crypto.randomUUID()}`,public_reference:reference,location_id:locationId,name:customerName,phone:customerPhone,email:customerEmail,service:'Custom PC build',source:'gotcracked.co/custom-pc-build',notes:leadNotes,status:'new'}).select().single();
     if(leadResult.error) throw leadResult.error;
-    const requestResult=await admin.from('pc_build_requests').insert({location_id:locationId,lead_id:leadResult.data.id,public_reference:reference,customer_name:customerName,customer_email:customerEmail,customer_phone:customerPhone,preferred_contact:preferredContact,survey,service_charge_cents:serviceChargeCents,status:'research_pending',compatibility_status:'pending',research_provider:'openai'}).select().single();
+    const requestResult=await admin.from('pc_build_requests').insert({location_id:locationId,lead_id:leadResult.data.id,public_reference:reference,customer_name:customerName,customer_email:customerEmail,customer_phone:customerPhone,preferred_contact:preferredContact,survey,service_charge_cents:serviceChargeCents,status:'research_pending',compatibility_status:'pending',research_provider:'cloudflare-workers-ai-browser-rendering'}).select().single();
     if(requestResult.error) throw requestResult.error;
 
     if (survey.existingParts) {
@@ -299,6 +263,12 @@ Deno.serve(async request => {
     } catch(researchError) {
       console.error('Custom PC research/compatibility failed:',researchError);
       const message=researchError instanceof Error?researchError.message:'Automated research failed.';
+      if (researchError instanceof ResearchProviderError) {
+        await admin.from('pc_build_requests').update({status:'research_pending',compatibility_status:'pending',research_error:message.slice(0,1000),updated_at:new Date().toISOString()}).eq('id',requestResult.data.id);
+        await admin.from('lead_events').insert({lead_id:leadResult.data.id,event_type:'note',message:`Cloudflare custom-PC research is temporarily unavailable: ${message.slice(0,500)}`});
+        await notifyLead({...leadResult.data,notes:leadNotes},reference,null,'Research service unavailable — retry required');
+        return json(origin,{ok:true,reference,status:'research_unavailable',message:'Your build survey was saved, but the automated research service is temporarily unavailable. GotCracked will retry or contact you; this was not recorded as a compatibility failure.'},202);
+      }
       await admin.from('pc_build_requests').update({status:'manual_review',compatibility_status:'manual_review',research_error:message.slice(0,1000),updated_at:new Date().toISOString()}).eq('id',requestResult.data.id);
       await admin.from('lead_events').insert({lead_id:leadResult.data.id,event_type:'note',message:`Automated custom-PC estimate held for manual review: ${message.slice(0,500)}`});
       await notifyLead({...leadResult.data,notes:leadNotes},reference,null,'Manual compatibility review required');
@@ -309,3 +279,4 @@ Deno.serve(async request => {
     return json(origin,{error:'Unable to prepare the custom PC build request right now. Please contact GotCracked for help.'},500);
   }
 });
+
