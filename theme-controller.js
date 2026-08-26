@@ -5,15 +5,31 @@
 
   const KEY = 'gc-portal-theme';
   const COMPONENT_STYLE_VERSION = '20260825-dark2';
+  const SWITCH_STYLE_VERSION = '20260825-switch1';
   const media = window.matchMedia?.('(prefers-color-scheme: dark)');
 
-  function ensureComponentStyles() {
-    if (document.querySelector('link[data-gc-dark-components]')) return;
+  function ensureStyle(selector, href, dataKey, dataValue) {
+    if (document.querySelector(selector)) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = `portal-dark-components.css?v=${COMPONENT_STYLE_VERSION}`;
-    link.dataset.gcDarkComponents = 'true';
+    link.href = href;
+    link.dataset[dataKey] = dataValue;
     document.head.appendChild(link);
+  }
+
+  function ensureComponentStyles() {
+    ensureStyle(
+      'link[data-gc-dark-components]',
+      `portal-dark-components.css?v=${COMPONENT_STYLE_VERSION}`,
+      'gcDarkComponents',
+      'true'
+    );
+    ensureStyle(
+      'link[data-gc-theme-switch]',
+      `theme-switch.css?v=${SWITCH_STYLE_VERSION}`,
+      'gcThemeSwitch',
+      'true'
+    );
   }
 
   function savedPreference() {
@@ -42,12 +58,19 @@
   function updateButton() {
     const button = document.getElementById('gc-theme-toggle');
     if (!button) return;
-    const resolved = document.documentElement.dataset.theme || resolvedTheme();
-    const next = resolved === 'dark' ? 'light' : 'dark';
-    button.innerHTML = `<span class="theme-icon" aria-hidden="true">${resolved === 'dark' ? '☀' : '☾'}</span>`;
-    button.setAttribute('aria-label', `Switch to ${next} mode`);
-    button.setAttribute('title', `Switch to ${next} mode`);
-    button.setAttribute('aria-pressed', resolved === 'dark' ? 'true' : 'false');
+    const preference = savedPreference();
+    const resolved = document.documentElement.dataset.theme || resolvedTheme(preference);
+    const isDark = resolved === 'dark';
+    const next = isDark ? 'light' : 'dark';
+
+    button.classList.toggle('is-dark', isDark);
+    button.innerHTML = '<span class="theme-switch-track" aria-hidden="true"><span class="theme-switch-symbol sun">☀</span><span class="theme-switch-symbol moon">☾</span><span class="theme-switch-thumb"></span></span>';
+    button.setAttribute('role', 'switch');
+    button.setAttribute('aria-checked', isDark ? 'true' : 'false');
+    button.setAttribute('aria-label', `Dark mode ${isDark ? 'on' : 'off'}. Switch to ${next} mode.`);
+    button.setAttribute('title', preference === 'system'
+      ? `Following device theme · tap for ${next} mode`
+      : `Switch to ${next} mode`);
   }
 
   function removeDeadTopbarControls(actions) {
@@ -73,19 +96,18 @@
     const actions = document.querySelector('.top-actions');
     if (!actions) return;
     removeDeadTopbarControls(actions);
-    if (document.getElementById('gc-theme-toggle')) {
-      updateButton();
-      return;
+    let button = document.getElementById('gc-theme-toggle');
+    if (!button) {
+      button = document.createElement('button');
+      button.id = 'gc-theme-toggle';
+      button.className = 'theme-toggle';
+      button.type = 'button';
+      button.addEventListener('click', () => {
+        const current = document.documentElement.dataset.theme || resolvedTheme();
+        apply(current === 'dark' ? 'light' : 'dark', { persist:true });
+      });
+      actions.prepend(button);
     }
-    const button = document.createElement('button');
-    button.id = 'gc-theme-toggle';
-    button.className = 'icon-button theme-toggle';
-    button.type = 'button';
-    button.addEventListener('click', () => {
-      const current = document.documentElement.dataset.theme || resolvedTheme();
-      apply(current === 'dark' ? 'light' : 'dark', { persist:true });
-    });
-    actions.prepend(button);
     updateButton();
   }
 
