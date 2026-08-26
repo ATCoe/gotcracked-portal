@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-production1';
+  const VERSION = '20260826-production2';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260826-sales-ops2';
   const PROFILE_READY_TIMEOUT_MS = 15000;
@@ -27,6 +27,7 @@
     'intake-modal-release.js',
     'directory-advanced.js',
     'master-directory.js',
+    'pc-builds.js',
     'cross-user-sync.js',
     'sales-ops-bootstrap.js',
     'sales-ops.js',
