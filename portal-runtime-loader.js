@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260825-release20';
+  const VERSION = '20260825-release21';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
@@ -24,6 +24,8 @@
 
   const deferredScripts = [
     'leads.js',
+    'schedule-board.js',
+    'schedule-print.js',
     'analytics.js',
     'shipping.js',
     'inventory-audit.js'
@@ -118,18 +120,27 @@
     if (started) return;
     started = true;
     document.documentElement.dataset.gcRuntimeState = 'starting';
+    document.documentElement.dataset.gcPortalBoot = 'loading';
     preload(criticalScripts);
 
     try {
       await loadSequence(criticalScripts);
+
+      // Hydrate the page the user is actually opening before the app shell is
+      // made visible. This is what prevents a refresh from painting the old
+      // static/legacy view for a frame before the current runtime takes over.
+      const currentView = location.hash.slice(1).split('/')[0] || 'dashboard';
+      await ensureViewRuntime(currentView);
+
       document.documentElement.dataset.gcRuntimeState = 'ready';
+      document.documentElement.dataset.gcPortalBoot = 'ready';
       document.dispatchEvent(new CustomEvent('gc-portal-runtime-ready', { detail:{ profile:profileReady } }));
       scheduleDeferredRuntime();
-      const currentView = location.hash.slice(1).split('/')[0] || 'dashboard';
-      ensureViewRuntime(currentView);
     } catch (error) {
       console.error('Portal critical runtime load failed:', error);
       document.documentElement.dataset.gcRuntimeState = 'error';
+      // Never strand staff behind an invisible shell if startup actually fails.
+      document.documentElement.dataset.gcPortalBoot = 'error';
       window.GotCrackedDiagnostics?.error?.(error, { context:'Portal staff profile initialization failed', duration:20000 });
       started = false;
     }
