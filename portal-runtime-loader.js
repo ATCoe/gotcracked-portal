@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260825-release21';
+  const VERSION = '20260826-release22';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
@@ -13,6 +13,7 @@
     'training-store-guard.js',
     'operations-v1-arrival.js',
     'portal-v1-polish.js',
+    'portal-mobile-audit.js',
     'portal-v1-final.js',
     'intake-modal-release.js',
     'master-directory.js',
@@ -126,9 +127,6 @@
     try {
       await loadSequence(criticalScripts);
 
-      // Hydrate the page the user is actually opening before the app shell is
-      // made visible. This is what prevents a refresh from painting the old
-      // static/legacy view for a frame before the current runtime takes over.
       const currentView = location.hash.slice(1).split('/')[0] || 'dashboard';
       await ensureViewRuntime(currentView);
 
@@ -139,7 +137,6 @@
     } catch (error) {
       console.error('Portal critical runtime load failed:', error);
       document.documentElement.dataset.gcRuntimeState = 'error';
-      // Never strand staff behind an invisible shell if startup actually fails.
       document.documentElement.dataset.gcPortalBoot = 'error';
       window.GotCrackedDiagnostics?.error?.(error, { context:'Portal staff profile initialization failed', duration:20000 });
       started = false;
