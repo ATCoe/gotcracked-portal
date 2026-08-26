@@ -4,20 +4,25 @@
   if (window.GotCrackedTheme) return;
 
   const KEY = 'gc-portal-theme';
-  const COMPONENT_STYLE_VERSION = '20260825-dark2';
-  const SWITCH_STYLE_VERSION = '20260825-switch1';
+  const COMPONENT_STYLE_VERSION = '20260825-dark3';
+  const SWITCH_STYLE_VERSION = '20260825-switch2';
   const media = window.matchMedia?.('(prefers-color-scheme: dark)');
 
   function ensureStyle(selector, href, dataKey, dataValue) {
-    if (document.querySelector(selector)) return;
+    const existing = document.querySelector(selector);
+    if (existing) return existing;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = href;
     link.dataset[dataKey] = dataValue;
     document.head.appendChild(link);
+    return link;
   }
 
   function ensureComponentStyles() {
+    // These are normally present in index.html before first paint. Keep these
+    // fallbacks for old cached shells without making runtime injection the
+    // normal rendering path.
     ensureStyle(
       'link[data-gc-dark-components]',
       `portal-dark-components.css?v=${COMPONENT_STYLE_VERSION}`,
@@ -92,6 +97,16 @@
     location.append(chevron);
   }
 
+  function bindButton(button) {
+    if (!button || button.dataset.gcThemeBound === 'true') return;
+    button.dataset.gcThemeBound = 'true';
+    button.type = 'button';
+    button.addEventListener('click', () => {
+      const current = document.documentElement.dataset.theme || resolvedTheme();
+      apply(current === 'dark' ? 'light' : 'dark', { persist:true });
+    });
+  }
+
   function ensureButton() {
     const actions = document.querySelector('.top-actions');
     if (!actions) return;
@@ -101,13 +116,9 @@
       button = document.createElement('button');
       button.id = 'gc-theme-toggle';
       button.className = 'theme-toggle';
-      button.type = 'button';
-      button.addEventListener('click', () => {
-        const current = document.documentElement.dataset.theme || resolvedTheme();
-        apply(current === 'dark' ? 'light' : 'dark', { persist:true });
-      });
       actions.prepend(button);
     }
+    bindButton(button);
     updateButton();
   }
 
