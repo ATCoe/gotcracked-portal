@@ -1,13 +1,9 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260825-release19';
+  const VERSION = '20260825-release20';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
-  // Runtime order is intentional. Theme CSS and the first-paint theme decision
-  // now live in <head>. Training Store synchronization hydrates before
-  // Operations. Operations then finishes staff-profile hydration before any
-  // profile-dependent module is allowed to attach handlers.
   const criticalScripts = [
     'theme-controller.js',
     'training-shared-sync.js',
@@ -35,7 +31,7 @@
 
   const viewDependencies = {
     leads: ['leads.js'],
-    schedule: ['schedule-board.js'],
+    schedule: ['schedule-board.js','schedule-print.js'],
     reports: ['analytics.js'],
     shipping: ['shipping.js'],
     inventory: ['inventory-audit.js'],
