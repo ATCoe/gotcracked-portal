@@ -3,6 +3,7 @@
 
   const VERSION = '20260826-release34';
   const MOBILE_TRACE_VERSION = '20260826-touch3';
+  const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
@@ -63,8 +64,11 @@
   const isTraining = () => localStorage.getItem('gc-training-store') === '1';
 
   function srcFor(file) {
-    const version = file === 'mobile-interaction-debug.js' ? MOBILE_TRACE_VERSION : VERSION;
-    return `${file}?v=${version}`;
+    const versions = {
+      'mobile-interaction-debug.js': MOBILE_TRACE_VERSION,
+      'account-page.js': ACCOUNT_PAGE_VERSION
+    };
+    return `${file}?v=${versions[file] || VERSION}`;
   }
 
   function preload(files) {
@@ -190,10 +194,7 @@
       document.documentElement.dataset.gcRuntimeState='ready';
       document.documentElement.dataset.gcPortalBoot='ready';
       document.dispatchEvent(new CustomEvent('gc-portal-runtime-ready',{detail:{profile:profileReady}}));
-      // Do not bulk-load every secondary view after boot. Each view already has
-      // an explicit dependency map and loads its own runtime on navigation.
-      // Keeping the dashboard idle prevents unrelated secondary modules from
-      // monopolizing the main thread immediately after the Portal becomes ready.
+      // Secondary views are view-scoped. Do not bulk-load them after dashboard boot.
     }catch(error){
       console.error('Portal critical runtime load failed:',error);
       document.documentElement.dataset.gcRuntimeState='error';
@@ -214,12 +215,6 @@
       console.error('Portal deferred runtime load failed:',error);
       deferredStarted=false;
     }
-  }
-
-  function scheduleDeferredRuntime(){
-    const run=()=>startDeferredRuntime();
-    if('requestIdleCallback'in window)window.requestIdleCallback(run,{timeout:2600});
-    else setTimeout(run,1600);
   }
 
   async function ensureViewRuntime(view){
