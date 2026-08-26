@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-production2';
+  const VERSION = '20260826-production3';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260826-sales-ops2';
   const PROFILE_READY_TIMEOUT_MS = 15000;
@@ -16,6 +16,7 @@
     'time-clock.js',
     'timesheets.js',
     'portal-live.js',
+    'portal-deep-links.js',
     'avatar-presets.js',
     'staff-profiles.js',
     'account-page.js',
@@ -49,7 +50,7 @@
     reports: ['analytics.js'],
     shipping: ['shipping.js'],
     inventory: ['inventory-audit.js'],
-    settings: ['pricing-settings.js']
+    settings: ['business-settings.js','pricing-settings.js']
   };
 
   let started = false;
