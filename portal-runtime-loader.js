@@ -190,7 +190,10 @@
       document.documentElement.dataset.gcRuntimeState='ready';
       document.documentElement.dataset.gcPortalBoot='ready';
       document.dispatchEvent(new CustomEvent('gc-portal-runtime-ready',{detail:{profile:profileReady}}));
-      scheduleDeferredRuntime();
+      // Do not bulk-load every secondary view after boot. Each view already has
+      // an explicit dependency map and loads its own runtime on navigation.
+      // Keeping the dashboard idle prevents unrelated secondary modules from
+      // monopolizing the main thread immediately after the Portal becomes ready.
     }catch(error){
       console.error('Portal critical runtime load failed:',error);
       document.documentElement.dataset.gcRuntimeState='error';
