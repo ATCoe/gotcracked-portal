@@ -1,13 +1,14 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260825-release13';
+  const VERSION = '20260825-release14';
 
   // Only the modules needed to make the primary repair/dashboard workspace
   // useful belong on the critical post-auth path. Everything else is deferred
   // until idle time or until its view is requested.
   const criticalScripts = [
     'portal-live.js',
+    'training-shared-sync.js',
     'operations-v1-core.js',
     'training-store-guard.js',
     'operations-v1-arrival.js',
@@ -58,9 +59,7 @@
   }
 
   function loadScript(file) {
-    if (document.querySelector(`script[data-gc-runtime="${file}"]`)) {
-      return Promise.resolve();
-    }
+    if (document.querySelector(`script[data-gc-runtime="${file}"]`)) return Promise.resolve();
     if (loading.has(file)) return loading.get(file);
 
     const promise = new Promise((resolve, reject) => {
@@ -78,7 +77,12 @@
   }
 
   async function loadSequence(files) {
-    for (const file of files) await loadScript(file);
+    for (const file of files) {
+      await loadScript(file);
+      if (file === 'training-shared-sync.js' && window.GotCrackedTrainingSync?.ready) {
+        await window.GotCrackedTrainingSync.ready;
+      }
+    }
   }
 
   async function startCriticalRuntime() {
@@ -110,38 +114,26 @@
 
   function scheduleDeferredRuntime() {
     const run = () => startDeferredRuntime();
-    if ('requestIdleCallback' in window) {
-      window.requestIdleCallback(run, { timeout: 2600 });
-    } else {
-      setTimeout(run, 1600);
-    }
+    if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 2600 });
+    else setTimeout(run, 1600);
   }
 
   async function ensureViewRuntime(view) {
     const files = viewDependencies[view] || [];
     if (!files.length) return;
-    try {
-      await loadSequence(files);
-    } catch (error) {
-      console.error(`Portal ${view} runtime load failed:`, error);
-    }
+    try { await loadSequence(files); }
+    catch (error) { console.error(`Portal ${view} runtime load failed:`, error); }
   }
 
   function scheduleCriticalStart() {
     const run = () => startCriticalRuntime();
-    // Yield one paint after the login screen disappears so the top bar and
-    // hamburger become interactive before heavier shop modules begin executing.
     requestAnimationFrame(() => requestAnimationFrame(run));
   }
 
   function watchLoginState() {
     const login = document.getElementById('login-screen');
     if (!login) return;
-
-    if (login.classList.contains('hidden')) {
-      scheduleCriticalStart();
-      return;
-    }
+    if (login.classList.contains('hidden')) { scheduleCriticalStart(); return; }
 
     const observer = new MutationObserver(() => {
       if (!login.classList.contains('hidden')) return;
@@ -162,14 +154,8 @@
     if (view) ensureViewRuntime(view);
   });
 
-  window.GotCrackedRuntime = {
-    ensureView: ensureViewRuntime,
-    startDeferred: startDeferredRuntime
-  };
+  window.GotCrackedRuntime = { ensureView: ensureViewRuntime, startDeferred: startDeferredRuntime };
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', watchLoginState, { once: true });
-  } else {
-    watchLoginState();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchLoginState, { once: true });
+  else watchLoginState();
 })();
