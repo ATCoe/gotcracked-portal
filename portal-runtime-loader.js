@@ -1,38 +1,18 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260825-release18';
+  const VERSION = '20260825-release19';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
-  // Apply the remembered/system theme before the authenticated runtime starts so
-  // returning staff do not see the Portal flash between light and dark modes.
-  try {
-    const saved = localStorage.getItem('gc-portal-theme');
-    const preference = ['light','dark','system'].includes(saved) ? saved : 'system';
-    const resolved = preference === 'system'
-      ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-      : preference;
-    document.documentElement.dataset.theme = resolved;
-    document.documentElement.dataset.themePreference = preference;
-    document.documentElement.style.colorScheme = resolved;
-  } catch {}
-
-  if (!document.querySelector('link[data-gc-theme-style]')) {
-    const theme = document.createElement('link');
-    theme.rel = 'stylesheet';
-    theme.href = `portal-theme.css?v=${VERSION}`;
-    theme.dataset.gcThemeStyle = 'true';
-    document.head.appendChild(theme);
-  }
-
-  // Runtime order is intentional. Training Store synchronization must hydrate
-  // before Operations reads sandbox state. Operations must then finish profile
-  // hydration before any older/live module that dereferences profile.location_id
-  // is allowed to attach its handlers.
+  // Runtime order is intentional. Theme CSS and the first-paint theme decision
+  // now live in <head>. Training Store synchronization hydrates before
+  // Operations. Operations then finishes staff-profile hydration before any
+  // profile-dependent module is allowed to attach handlers.
   const criticalScripts = [
     'theme-controller.js',
     'training-shared-sync.js',
     'operations-v1-core.js',
+    'time-clock.js',
     'portal-live.js',
     'training-store-guard.js',
     'operations-v1-arrival.js',
@@ -48,7 +28,6 @@
 
   const deferredScripts = [
     'leads.js',
-    'workforce.js',
     'analytics.js',
     'shipping.js',
     'inventory-audit.js'
@@ -56,7 +35,7 @@
 
   const viewDependencies = {
     leads: ['leads.js'],
-    staff: ['workforce.js'],
+    schedule: ['schedule-board.js'],
     reports: ['analytics.js'],
     shipping: ['shipping.js'],
     inventory: ['inventory-audit.js'],
@@ -124,8 +103,6 @@
 
   async function loadSequence(files) {
     for (const file of files) {
-      // Any module after Operations is profile-dependent. Never let it attach
-      // handlers while the shared staff profile is still null.
       if (file !== 'theme-controller.js' && file !== 'training-shared-sync.js' && file !== 'operations-v1-core.js') {
         await waitForOperationsProfile();
       }
@@ -152,6 +129,8 @@
       document.documentElement.dataset.gcRuntimeState = 'ready';
       document.dispatchEvent(new CustomEvent('gc-portal-runtime-ready', { detail:{ profile:profileReady } }));
       scheduleDeferredRuntime();
+      const currentView = location.hash.slice(1).split('/')[0] || 'dashboard';
+      ensureViewRuntime(currentView);
     } catch (error) {
       console.error('Portal critical runtime load failed:', error);
       document.documentElement.dataset.gcRuntimeState = 'error';
