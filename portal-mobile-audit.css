@@ -1,0 +1,98 @@
+/* GotCracked mobile QA corrections — 2026-08-26 */
+
+/* Keep every view inside the phone viewport. Wide data surfaces own their scroll. */
+html,body{max-width:100%;overflow-x:hidden}
+main,.view,.card,.v1-ops-card,.gc-schedule-page,#schedule-board,#staff-management-list{min-width:0;max-width:100%}
+.table-wrap,.v1-table-wrap,.gc-schedule-board-scroll{max-width:100%;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+
+/* Walk-in intake validation must remain in normal document flow. */
+#v1-intake-dialog .v1-intake-body{display:block!important;min-width:0!important}
+#v1-intake-dialog .v1-intake-guidance{
+  position:static!important;inset:auto!important;display:block!important;float:none!important;clear:both!important;
+  width:auto!important;max-width:100%!important;min-width:0!important;height:auto!important;min-height:0!important;
+  margin:0 0 14px!important;padding:10px 12px!important;overflow:visible!important;white-space:normal!important;
+  transform:none!important;line-height:1.4!important;box-sizing:border-box!important;
+}
+#v1-intake-dialog .v1-intake-guidance + h3{margin-top:4px!important}
+#v1-intake-dialog .v1-intake-body>h3:first-child{clear:both}
+
+/* New Lead modal was inheriting a light shell in dark mode. */
+html[data-theme="dark"] #portal-v1-lead-dialog .v1-lead-dialog-shell,
+html[data-theme="dark"] #portal-v1-lead-dialog .v1-lead-dialog-body{
+  background:#111d2a!important;color:#edf4fb!important;
+}
+html[data-theme="dark"] #portal-v1-lead-dialog .v1-intake-guidance{
+  background:#0d1824!important;border-color:#31465b!important;color:#bdd0e3!important;
+}
+html[data-theme="dark"] #portal-v1-lead-dialog label{color:#c6d5e4!important}
+html[data-theme="dark"] #portal-v1-lead-dialog h2,
+html[data-theme="dark"] #portal-v1-lead-dialog h3{color:#f2f7fb!important}
+
+/* Permission cards had light header strips in dark mode. */
+html[data-theme="dark"] .v1-permission-person,
+html[data-theme="dark"] .v1-permission-person>header,
+html[data-theme="dark"] .v1-permission-person .v1-permission-list{
+  background:#111d2a!important;border-color:#2b3c4e!important;color:#edf4fb!important;
+}
+html[data-theme="dark"] .v1-permission-person>header small,
+html[data-theme="dark"] .v1-permission-row small{color:#93a7ba!important}
+
+/* Schedule: only the board/intelligence rows may scroll horizontally, never the page. */
+#schedule,#schedule .gc-schedule-page,#schedule .gc-schedule-toolbar,#schedule .gc-schedule-summary,
+#schedule .gc-schedule-intel,#schedule .gc-schedule-board-card,#schedule .gc-schedule-timeoff{
+  width:100%;max-width:100%;min-width:0;box-sizing:border-box;
+}
+#schedule .gc-schedule-board-scroll{width:100%;max-width:100%;overflow-x:auto;overflow-y:visible}
+#schedule .gc-schedule-intel{overflow:hidden}
+#schedule .gc-schedule-days{max-width:100%}
+
+@media(max-width:750px){
+  main{width:100%;max-width:100%;overflow-x:hidden}
+  .view{width:100%;max-width:100%;overflow-x:hidden}
+  .page-heading,.page-heading>div,.v1-ops-card-head,.v1-table-tools{min-width:0;max-width:100%}
+
+  /* Schedule controls stack cleanly; wide week data scrolls inside its own surface. */
+  #schedule .gc-schedule-toolbar{align-items:stretch;flex-direction:column}
+  #schedule .gc-schedule-week-nav{display:grid;grid-template-columns:auto minmax(0,1fr) auto;width:100%}
+  #schedule .gc-schedule-week-title{min-width:0;width:100%}
+  #schedule .gc-schedule-toolbar-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));justify-content:stretch;width:100%}
+  #schedule .gc-schedule-toolbar-actions>*{min-width:0;width:100%;justify-content:center}
+  #schedule .gc-schedule-summary-head,#schedule .gc-schedule-intel-head,#schedule .gc-schedule-board-head,#schedule .gc-schedule-timeoff-head{flex-direction:column}
+  #schedule .gc-schedule-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #schedule .gc-schedule-plan{grid-template-columns:1fr}
+  #schedule .gc-schedule-days{display:flex;overflow-x:auto;gap:8px;padding-bottom:4px;scroll-snap-type:x proximity}
+  #schedule .gc-schedule-day-intel{flex:0 0 min(78vw,280px);scroll-snap-align:start}
+  #schedule .gc-schedule-timeoff{overflow:hidden}
+  #schedule .gc-timeoff-row{grid-template-columns:1fr;align-items:start}
+  #schedule .gc-timeoff-actions{width:100%}
+  #schedule .gc-timeoff-actions>*{flex:1}
+
+  /* Staff table becomes readable cards rather than a clipped desktop table. */
+  #staff-management-list .table-wrap{overflow:visible!important}
+  #staff-management-list table,#staff-management-list tbody,#staff-management-list tr,#staff-management-list td{display:block;width:100%;min-width:0}
+  #staff-management-list thead{display:none}
+  #staff-management-list tbody{display:grid;gap:12px}
+  #staff-management-list tr{padding:12px 14px;border:1px solid #dfe6ee;border-radius:14px;background:#fff;box-shadow:0 5px 16px rgba(13,31,49,.05)}
+  #staff-management-list td{display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:start;padding:8px 0!important;border:0!important;overflow-wrap:anywhere}
+  #staff-management-list td::before{font-size:10px;line-height:1.35;font-weight:900;letter-spacing:.04em;text-transform:uppercase;color:#728194}
+  #staff-management-list td:nth-child(1)::before{content:"Employee"}
+  #staff-management-list td:nth-child(2)::before{content:"Portal role"}
+  #staff-management-list td:nth-child(3)::before{content:"Discord"}
+  #staff-management-list td:nth-child(4)::before{content:"Status"}
+  #staff-management-list td:nth-child(5)::before{content:"Actions"}
+  #staff-management-list td select{width:100%;min-width:0}
+  #staff-management-list td:last-child>button{width:100%;margin:4px 0 0}
+  html[data-theme="dark"] #staff-management-list tr{background:#111d2a;border-color:#2b3c4e;box-shadow:none}
+  html[data-theme="dark"] #staff-management-list td::before{color:#91a6ba}
+
+  .v1-permission-grid{grid-template-columns:1fr!important;min-width:0}
+  .v1-permission-person{min-width:0;overflow:hidden}
+  .v1-permission-person>header{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:8px!important}
+  .v1-permission-row{grid-template-columns:minmax(0,1fr) auto!important;gap:10px!important}
+}
+
+@media(max-width:430px){
+  #schedule .gc-schedule-metrics{grid-template-columns:1fr}
+  #schedule .gc-schedule-toolbar-actions{grid-template-columns:1fr}
+  #staff-management-list td{grid-template-columns:84px minmax(0,1fr)}
+}
