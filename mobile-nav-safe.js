@@ -70,15 +70,19 @@
   function setOpen(open) {
     const panel = sidebar();
     const toggle = button();
-    if (!panel || !toggle) return;
+    if (!panel) return;
 
     const shouldOpen = Boolean(open) && mobileQuery.matches;
     panel.classList.toggle('open', shouldOpen);
     panel.dataset.mobileOpen = shouldOpen ? 'true' : 'false';
     panel.setAttribute('aria-hidden', shouldOpen ? 'false' : String(mobileQuery.matches));
-    toggle.setAttribute('aria-expanded', String(shouldOpen));
-    toggle.setAttribute('aria-controls', panel.id || 'portal-sidebar');
-    toggle.setAttribute('aria-label', shouldOpen ? 'Close menu' : 'Open menu');
+
+    if (toggle) {
+      toggle.type = 'button';
+      toggle.setAttribute('aria-expanded', String(shouldOpen));
+      toggle.setAttribute('aria-controls', panel.id || 'portal-sidebar');
+      toggle.setAttribute('aria-label', shouldOpen ? 'Close menu' : 'Open menu');
+    }
   }
 
   function syncActive() {
@@ -97,32 +101,43 @@
   }
 
   function bind() {
-    const toggle = button();
-    const panel = sidebar();
-    if (!toggle || !panel || toggle.dataset.gcMobileBound === 'true') return;
+    if (document.documentElement.dataset.gcMobileNavBound === 'true') return;
+    document.documentElement.dataset.gcMobileNavBound = 'true';
 
-    toggle.dataset.gcMobileBound = 'true';
-    toggle.type = 'button';
-    toggle.setAttribute('aria-controls', panel.id || 'portal-sidebar');
-    toggle.setAttribute('aria-expanded', 'false');
+    /*
+     * Own the hamburger through event delegation instead of binding to one DOM
+     * node. Authenticated Portal modules can update/rebuild shell content; a
+     * delegated controller continues to work even if the visible hamburger is a
+     * fresh element. This also lets this early shell controller win before any
+     * later capture-phase operational handlers can consume the tap.
+     */
+    document.addEventListener('click', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      const toggle = target?.closest('.mobile-menu');
+      if (!toggle || !mobileQuery.matches) return;
 
-    toggle.addEventListener('click', event => {
-      if (!mobileQuery.matches) return;
+      const panel = sidebar();
+      if (!panel) return;
+
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       setOpen(panel.dataset.mobileOpen !== 'true');
-    });
+    }, true);
 
     document.addEventListener('pointerdown', event => {
-      if (!mobileQuery.matches || panel.dataset.mobileOpen !== 'true') return;
+      const panel = sidebar();
+      if (!panel || !mobileQuery.matches || panel.dataset.mobileOpen !== 'true') return;
+
       const target = event.target instanceof Node ? event.target : null;
-      if (!target || panel.contains(target) || toggle.contains(target)) return;
+      const toggle = button();
+      if (!target || panel.contains(target) || toggle?.contains(target)) return;
       setOpen(false);
     }, true);
 
-    panel.addEventListener('click', event => {
+    document.addEventListener('click', event => {
       const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest(`.${NAV_CLASS} .nav-link[data-view]`)) setOpen(false);
+      if (!target?.closest(`.${NAV_CLASS} .nav-link[data-view]`)) return;
+      setOpen(false);
     });
 
     window.addEventListener('hashchange', () => {
