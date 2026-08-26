@@ -56,19 +56,33 @@ jobs:
               raise SystemExit('Public intake confirmation email flow is missing.')
 
           pc = Path('supabase/functions/custom-pc-build/index.ts').read_text(encoding='utf-8')
-          for token in [
+          required_pc_tokens = [
               "https://www.newegg.com/tools/custom-pc-builder",
+              "{ type:'computer' }",
+              "isStatefulNeweggBuilderUrl",
+              "/tools/custom-pc-builder/pl/ID-",
+              "tempPcbId",
+              "diywishlist",
+              "A stateful Newegg PC Builder verification link is required",
               "Newegg PC Builder compatibility could not be verified",
               "manufacturer specifications",
               "psu_connectors_verified",
               "bios_support_verified",
               "case_gpu_clearance_mm",
-              "compatibility_status:'verified'"
-          ]:
+              "compatibility_status:'verified'",
+              "status:'manual_review'",
+              "do NOT sign in to Newegg",
+              "do NOT add products to a cart",
+              "do NOT place an order"
+          ]
+          for token in required_pc_tokens:
               if token not in pc:
-                  raise SystemExit(f'Custom-PC compatibility gate weakened or missing: {token}')
-          if "status:'manual_review'" not in pc or 'No automated estimate' in pc:
-              pass
+                  raise SystemExit(f'Custom-PC Newegg compatibility gate weakened or missing: {token}')
+          if "if (survey.existingParts)" not in pc or 'Customer-owned or reused components require exact-model and physical-condition verification' not in pc:
+              raise SystemExit('Customer-owned PC parts must remain a manual-review path.')
+          if 'estimatedTotalCents:totalCents' not in pc or 'partsCostCents+serviceChargeCents' not in pc:
+              raise SystemExit('Custom-PC customer total must remain server-calculated from researched parts plus configured service charge.')
+
           if 'pc-builds.js' not in runtime or not Path('pc-builds.js').exists() or not Path('pc-builds.css').exists():
               raise SystemExit('Portal custom-PC workspace is not loaded or source-controlled.')
           if 'custom_pc_build_service_charge_cents' not in Path('pricing-settings.js').read_text(encoding='utf-8'):
