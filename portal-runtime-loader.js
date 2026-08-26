@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-release27';
+  const VERSION = '20260826-release28';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
@@ -14,6 +14,7 @@
     'portal-live.js',
     'avatar-presets.js',
     'staff-profiles.js',
+    'account-page.js',
     'training-store-guard.js',
     'operations-v1-arrival.js',
     'portal-v1-polish.js',
@@ -105,6 +106,7 @@
       if(file==='training-shared-sync.js'&&window.GotCrackedTrainingSync?.ready) await window.GotCrackedTrainingSync.ready;
       if(file==='operations-v1-core.js') await waitForOperationsProfile();
       if(file==='account-sync.js'&&window.GotCrackedAccountSync?.ready) await window.GotCrackedAccountSync.ready;
+      if(file==='account-page.js'&&window.GotCrackedAccountPage?.ready) await window.GotCrackedAccountPage.ready;
     }
   }
 
