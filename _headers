@@ -9,6 +9,9 @@
 /theme-bootstrap.js
   Cache-Control: no-store, max-age=0
 
+/portal-runtime-loader.js
+  Cache-Control: no-store, max-age=0
+
 /mobile-interaction-debug.js
   Cache-Control: no-store, max-age=0
 
