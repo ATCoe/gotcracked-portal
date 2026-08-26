@@ -57,8 +57,6 @@ jobs:
 
           pc = Path('supabase/functions/custom-pc-build/index.ts').read_text(encoding='utf-8')
           required_pc_tokens = [
-              "https://www.newegg.com/tools/custom-pc-builder",
-              "{ type:'computer' }",
               "isStatefulNeweggBuilderUrl",
               "/tools/custom-pc-builder/pl/ID-",
               "tempPcbId",
@@ -71,9 +69,11 @@ jobs:
               "case_gpu_clearance_mm",
               "compatibility_status:'verified'",
               "status:'manual_review'",
-              "do NOT sign in to Newegg",
-              "do NOT add products to a cart",
-              "do NOT place an order",
+              "PC_BUILD_RESEARCH_WORKER_URL",
+              "PC_BUILD_RESEARCH_TOKEN",
+              "ResearchProviderError",
+              "status:'research_unavailable'",
+              "research_provider:'cloudflare-workers-ai-browser-rendering'",
               "throw new Error('PC build rate limiter unavailable.')"
           ]
           for token in required_pc_tokens:
@@ -85,6 +85,17 @@ jobs:
               raise SystemExit('Customer-owned PC parts must remain a manual-review path.')
           if 'estimatedTotalCents:totalCents' not in pc or 'partsCostCents+serviceChargeCents' not in pc:
               raise SystemExit('Custom-PC customer total must remain server-calculated from researched parts plus configured service charge.')
+          if 'api.openai.com' in pc or 'OPENAI_API_KEY' in pc:
+              raise SystemExit('Paid OpenAI custom-PC research path must not return.')
+
+          worker = Path('cloudflare/pc-build-research/src/index.ts')
+          worker_config = Path('cloudflare/pc-build-research/wrangler.jsonc')
+          if not worker.exists() or not worker_config.exists():
+              raise SystemExit('Cloudflare Workers AI + Browser Rendering research worker is not source-controlled.')
+          worker_source = worker.read_text(encoding='utf-8')
+          for token in ["env.AI.run", "puppeteer.launch(env.BROWSER)", "https://www.newegg.com/tools/custom-pc-builder", "statefulBuilderUrl", "status: browserAudit.verified ? 'verified' : 'manual_review'", "never authenticate, add to cart, or enter personal data"]:
+              if token not in worker_source:
+                  raise SystemExit(f'Cloudflare research or Newegg safety invariant missing: {token}')
 
           if 'pc-builds.js' not in runtime or not Path('pc-builds.js').exists() or not Path('pc-builds.css').exists():
               raise SystemExit('Portal custom-PC workspace is not loaded or source-controlled.')
@@ -103,3 +114,4 @@ jobs:
                   raise SystemExit(f'Custom-PC migration is missing: {migration_name}')
 
           print('Portal production guard passed.')
+
