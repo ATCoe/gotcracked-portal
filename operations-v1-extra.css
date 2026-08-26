@@ -18,4 +18,45 @@ body.training-store .sidebar{border-right-color:#d7bd65}
 .v1-po-add-line h3{margin:0 0 10px;font-size:.9rem}
 .v1-training-chip{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;background:#fff0b2;color:#745600;font-size:.66rem;font-weight:900;letter-spacing:.05em}
 .v1-permission-note{margin:12px 0 0;padding:10px 12px;border-radius:9px;background:#f5f8fb;color:#61758a;font-size:.75rem}
-@media(max-width:750px){.v1-training-banner{position:relative;top:auto;flex-wrap:wrap;padding:8px 12px}.v1-training-banner span{flex-basis:calc(100% - 120px)}body.training-store .topbar{top:0}.v1-store-switch strong{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+
+/* Intake/customer modal: authoritative typography and spacing. This intentionally
+   neutralizes older dialog/form rules that were collapsing labels and helper text. */
+#v1-intake-dialog{width:min(900px,calc(100vw - 28px))!important;max-width:900px!important;padding:0!important;border:1px solid #cbd8e4!important;border-radius:18px!important;background:#fff!important;color:#162235!important;font-size:14px!important;line-height:1.45!important;overflow:hidden!important}
+#v1-intake-dialog .v1-intake-shell{display:grid!important;grid-template-rows:auto auto minmax(0,1fr) auto!important;width:100%!important;height:min(760px,calc(100dvh - 28px))!important;max-height:calc(100dvh - 28px)!important;min-height:0!important;background:#fff!important}
+#v1-intake-dialog .v1-intake-head{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:16px!important;padding:18px 22px!important;border-bottom:1px solid #e4e9ef!important;background:#fff!important}
+#v1-intake-dialog .v1-kicker{margin:0 0 4px!important;font-size:11px!important;line-height:1.2!important;letter-spacing:.08em!important;text-transform:uppercase!important;font-weight:800!important;color:#57708a!important}
+#v1-intake-dialog .v1-intake-head h2{margin:0!important;font-size:22px!important;line-height:1.2!important;color:#162235!important}
+#v1-intake-dialog .icon-button{display:grid!important;place-items:center!important;flex:0 0 44px!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;font-size:24px!important;line-height:1!important;color:#52677d!important;border-radius:10px!important}
+#v1-intake-dialog .v1-stepper{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:7px!important;padding:13px 22px!important;background:#f8fafc!important;border-bottom:1px solid #e9edf2!important}
+#v1-intake-dialog .v1-step{display:block!important;height:6px!important;border-radius:999px!important;background:#dce5ee!important}
+#v1-intake-dialog .v1-step.done,#v1-intake-dialog .v1-step.active{background:#2d7dc7!important}
+#v1-intake-dialog .v1-intake-body{min-height:0!important;padding:24px!important;overflow:auto!important;-webkit-overflow-scrolling:touch!important;color:#162235!important;background:#fff!important}
+#v1-intake-dialog .v1-intake-body h3{margin:0 0 7px!important;font-size:18px!important;line-height:1.3!important;color:#162235!important}
+#v1-intake-dialog .v1-intake-body>p{margin:0 0 20px!important;font-size:13px!important;line-height:1.55!important;color:#687b8f!important;max-width:760px!important}
+#v1-intake-dialog .v1-form,#v1-intake-dialog .v1-form-grid{display:grid!important;gap:14px!important}
+#v1-intake-dialog .v1-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+#v1-intake-dialog .v1-form-grid .full{grid-column:1/-1!important}
+#v1-intake-dialog .v1-form label,#v1-intake-dialog .v1-form-grid label{display:grid!important;position:relative!important;gap:7px!important;margin:0!important;padding:0!important;font-size:13px!important;line-height:1.3!important;font-weight:750!important;color:#42576d!important;min-width:0!important}
+#v1-intake-dialog .v1-required{float:none!important;display:inline-block!important;margin-left:6px!important;font-size:10px!important;line-height:1!important;font-weight:800!important;color:#b42318!important;vertical-align:middle!important}
+#v1-intake-dialog input,#v1-intake-dialog select,#v1-intake-dialog textarea{box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-height:46px!important;margin:0!important;padding:10px 12px!important;border:1px solid #cfdbe6!important;border-radius:10px!important;background:#fff!important;color:#162235!important;font:inherit!important;font-size:14px!important;line-height:1.35!important;outline:0!important}
+#v1-intake-dialog textarea{min-height:96px!important;resize:vertical!important}
+#v1-intake-dialog input:focus,#v1-intake-dialog select:focus,#v1-intake-dialog textarea:focus{border-color:#66a4e3!important;box-shadow:0 0 0 3px rgba(24,119,242,.11)!important}
+#v1-intake-dialog .v1-customer-results,#v1-intake-dialog .v1-device-choices{display:grid!important;gap:10px!important;margin-top:14px!important}
+#v1-intake-dialog .v1-customer-results>p,#v1-intake-dialog .v1-muted{margin:0!important;font-size:13px!important;line-height:1.5!important;color:#718398!important}
+#v1-intake-dialog .v1-choice{display:block!important;width:100%!important;padding:13px 14px!important;border:1px solid #dce5ee!important;border-radius:11px!important;background:#fff!important;text-align:left!important;color:#162235!important}
+#v1-intake-dialog .v1-choice strong{display:block!important;font-size:14px!important;line-height:1.3!important}
+#v1-intake-dialog .v1-choice small{display:block!important;margin-top:4px!important;font-size:12px!important;line-height:1.4!important;color:#75869a!important}
+#v1-intake-dialog .v1-intake-actions{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;padding:14px 22px!important;border-top:1px solid #e4e9ef!important;background:#fff!important}
+#v1-intake-dialog .v1-intake-actions .primary-button,#v1-intake-dialog .v1-intake-actions .secondary-button{min-width:110px!important;min-height:44px!important;margin:0!important;font-size:13px!important}
+
+@media(max-width:750px){
+  .v1-training-banner{position:relative;top:auto;flex-wrap:wrap;padding:8px 12px}.v1-training-banner span{flex-basis:calc(100% - 120px)}body.training-store .topbar{top:0}.v1-store-switch strong{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #v1-intake-dialog{width:100vw!important;max-width:none!important;height:100dvh!important;max-height:100dvh!important;margin:0!important;border:0!important;border-radius:0!important}
+  #v1-intake-dialog .v1-intake-shell{height:100dvh!important;max-height:100dvh!important}
+  #v1-intake-dialog .v1-intake-head{padding:14px 16px!important}
+  #v1-intake-dialog .v1-stepper{padding:10px 16px!important}
+  #v1-intake-dialog .v1-intake-body{padding:18px 16px 22px!important}
+  #v1-intake-dialog .v1-form-grid{grid-template-columns:1fr!important}
+  #v1-intake-dialog .v1-form-grid .full{grid-column:auto!important}
+  #v1-intake-dialog .v1-intake-actions{padding:12px 16px calc(12px + env(safe-area-inset-bottom))!important}
+}
