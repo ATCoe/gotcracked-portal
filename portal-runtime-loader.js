@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-release34';
+  const VERSION = '20260826-release35';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
