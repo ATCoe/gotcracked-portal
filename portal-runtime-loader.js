@@ -1,8 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-release34';
-  const MOBILE_TRACE_VERSION = '20260826-touch3';
+  const VERSION = '20260826-production1';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260826-sales-ops2';
   const PROFILE_READY_TIMEOUT_MS = 15000;
@@ -11,7 +10,6 @@
     'theme-controller.js',
     'training-shared-sync.js',
     'operations-v1-core.js',
-    'mobile-interaction-debug.js',
     'mobile-dialog-compat.js',
     'action-launchers.js',
     'account-sync.js',
@@ -66,7 +64,6 @@
 
   function srcFor(file) {
     const versions = {
-      'mobile-interaction-debug.js': MOBILE_TRACE_VERSION,
       'account-page.js': ACCOUNT_PAGE_VERSION,
       'sales-ops.js': SALES_OPS_VERSION
     };
@@ -162,9 +159,7 @@
   async function loadSequence(files) {
     for(const file of files){
       if(file!=='theme-controller.js'&&file!=='training-shared-sync.js'&&file!=='operations-v1-core.js') await waitForOperationsProfile();
-
       if(file==='directory-advanced.js'||file==='master-directory.js') await waitForAccountSyncBeforeDirectory();
-
       await loadScript(file);
       if(file==='training-shared-sync.js') captureTrainingSyncReady();
       if(file==='operations-v1-core.js') {
@@ -179,7 +174,10 @@
   async function ensureStoreModeRuntime(){
     if(isTraining()) return;
     try { await loadScript('portal-live.js'); }
-    catch(error){ console.error('Portal live-data runtime load failed:',error); }
+    catch(error){
+      console.error('Portal live-data runtime load failed:',error);
+      window.GotCrackedDiagnostics?.error?.(error,{context:'Live Portal data could not be loaded'});
+    }
   }
 
   async function startCriticalRuntime(){
@@ -187,7 +185,7 @@
     started=true;
     document.documentElement.dataset.gcRuntimeState='starting';
     document.documentElement.dataset.gcPortalBoot='loading';
-    const files=isTraining() ? criticalScripts.filter(file=>file!=='portal-live.js') : criticalScripts.filter(file=>file!=='mobile-interaction-debug.js');
+    const files=isTraining() ? criticalScripts.filter(file=>file!=='portal-live.js') : criticalScripts;
     preload(files);
     try{
       await loadSequence(files);
@@ -196,7 +194,6 @@
       document.documentElement.dataset.gcRuntimeState='ready';
       document.documentElement.dataset.gcPortalBoot='ready';
       document.dispatchEvent(new CustomEvent('gc-portal-runtime-ready',{detail:{profile:profileReady}}));
-      // Secondary views are view-scoped. Do not bulk-load them after dashboard boot.
     }catch(error){
       console.error('Portal critical runtime load failed:',error);
       document.documentElement.dataset.gcRuntimeState='error';
@@ -215,6 +212,7 @@
       document.dispatchEvent(new CustomEvent('gc-portal-secondary-runtime-ready'));
     }catch(error){
       console.error('Portal deferred runtime load failed:',error);
+      window.GotCrackedDiagnostics?.error?.(error,{context:'A secondary Portal module could not be loaded'});
       deferredStarted=false;
     }
   }
@@ -232,8 +230,7 @@
   }
 
   function scheduleCriticalStart(){
-    const run=()=>startCriticalRuntime();
-    requestAnimationFrame(()=>requestAnimationFrame(run));
+    requestAnimationFrame(()=>requestAnimationFrame(startCriticalRuntime));
   }
 
   function watchLoginState(){
