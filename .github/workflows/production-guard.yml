@@ -73,11 +73,14 @@ jobs:
               "status:'manual_review'",
               "do NOT sign in to Newegg",
               "do NOT add products to a cart",
-              "do NOT place an order"
+              "do NOT place an order",
+              "throw new Error('PC build rate limiter unavailable.')"
           ]
           for token in required_pc_tokens:
               if token not in pc:
                   raise SystemExit(f'Custom-PC Newegg compatibility gate weakened or missing: {token}')
+          if "PC build rate limiter unavailable:', result.error.message); return true" in pc:
+              raise SystemExit('Custom-PC rate limiter must fail closed when the limiter RPC is unavailable.')
           if "if (survey.existingParts)" not in pc or 'Customer-owned or reused components require exact-model and physical-condition verification' not in pc:
               raise SystemExit('Customer-owned PC parts must remain a manual-review path.')
           if 'estimatedTotalCents:totalCents' not in pc or 'partsCostCents+serviceChargeCents' not in pc:
