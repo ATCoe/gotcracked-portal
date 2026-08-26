@@ -18,9 +18,6 @@
 /portal-runtime-loader.js
   Cache-Control: no-store, max-age=0
 
-/mobile-interaction-debug.js
-  Cache-Control: no-store, max-age=0
-
 /*.js
   Cache-Control: no-cache, max-age=0, must-revalidate
 
