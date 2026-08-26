@@ -200,6 +200,8 @@ jobs:
 
           if 'function sundayOf' not in schedule:
               raise SystemExit('Schedule must use a Sunday-Saturday work week.')
+          if schedule.find('const state =') < schedule.find('const dateOnly ='):
+              raise SystemExit('Schedule state must initialize after date helpers to prevent startup TDZ failures.')
           for rpc in ['get_schedule_management_summary','get_staff_schedule_week','get_schedule_actuals']:
               if rpc not in schedule:
                   raise SystemExit(f'Schedule data boundary missing RPC: {rpc}')
@@ -210,7 +212,7 @@ jobs:
 
           if 'schedule-print.html' not in schedule_print or 'gc-schedule-print:' not in schedule_print:
               raise SystemExit('Schedule print action must open the dedicated print document.')
-          if '@page{size:letter landscape' not in schedule_print_css.replace(' ',''):
+          if '@page{size:letterlandscape' not in schedule_print_css.replace(' ',''):
               raise SystemExit('Schedule print template must target Letter landscape paper.')
           if 'window.print()' not in schedule_print_page or 'schedule-print-table' not in schedule_print_page:
               raise SystemExit('Dedicated printable schedule rendering is incomplete.')
