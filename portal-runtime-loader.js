@@ -1,12 +1,34 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260825-release16';
+  const VERSION = '20260825-release17';
+
+  // Apply the remembered/system theme before the authenticated runtime starts so
+  // returning staff do not see the Portal flash between light and dark modes.
+  try {
+    const saved = localStorage.getItem('gc-portal-theme');
+    const preference = ['light','dark','system'].includes(saved) ? saved : 'system';
+    const resolved = preference === 'system'
+      ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : preference;
+    document.documentElement.dataset.theme = resolved;
+    document.documentElement.dataset.themePreference = preference;
+    document.documentElement.style.colorScheme = resolved;
+  } catch {}
+
+  if (!document.querySelector('link[data-gc-theme-style]')) {
+    const theme = document.createElement('link');
+    theme.rel = 'stylesheet';
+    theme.href = `portal-theme.css?v=${VERSION}`;
+    theme.dataset.gcThemeStyle = 'true';
+    document.head.appendChild(theme);
+  }
 
   // Only the modules needed to make the primary repair/dashboard workspace
   // useful belong on the critical post-auth path. Everything else is deferred
   // until idle time or until its view is requested.
   const criticalScripts = [
+    'theme-controller.js',
     'portal-live.js',
     'training-shared-sync.js',
     'operations-v1-core.js',
