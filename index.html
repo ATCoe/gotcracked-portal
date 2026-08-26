@@ -6,19 +6,31 @@
     <link rel="icon" type="image/png" href="assets/gotcracked-favicon.png" />
     <title>GotCracked | Portal</title>
 
-    <!-- Portal 1.0 deterministic stylesheet stack. portal-v1-release.css is
-         intentionally LAST and owns final responsive/drawer behavior. -->
-    <link rel="stylesheet" href="styles.css?v=20260825-release5" />
-    <link rel="stylesheet" href="workflow.css?v=20260825-release5" />
-    <link rel="stylesheet" href="complete.css?v=20260825-release5" />
-    <link rel="stylesheet" href="auth-modern.css?v=20260825-release5" />
-    <link rel="stylesheet" href="workforce.css?v=20260825-release5" />
-    <link rel="stylesheet" href="hardening.css?v=20260825-release5" />
-    <link rel="stylesheet" href="operations-v1.css?v=20260825-release10" />
-    <link rel="stylesheet" href="operations-v1-extra.css?v=20260825-release5" />
-    <link rel="stylesheet" href="portal-v1-polish.css?v=20260825-release5" data-gc-v1-polish="true" />
-    <link rel="stylesheet" href="master-directory.css?v=20260825-release10" data-gc-master-directory="true" />
-    <link rel="stylesheet" href="portal-v1-release.css?v=20260825-release12" data-gc-v1-final="true" />
+    <!-- Resolve the saved/system theme before the browser paints the shell. -->
+    <script src="theme-bootstrap.js?v=20260825-release19"></script>
+
+    <!-- Deterministic first-paint stylesheet stack. Component/theme styles are
+         present up front so authenticated runtime code never has to restyle an
+         already-painted legacy shell. -->
+    <link rel="stylesheet" href="styles.css?v=20260825-release19" />
+    <link rel="stylesheet" href="workflow.css?v=20260825-release19" />
+    <link rel="stylesheet" href="complete.css?v=20260825-release19" />
+    <link rel="stylesheet" href="auth-modern.css?v=20260825-release19" />
+    <link rel="stylesheet" href="workforce.css?v=20260825-release19" />
+    <link rel="stylesheet" href="hardening.css?v=20260825-release19" />
+    <link rel="stylesheet" href="operations-v1.css?v=20260825-release19" />
+    <link rel="stylesheet" href="operations-v1-extra.css?v=20260825-release19" />
+    <link rel="stylesheet" href="portal-v1-polish.css?v=20260825-release19" data-gc-v1-polish="true" />
+    <link rel="stylesheet" href="master-directory.css?v=20260825-release19" data-gc-master-directory="true" />
+    <link rel="stylesheet" href="portal-v1-release.css?v=20260825-release19" data-gc-v1-final="true" />
+    <link rel="stylesheet" href="portal-theme.css?v=20260825-release19" data-gc-theme-style="true" />
+    <link rel="stylesheet" href="portal-dark-components.css?v=20260825-dark3" data-gc-dark-components="true" />
+    <link rel="stylesheet" href="theme-switch.css?v=20260825-switch2" data-gc-theme-switch="true" />
+    <link rel="stylesheet" href="intake-modal-release.css?v=20260825-release19" />
+    <link rel="stylesheet" href="sales-ops.css?v=20260825-release19" />
+    <link rel="stylesheet" href="checkout-receipts.css?v=20260825-release19" />
+    <link rel="stylesheet" href="schedule-board.css?v=20260825-release19" />
+    <link rel="stylesheet" href="time-clock.css?v=20260825-release19" />
   </head>
   <body>
     <section id="login-screen" class="login-screen">
@@ -46,6 +58,7 @@
       </div>
       <div class="login-aside"><div><p class="eyebrow">GotCracked staff portal</p><h2>Every repair.<br />One clear workflow.</h2><p>Intake, repair status, parts, customer communication, and pickup—kept together.</p></div></div>
     </section>
+
     <div class="app-shell">
       <aside class="sidebar">
         <a class="brand" href="#dashboard" aria-label="GotCracked dashboard">
@@ -57,22 +70,38 @@
           <a class="nav-link" href="#shipping" data-view="shipping"><span>▰</span>Mail-in & shipping <b id="shipping-count" hidden>0</b></a>
           <a class="nav-link" href="#leads" data-view="leads"><span>⌁</span>Leads <b id="lead-count" hidden>0</b></a>
           <a class="nav-link" href="#appointments" data-view="appointments"><span>◷</span>Appointments</a>
+          <a class="nav-link" href="#schedule" data-view="schedule"><span>▦</span>Schedule</a>
           <a class="nav-link" href="#customers" data-view="customers"><span>♙</span>Customers</a>
           <a class="nav-link" href="#inventory" data-view="inventory"><span>▤</span>Inventory</a>
           <a class="nav-link" href="#reports" data-view="reports"><span>◫</span>Reports</a>
           <a class="nav-link" href="#staff" data-view="staff"><span>♟</span>Staff access</a>
         </nav>
         <div class="sidebar-bottom">
+          <div id="sidebar-time-clock" class="gc-timeclock-mini" data-state="off_clock" aria-label="Time clock">
+            <div class="gc-timeclock-mini-head"><span class="gc-timeclock-state">Time clock</span><strong>0:00</strong></div>
+            <div class="gc-timeclock-mini-actions"><button type="button" class="gc-clock-primary" disabled>Loading…</button></div>
+          </div>
           <a class="nav-link" href="#settings" data-view="settings"><span>⚙</span>Settings</a>
           <div class="profile"><div id="staff-initials" class="avatar">GC</div><div><strong id="staff-name">Loading staff…</strong><small id="staff-role">Authorized staff</small></div><button id="sign-out" class="icon-button" aria-label="Sign out">↪</button></div>
         </div>
       </aside>
 
       <main>
-        <header class="topbar"><button class="mobile-menu icon-button" type="button" aria-label="Open menu">☰</button><div class="location"><span class="status-dot"></span> GotCracked — Main Store <span class="chevron">⌄</span></div><div class="top-actions"><button class="icon-button" aria-label="Notifications">♧<i hidden></i></button><button class="help">?</button></div></header>
+        <header class="topbar">
+          <button class="mobile-menu icon-button" type="button" aria-label="Open menu">☰</button>
+          <div class="location"><span class="status-dot"></span> Blacksburg <span class="chevron">⌄</span></div>
+          <div class="top-actions">
+            <button id="gc-theme-toggle" class="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode">
+              <span class="theme-switch-track" aria-hidden="true"><span class="theme-switch-symbol sun">☀</span><span class="theme-switch-symbol moon">☾</span><span class="theme-switch-thumb"></span></span>
+            </button>
+          </div>
+        </header>
 
         <section id="dashboard" class="view active-view">
           <div class="page-heading"><div><p class="eyebrow">Today</p><h1>Loading your dashboard…</h1><p class="subtle">Here’s what needs attention at GotCracked today.</p></div><button class="primary-button" data-open-ticket>+ New repair</button></div>
+          <div id="dashboard-time-clock" class="gc-dashboard-clock" data-state="off_clock" aria-label="Your time clock">
+            <div class="gc-dashboard-clock-main"><span class="gc-dashboard-clock-icon" aria-hidden="true">◷</span><div class="gc-dashboard-clock-copy"><small>Time clock</small><strong>Loading…</strong><span>Checking your current shift.</span></div></div>
+          </div>
           <section class="metrics" aria-label="Today at a glance">
             <article><span class="metric-icon blue">⌁</span><div><p>Open repairs</p><strong>0</strong><small>Live shop data</small></div></article>
             <article><span class="metric-icon amber">◷</span><div><p>Today’s appointments</p><strong>0</strong><small>Live shop data</small></div></article>
@@ -88,14 +117,16 @@
         <section id="repairs" class="view"><div class="page-heading"><div><p class="eyebrow">Repair workflow</p><h1>Repair tickets</h1><p class="subtle">Controlled repair stages, pickup, payment, and archived outcomes.</p></div><button class="primary-button" data-open-ticket>+ New repair</button></div><div class="card"><div class="toolbar"><div class="search">⌕ <input id="repair-search" placeholder="Search ticket, customer, device, phone, or email" /></div><select id="status-filter" aria-label="Filter repair status"><option value="active" selected>Active repair queue</option><option value="archive">Archive / closed outcomes</option><option value="all">All statuses</option><option value="awaiting_repair">Awaiting Repair</option><option value="need_to_order_parts">Need to Order Parts</option><option value="awaiting_parts">Awaiting Parts</option><option value="diagnostic_in_progress">Diagnostic in Progress</option><option value="repair_in_progress">Repair in Progress</option><option value="quality_inspection">Quality Inspection</option><option value="awaiting_callback">Awaiting Callback</option><option value="repaired">Repaired – Ready for Pickup</option><option value="sale_complete">Sale Complete</option><option value="unrepairable">Unrepairable</option><option value="customer_declined">Customer Declined</option><option value="cancelled">Cancelled</option></select></div><div class="table-wrap"><table><thead><tr><th>Ticket</th><th>Customer / device</th><th>Service</th><th>Assigned to</th><th>Status</th><th>Updated</th></tr></thead><tbody id="repair-table"></tbody></table></div></div></section>
         <section id="shipping" class="view"><div class="page-heading"><div><p class="eyebrow">Mail-in operations</p><h1>Shipping desk</h1><p class="subtle">Receive inbound devices, prepare insured returns, and keep customers informed.</p></div><a class="primary-button" href="https://ship.pirateship.com/" target="_blank" rel="noopener">Create carrier label ↗</a></div><div id="shipping-workspace"><div class="empty-card"><span>▰</span><h2>Loading mail-in repairs…</h2></div></div></section>
         <section id="leads" class="view"><div class="page-heading"><div><p class="eyebrow">Unified lead pipeline</p><h1>Leads</h1><p class="subtle">Create leads manually or work the same live queue shared with Discord.</p></div><button class="primary-button" data-live-action="lead">+ New lead</button></div><div class="card"><div class="toolbar"><div class="search">⌕ <input id="lead-search" placeholder="Search leads"></div><select id="lead-status"><option value="all">All statuses</option><option value="new">New</option><option value="claimed">Claimed</option><option value="qualified">Qualified</option><option value="won">Won</option><option value="lost">Lost</option></select></div><div id="portal-leads"></div></div></section>
-        <section id="appointments" class="view"><div class="page-heading"><div><p class="eyebrow">Scheduling</p><h1>Appointments</h1><p class="subtle">Reserve time without losing room for walk-ins.</p></div><button class="primary-button" data-open-ticket>+ Walk-in repair</button></div><div class="empty-card"><span>◷</span><h2>Appointment calendar is ready for your schedule.</h2><p>Connect your booking page when you’re ready; today’s appointments already appear on the dashboard.</p></div></section>
+        <section id="appointments" class="view"><div class="page-heading"><div><p class="eyebrow">Appointments</p><h1>Appointments</h1><p class="subtle">Reserve customer time without losing room for walk-ins.</p></div><button class="primary-button" data-open-ticket>+ Walk-in repair</button></div><div class="empty-card"><span>◷</span><h2>Appointment calendar is ready for your schedule.</h2><p>Connect your booking page when you’re ready; today’s appointments already appear on the dashboard.</p></div></section>
+        <section id="schedule" class="view"><div class="page-heading"><div><p class="eyebrow">Workforce planning</p><h1>Schedule</h1><p class="subtle">Sunday–Saturday staffing, workload forecasting, SPLH, shifts, and time off.</p></div></div><div id="schedule-board"><div class="empty-card"><span>◷</span><h2>Loading weekly schedule…</h2></div></div></section>
         <section id="customers" class="view"><div class="page-heading"><div><p class="eyebrow">Relationships</p><h1>Customers</h1><p class="subtle">A complete repair history for every customer.</p></div><button class="primary-button">+ New customer</button></div><div class="empty-card"><span>♙</span><h2>Customer records are linked to every repair ticket.</h2><p>Search, contact, and view devices from one place.</p></div></section>
         <section id="inventory" class="view"><div class="page-heading"><div><p class="eyebrow">Parts & supplies</p><h1>Inventory</h1><p class="subtle">Know what is on hand before you promise a turnaround.</p></div><button class="primary-button">+ Add part</button></div><div class="empty-card"><span>▤</span><h2>Inventory management foundation is in place.</h2><p>Parts will support stock levels, suppliers, reorder points, and ticket reservations.</p></div></section>
         <section id="reports" class="view"><div class="page-heading"><div><p class="eyebrow">Business intelligence</p><h1>Reports</h1><p class="subtle">Repair velocity, sales, margins, and technician workload.</p></div></div><div class="empty-card"><span>◫</span><h2>Your reports will grow with real shop data.</h2><p>The dashboard starts the process with your daily operating picture.</p></div></section>
         <section id="settings" class="view"></section>
-        <section id="staff" class="view"><div class="page-heading"><div><p class="eyebrow">Team operations</p><h1>Staff & scheduling</h1><p class="subtle">Onboard employees, control access, and plan labor from one Portal workspace.</p></div></div><div class="two-col"><article class="card"><h2>Invite a staff member</h2><p class="subtle">The secure onboarding link expires in 72 hours and can be used once.</p><form id="staff-invite-form" class="settings-list"><label>Display name<input name="displayName" required placeholder="Jordan Smith"></label><label>Discord user ID (recommended)<input name="discordUserId" placeholder="Right-click user → Copy User ID"></label><label>Portal role<select name="role"><option value="front_desk">Front desk</option><option value="technician">Technician</option><option value="manager">Manager</option></select></label><button class="primary-button" type="submit">Create and copy invite</button><p id="staff-invite-output" class="auth-message" role="status"></p></form></article><article class="card"><h2>Your Discord identity</h2><p>Existing owner accounts should link Discord once. After linking, use Discord for normal sign-in and keep email/password only for recovery.</p><button id="link-discord" class="discord-button" type="button">Link Discord account</button><p class="demo-note">Portal roles remain the final authority. Discord membership is checked at each sign-in.</p></article></div><article class="card"><div class="card-title"><div><h2>Employee access</h2><p>Roles, Discord linkage, and immediate access revocation.</p></div></div><div id="staff-management-list"><p class="empty-state">Loading employees…</p></div></article><div id="labor-scheduler"></div></section>
+        <section id="staff" class="view"><div class="page-heading"><div><p class="eyebrow">Team operations</p><h1>Staff access</h1><p class="subtle">Onboard employees, control roles, and manage Portal permissions.</p></div></div><div class="two-col"><article class="card"><h2>Invite a staff member</h2><p class="subtle">The secure onboarding link expires in 72 hours and can be used once.</p><form id="staff-invite-form" class="settings-list"><label>Display name<input name="displayName" required placeholder="Jordan Smith"></label><label>Discord user ID (recommended)<input name="discordUserId" placeholder="Right-click user → Copy User ID"></label><label>Portal role<select name="role"><option value="front_desk">Front desk</option><option value="technician">Technician</option><option value="manager">Manager</option></select></label><button class="primary-button" type="submit">Create and copy invite</button><p id="staff-invite-output" class="auth-message" role="status"></p></form></article><article class="card"><h2>Your Discord identity</h2><p>Existing owner accounts should link Discord once. After linking, use Discord for normal sign-in and keep email/password only for recovery.</p><button id="link-discord" class="discord-button" type="button">Link Discord account</button><p class="demo-note">Portal roles remain the final authority. Discord membership is checked at each sign-in.</p></article></div><article class="card"><div class="card-title"><div><h2>Employee access</h2><p>Roles, Discord linkage, and immediate access revocation.</p></div></div><div id="staff-management-list"><p class="empty-state">Loading employees…</p></div></article></section>
       </main>
     </div>
+
     <dialog id="new-ticket"><form method="dialog" id="ticket-form"><div class="modal-head"><div><p class="eyebrow">New intake</p><h2>Create repair ticket</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><div class="form-grid"><label>Customer name<input required name="customer" placeholder="e.g. Taylor Morgan" /></label><label>Phone number<input required name="phone" placeholder="(555) 555-5555" /></label><label>Email<input name="email" type="email" placeholder="customer@example.com" /></label><label>Device<input required name="device" placeholder="e.g. iPhone 15 Pro" /></label><label>Repair type<select name="service"><option>Screen repair</option><option>Battery replacement</option><option>Diagnosis</option><option>Charging issue</option><option>Other repair</option></select></label><label>Intake method<select name="intake_method"><option value="walk_in">Walk-in / local</option><option value="mail_in">Mail-in repair</option></select></label><label>Initial shipping status<select name="shipping_status"><option value="not_applicable">Not applicable</option><option value="awaiting_inbound">Awaiting inbound package</option><option value="inbound_in_transit">Inbound in transit</option><option value="received">Received at shop</option></select></label><label class="full">Return shipping address<input name="shipping_address" placeholder="Street, unit, city, state, ZIP (mail-in only)"></label><label class="full">Customer-reported issue<textarea name="issue" placeholder="What is happening with the device?"></textarea></label></div><div class="modal-actions"><button value="cancel" class="secondary-button">Cancel</button><button class="primary-button" value="default">Create ticket</button></div></form></dialog>
     <dialog id="ticket-detail"><div id="ticket-detail-content"></div></dialog>
     <dialog id="operation-dialog"><form id="operation-form"><div id="operation-dialog-content"></div></form></dialog>
@@ -104,12 +135,11 @@
     <!-- Authentication and shell only. Heavy operational modules are loaded by
          portal-runtime-loader.js after the authenticated Portal is visible. -->
     <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script defer src="supabase.js?v=20260825-release11"></script>
-    <script defer src="discord-integration.js?v=20260825-release5"></script>
-    <script defer src="workflow.js?v=20260825-release5"></script>
-    <script defer src="app.js?v=20260825-release12"></script>
-    <script defer src="mobile-nav-safe.js?v=20260825-release5"></script>
-    <script defer src="portal-runtime-loader.js?v=20260825-release12"></script>
+    <script defer src="supabase.js?v=20260825-release19"></script>
+    <script defer src="discord-integration.js?v=20260825-release19"></script>
+    <script defer src="workflow.js?v=20260825-release19"></script>
+    <script defer src="app.js?v=20260825-release19"></script>
+    <script defer src="mobile-nav-safe.js?v=20260825-release19"></script>
+    <script defer src="portal-runtime-loader.js?v=20260825-release19"></script>
   </body>
 </html>
-
