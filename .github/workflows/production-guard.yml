@@ -14,6 +14,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compile Cloudflare PC research worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          cd cloudflare/pc-build-research
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm run check
       - name: Production-only invariants
         shell: python
         run: |
