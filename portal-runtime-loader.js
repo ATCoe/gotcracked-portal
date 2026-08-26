@@ -1,13 +1,14 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-release33';
+  const VERSION = '20260826-release34';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
     'theme-controller.js',
     'training-shared-sync.js',
     'operations-v1-core.js',
+    'mobile-interaction-debug.js',
     'mobile-dialog-compat.js',
     'action-launchers.js',
     'account-sync.js',
@@ -176,7 +177,7 @@
     started=true;
     document.documentElement.dataset.gcRuntimeState='starting';
     document.documentElement.dataset.gcPortalBoot='loading';
-    const files=isTraining() ? criticalScripts.filter(file=>file!=='portal-live.js') : criticalScripts;
+    const files=isTraining() ? criticalScripts.filter(file=>file!=='portal-live.js') : criticalScripts.filter(file=>file!=='mobile-interaction-debug.js');
     preload(files);
     try{
       await loadSequence(files);
