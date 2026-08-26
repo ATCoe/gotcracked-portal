@@ -90,11 +90,11 @@
   }
 
   function referenceRequired(method){
-    return ['external_pos_card','external_pos_other','cash_app','zelle','chime'].includes(method);
+    return ['cash','external_pos_card','external_pos_other','cash_app','zelle','chime'].includes(method);
   }
 
   function methodHelp(method,cfg){
-    if(method==='cash') return 'Collect the cash before continuing. The employee confirmation is saved with the payment audit record.';
+    if(method==='cash') return 'Ring the cash payment in the external POS first, then enter its receipt or transaction reference and confirm the cash was received.';
     if(method==='external_pos_card'||method==='external_pos_other') return 'Complete the transaction in the physical/external POS first, then enter its receipt or transaction reference.';
     if(['cash_app','zelle','chime'].includes(method)) return `${METHOD_LABELS[method]} does not provide GotCracked a universal merchant webhook we can safely trust for every account. Verify the transfer in the provider and record its confirmation/reference before continuing.`;
     if(method==='paypal') return cfg?.paypal_automatic_verification ? 'The work order will stay blocked until PayPal confirms the payment server-to-server.' : 'PayPal automatic verification must be connected before this method can be used.';
@@ -139,8 +139,11 @@
     dialog.showModal();
 
     return new Promise(resolve=>{
-      const close=()=>{if(dialog.open)dialog.close();resolve(null);};
+      let settled=false;
+      const finish=value=>{if(settled)return;settled=true;if(dialog.open)dialog.close();resolve(value);};
+      const close=()=>finish(null);
       dialog.querySelectorAll('[data-gc-pay-close]').forEach(btn=>btn.addEventListener('click',close,{once:true}));
+      dialog.addEventListener('cancel',event=>{event.preventDefault();close();},{once:true});
       form.elements.method.addEventListener('change',()=>refreshMethodForm(form,cfg));
       form.elements.amount.addEventListener('input',()=>{
         const cents=Math.round(Number(form.elements.amount.value||0)*100);
@@ -167,13 +170,12 @@
             result=await client.rpc('create_provider_payment_request',{requested_amount_cents:cents,requested_method:method,payment_note:note||null});
             if(result.error)throw result.error;
             status.textContent='Waiting for automatic PayPal verification. The work order remains blocked.';
-            button.disabled=false;button.textContent='Check verification';
+            button.disabled=false;button.textContent='Waiting for PayPal';
             return;
           }
           result=await client.rpc('record_manual_prepayment',{paid_amount_cents:cents,paid_method:method,paid_reference:reference||null,payment_note:note||null});
           if(result.error)throw result.error;
-          if(dialog.open)dialog.close();
-          resolve(result.data);
+          finish(result.data);
         }catch(error){
           status.textContent=error?.message||'Unable to verify this payment.';
           status.classList.add('is-error');
@@ -204,20 +206,44 @@
     client.__gcPaymentInsertPatched=true;
   }
 
+  function replay(button){
+    if(!button)return;
+    button.dataset.gcPaymentBypass='true';
+    button.click();
+    setTimeout(()=>delete button.dataset.gcPaymentBypass,0);
+  }
+
   async function interceptWorkOrderCreation(event){
     if(training()) return;
     const target=event.target instanceof Element?event.target:null;
     if(!target) return;
     const intakeButton=target.closest('[data-v1-intake-create]');
     const convertButton=target.closest('[data-v1-convert-lead]');
-    if(!intakeButton&&!convertButton) return;
-    if(target.closest('[data-gc-payment-bypass="true"]')) return;
+    const button=intakeButton||convertButton;
+    if(!button) return;
+    if(button.matches('[data-gc-payment-bypass="true"]')) return;
 
-    const cfg=await loadConfig();
-    if(!cfg?.prepay_required) return;
-
+    // Stop the legacy handler synchronously. Waiting to do this until after an async
+    // configuration lookup allows the original click handler to create a work order
+    // before the payment gate has a chance to run.
     event.preventDefault();
     event.stopImmediatePropagation();
+
+    let cfg=null;
+    try{cfg=await loadConfig();}
+    catch(error){
+      console.warn('Unable to load payment configuration; allowing legacy workflow.',error);
+      replay(button);
+      return;
+    }
+
+    // Rolling-deploy fail-open: if the new DB functions are not live yet, replay the
+    // original action. Once migration 0032 is installed, the database trigger is the
+    // final authority and this path can no longer create an unpaid work order.
+    if(!cfg||!cfg.prepay_required){
+      replay(button);
+      return;
+    }
 
     if(convertButton){
       alert('Pre-payment is required before a work order can be created. Keep this customer in Leads until intake/payment, then create the repair from New Repair / Walk-in.');
@@ -227,18 +253,14 @@
     // Legacy pending-arrival tickets already existed before the prepay gate. Do not
     // collect an orphaned second payment simply to receive one of those records.
     if(state()?.intake?.pendingTicket){
-      intakeButton.dataset.gcPaymentBypass='true';
-      intakeButton.click();
-      delete intakeButton.dataset.gcPaymentBypass;
+      replay(intakeButton);
       return;
     }
 
     const payment=await openPrepayDialog(cfg);
     if(!payment?.id) return;
     activePaymentRequestId=payment.id;
-    intakeButton.dataset.gcPaymentBypass='true';
-    intakeButton.click();
-    setTimeout(()=>delete intakeButton.dataset.gcPaymentBypass,0);
+    replay(intakeButton);
   }
 
   function settingsMarkup(cfg){
@@ -253,7 +275,7 @@
         <div class="gc-pay-settings-grid">
           ${Object.entries(METHOD_LABELS).map(([key,label])=>`<label class="gc-pay-toggle"><input type="checkbox" name="method_${key}" ${m[key]?'checked':''}><span><strong>${esc(label)}</strong>${key==='paypal'?'<small>Automatic connection required</small>':''}</span></label>`).join('')}
         </div>
-        <div class="gc-payment-warning"><strong>Verification rules:</strong> cash and physical/external POS are employee-confirmed. Cash App, Zelle, and Chime are recorded as audited external transfers because they do not expose one universal merchant verification API for every account. PayPal stays blocked unless trusted automatic verification is connected.</div>
+        <div class="gc-payment-warning"><strong>Verification rules:</strong> cash and physical/external POS are rung through the external POS and employee-confirmed. Cash App, Zelle, and Chime are recorded as audited external transfers because they do not expose one universal merchant verification API for every account. PayPal stays blocked unless trusted automatic verification is connected.</div>
         <p class="auth-message" role="status"></p>
         <button class="primary-button" type="submit">Save payment settings</button>
       </form>
