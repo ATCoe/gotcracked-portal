@@ -1,29 +1,17 @@
-/* Persistent / saved directory filters and last-update grouping */
-.gc-dir-saved-controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-.gc-dir-saved-controls select{min-height:38px;max-width:220px;border:1px solid #ccd7e3;border-radius:10px;background:#fff;color:#203247;padding:7px 9px;font:inherit}
+/* Persistent / saved directory filters and last-update grouping — bounded, event-driven */
+.gc-dir-utility-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 22px 10px;min-width:0;max-width:100%}
+.gc-dir-saved-controls{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap;min-width:0;max-width:100%}
+.gc-dir-saved-controls select{min-height:36px;max-width:190px;min-width:140px;border:1px solid #ccd7e3;border-radius:9px;background:#fff;color:#203247;padding:6px 9px;font:inherit;font-size:.76rem}
+.gc-dir-saved-controls button{min-height:36px;padding:7px 10px;font-size:.73rem;white-space:nowrap}
 .gc-dir-advanced-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;grid-column:1/-1}
 .gc-dir-advanced-row label{display:grid;gap:5px;font-size:11px;font-weight:800;color:#526376}
 .gc-dir-advanced-row input,.gc-dir-advanced-row select{width:100%;min-width:0;min-height:40px;border:1px solid #ccd7e3;border-radius:10px;background:#fff;color:#203247;padding:8px 10px;font:inherit}
-.gc-dir-update-group{display:grid;gap:0;border-top:1px solid #e4e9ef}
-.gc-dir-update-group:first-of-type{border-top:0}
+.gc-dir-update-group{display:grid;gap:0;border-top:1px solid #e4e9ef}.gc-dir-update-group:first-of-type{border-top:0}
 .gc-dir-update-group-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:#f7f9fc;color:#526274;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.04em}
 .gc-dir-update-group-head span{font-weight:700;text-transform:none;letter-spacing:0;color:#7b8998}
-.gc-dir-update-hidden{display:none!important}
-.gc-dir-row[data-gc-advanced-hidden="true"]{display:none!important}
-html[data-theme="dark"] .gc-dir-saved-controls select,
-html[data-theme="dark"] .gc-dir-advanced-row input,
-html[data-theme="dark"] .gc-dir-advanced-row select{background:#0d1824;border-color:#32475c;color:#edf4fb}
-html[data-theme="dark"] .gc-dir-advanced-row label{color:#a8bacb}
-html[data-theme="dark"] .gc-dir-update-group{border-color:#2b3b4b}
-html[data-theme="dark"] .gc-dir-update-group-head{background:#14202c;color:#c8d6e3}
-html[data-theme="dark"] .gc-dir-update-group-head span{color:#8fa3b7}
+.gc-dir-update-hidden,.gc-dir-row[data-gc-advanced-hidden="true"]{display:none!important}
+html[data-theme="dark"] .gc-dir-saved-controls select,html[data-theme="dark"] .gc-dir-advanced-row input,html[data-theme="dark"] .gc-dir-advanced-row select{background:#0d1824;border-color:#32475c;color:#edf4fb}
+html[data-theme="dark"] .gc-dir-advanced-row label{color:#a8bacb}html[data-theme="dark"] .gc-dir-update-group{border-color:#2b3b4b}html[data-theme="dark"] .gc-dir-update-group-head{background:#14202c;color:#c8d6e3}html[data-theme="dark"] .gc-dir-update-group-head span{color:#8fa3b7}
 @media(max-width:950px){.gc-dir-advanced-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:750px){
- .gc-dir-saved-controls{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto}
- .gc-dir-saved-controls select{max-width:none;width:100%}
- .gc-dir-advanced-row{grid-template-columns:1fr}
-}
-@media(max-width:430px){
- .gc-dir-saved-controls{grid-template-columns:1fr 1fr}
- .gc-dir-saved-controls select{grid-column:1/-1}
-}
+@media(max-width:750px){.gc-dir-utility-row{display:block;width:100%;box-sizing:border-box;padding:0 15px 10px;overflow:hidden}.gc-dir-saved-controls{display:grid;width:100%;max-width:100%;box-sizing:border-box;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.gc-dir-saved-controls select{grid-column:1/-1;max-width:100%;min-width:0;width:100%;box-sizing:border-box}.gc-dir-saved-controls button{width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}.gc-dir-advanced-row{grid-template-columns:1fr}}
+@media(max-width:430px){.gc-dir-saved-controls{grid-template-columns:1fr 1fr}.gc-dir-saved-controls select{grid-column:1/-1}.gc-dir-saved-controls button{padding-left:8px;padding-right:8px}}
