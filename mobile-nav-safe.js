@@ -8,7 +8,6 @@
   const mobileQuery = window.matchMedia(`(max-width: ${MOBILE_MAX}px)`);
   let lastPointerToggleAt = 0;
   let returnFocus = null;
-  let sidebarGuard = null;
 
   const navItems = {
     primary: [
@@ -37,58 +36,6 @@
   const buttons = () => Array.from(document.querySelectorAll('.mobile-menu'));
   const currentView = () => window.location.hash.slice(1).split('/')[0] || 'dashboard';
 
-  function injectStyle() {
-    if (document.getElementById('gc-mobile-nav-safe-style')) return;
-    const style = document.createElement('style');
-    style.id = 'gc-mobile-nav-safe-style';
-    style.textContent = `
-      .${BACKDROP_CLASS}, .${CLOSE_CLASS}{display:none}
-      @media(max-width:${MOBILE_MAX}px){
-        :root{--gc-sidebar-mobile:min(88vw,360px)!important}
-        html[data-gc-mobile-nav-open="true"],
-        html[data-gc-mobile-nav-open="true"] body{overflow:hidden!important;overscroll-behavior:none!important}
-        .${BACKDROP_CLASS}{
-          display:block!important;position:fixed!important;inset:0!important;z-index:55!important;
-          background:rgba(3,11,20,.52)!important;opacity:0;visibility:hidden;pointer-events:none;
-          transition:opacity .18s ease,visibility .18s ease;touch-action:manipulation;
-          -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
-          -webkit-filter:none!important;filter:none!important;
-        }
-        html[data-gc-mobile-nav-open="true"] .${BACKDROP_CLASS}{opacity:1;visibility:visible;pointer-events:auto}
-        .sidebar{width:var(--gc-sidebar-mobile)!important}
-        html[data-gc-mobile-nav-open="true"] .sidebar,
-        .sidebar.open{
-          z-index:60!important;opacity:1!important;-webkit-filter:none!important;filter:none!important;
-          background:var(--navy,#111b2b)!important;mix-blend-mode:normal!important;isolation:isolate!important;
-        }
-        .sidebar #sidebar-time-clock,
-        .sidebar .gc-timeclock-mini,
-        .sidebar [data-sidebar-time-clock]{display:none!important}
-        .sidebar>.${NAV_CLASS}{
-          overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior-y:contain!important;
-          -webkit-overflow-scrolling:touch!important;scrollbar-width:none!important;padding-bottom:10px!important;
-        }
-        .sidebar>.${NAV_CLASS}::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
-        .${CLOSE_CLASS}{
-          display:grid!important;place-items:center!important;position:absolute!important;
-          top:max(10px,env(safe-area-inset-top))!important;right:10px!important;z-index:3!important;
-          width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;
-          padding:0!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:12px!important;
-          background:rgba(255,255,255,.075)!important;color:#e9f2fb!important;font-size:28px!important;
-          font-weight:400!important;line-height:1!important;cursor:pointer!important;touch-action:manipulation!important;
-          -webkit-tap-highlight-color:transparent;user-select:none;
-        }
-        .${CLOSE_CLASS}:active{background:rgba(255,255,255,.15)!important;transform:scale(.96)}
-        .mobile-menu{
-          width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;
-          display:grid!important;place-items:center!important;padding:0!important;border-radius:10px!important;
-          touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;user-select:none!important;
-        }
-        .${NAV_CLASS} a,.${NAV_CLASS} summary{-webkit-touch-callout:none;user-select:none}
-      }
-    `;
-    document.head.appendChild(style);
-  }
 
   function linkMarkup([view, icon, label]) {
     return `<a class="nav-link" href="#${view}" data-view="${view}" data-mobile-nav-item="true"><span>${icon}</span>${label}</a>`;
@@ -137,10 +84,18 @@
     panel.querySelectorAll('#sidebar-time-clock,.gc-timeclock-mini,[data-sidebar-time-clock]').forEach(node => node.remove());
   }
 
-  function guardSidebar(panel) {
-    if (!panel || sidebarGuard) return;
-    sidebarGuard = new MutationObserver(() => removeSidebarTimeClock(panel));
-    sidebarGuard.observe(panel, {childList:true, subtree:true});
+
+  function teardownDesktopArtifacts(panel = sidebar()) {
+    document.documentElement.dataset.gcMobileNavOpen = 'false';
+    document.body?.classList.remove('mobile-nav-open');
+    document.querySelectorAll(`.${BACKDROP_CLASS}`).forEach(node => node.remove());
+    if (!panel) return;
+    panel.querySelectorAll(`.${NAV_CLASS}, .${CLOSE_CLASS}`).forEach(node => node.remove());
+    panel.classList.remove('gc-mobile-nav-ready', 'open');
+    panel.removeAttribute('data-mobile-open');
+    panel.removeAttribute('aria-hidden');
+    forcePanelVisualState(panel, false);
+    syncButtons(false);
   }
 
   function ensureBackdrop() {
@@ -179,7 +134,10 @@
     if (!panel.id) panel.id = 'portal-sidebar';
 
     removeSidebarTimeClock(panel);
-    guardSidebar(panel);
+    if (!mobileQuery.matches) {
+      teardownDesktopArtifacts(panel);
+      return null;
+    }
     ensureBackdrop();
     ensureCloseButton(panel);
 
@@ -207,7 +165,11 @@
     if (!panel) return;
 
     removeSidebarTimeClock(panel);
-    const shouldOpen = Boolean(open) && mobileQuery.matches;
+    if (!mobileQuery.matches) {
+      teardownDesktopArtifacts(panel);
+      return;
+    }
+    const shouldOpen = Boolean(open);
     const backdrop = ensureBackdrop();
     ensureCloseButton(panel);
 
@@ -381,14 +343,13 @@
 
   function init() {
     document.querySelectorAll('.sidebar-backdrop').forEach(node => node.remove());
-    injectStyle();
     buildOnce();
     bind();
     setOpen(false, {restoreFocus:false});
   }
 
   window.GotCrackedMobileNav = {
-    version:'20260827-mobile-nav5',
+    version:'20260827-mobile-nav6',
     build:buildOnce,
     setOpen,
     syncActive

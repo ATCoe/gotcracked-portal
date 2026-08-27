@@ -57,7 +57,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .sidebar .profile{flex:0 0 auto;min-width:0}
 .sidebar .profile>div:nth-child(2){min-width:0}
 .sidebar .profile strong,.sidebar .profile small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gc-mobile-nav{display:none}
+.sidebar>.gc-mobile-nav{display:none!important}
+.gc-mobile-nav-backdrop,.gc-mobile-nav-close{display:none}
 
 /* The old mobile backdrop button is retired. Hide any stale cached instance so
    it can never become an invisible layer over the app. */
@@ -187,9 +188,41 @@ dialog::backdrop,#v1-intake-dialog::backdrop,#v1-po-dialog::backdrop,#portal-v1-
    PHONE
    ------------------------------------------------------------------------- */
 @media(max-width:750px){
-  :root{--gc-topbar:62px}
+  :root{--gc-topbar:62px;--gc-sidebar-mobile:min(88vw,360px)!important}
   html,body{overflow-x:hidden}
   .app-shell{display:block;min-height:100dvh}
+
+  html[data-gc-mobile-nav-open="true"],
+  html[data-gc-mobile-nav-open="true"] body{overflow:hidden!important;overscroll-behavior:none!important}
+  .gc-mobile-nav-backdrop{
+    display:block!important;position:fixed!important;inset:0!important;z-index:55!important;
+    background:rgba(3,11,20,.52)!important;opacity:0;visibility:hidden;pointer-events:none;
+    transition:opacity .18s ease,visibility .18s ease;touch-action:manipulation;
+    -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+    -webkit-filter:none!important;filter:none!important;
+  }
+  html[data-gc-mobile-nav-open="true"] .gc-mobile-nav-backdrop{opacity:1;visibility:visible;pointer-events:auto}
+  html[data-gc-mobile-nav-open="true"] .sidebar,.sidebar.open{
+    z-index:60!important;opacity:1!important;-webkit-filter:none!important;filter:none!important;
+    background:var(--navy,#111b2b)!important;mix-blend-mode:normal!important;isolation:isolate!important;
+  }
+  .sidebar #sidebar-time-clock,.sidebar .gc-timeclock-mini,.sidebar [data-sidebar-time-clock]{display:none!important}
+  .gc-mobile-nav-close{
+    display:grid!important;place-items:center!important;position:absolute!important;
+    top:max(10px,env(safe-area-inset-top))!important;right:10px!important;z-index:3!important;
+    width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;
+    padding:0!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:12px!important;
+    background:rgba(255,255,255,.075)!important;color:#e9f2fb!important;font-size:28px!important;
+    font-weight:400!important;line-height:1!important;cursor:pointer!important;touch-action:manipulation!important;
+    -webkit-tap-highlight-color:transparent;user-select:none;
+  }
+  .gc-mobile-nav-close:active{background:rgba(255,255,255,.15)!important;transform:scale(.96)}
+  .mobile-menu{
+    width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;
+    display:grid!important;place-items:center!important;padding:0!important;border-radius:10px!important;
+    touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;user-select:none!important;
+  }
+  .gc-mobile-nav a,.gc-mobile-nav summary{-webkit-touch-callout:none;user-select:none}
 
   .sidebar{
     display:flex!important;
