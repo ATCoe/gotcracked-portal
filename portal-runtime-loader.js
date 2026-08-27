@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260827-production22';
+  const VERSION = '20260827-production23';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -59,10 +59,10 @@
     schedule: ['workforce-premium.js','timesheets.js','schedule-board.js','schedule-print.js'],
     customers: ['customers-board.js'],
     reports: ['analytics.js','reconciliation-center.js'],
-    shipping: ['shipping.js'],
-    inventory: ['inventory-audit.js'],
+    shipping: ['shipping.js','shipping-integrated.js'],
+    inventory: ['inventory-command-center.js','inventory-audit.js','parts-registry.js'],
     staff: ['avatar-presets.js','staff-profiles.js','account-page.js','workforce-premium.js','timesheets.js'],
-    settings: ['business-settings.js','google-settings-integration.js','pricing-settings.js']
+    settings: ['business-settings.js','google-settings-integration.js','pricing-settings.js','procurement-settings.js','mobilesentrix-integration.js','shipping-integrated.js']
   };
 
   let started = false;
