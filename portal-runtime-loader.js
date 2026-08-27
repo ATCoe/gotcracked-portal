@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260827-production11';
+  const VERSION = '20260827-production12';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260826-sales-ops2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -28,6 +28,7 @@
     'training-store-guard.js',
     'operations-v1-arrival.js',
     'portal-v1-polish.js',
+    'intake-profile-validation-fix.js',
     'portal-mobile-audit.js',
     'portal-v1-final.js',
     'intake-modal-release.js',
