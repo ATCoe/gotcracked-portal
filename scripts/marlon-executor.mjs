@@ -119,6 +119,18 @@ async function prepare(){
   if(!ticket){ output('has_work','false'); return; }
   const runId=claim.run?.id;
   output('ticket_number',ticket.ticket_number);
+  if(claim.resume===true){
+    const meta=claim.run?.metadata||{};
+    const branch=String(meta.branch||'');
+    if(!branch||!claim.run?.commit_sha) throw new Error('Waiting deployment is missing its preserved branch or commit.');
+    git('fetch','origin',branch);
+    git('checkout','-B',branch,`origin/${branch}`);
+    const state={runId,ticketId:ticket.id,ticketNumber:ticket.ticket_number,baseSha:String(meta.base_sha||''),diagnosis:claim.run?.diagnosis||ticket.diagnosis||'',patchSummary:claim.run?.patch_summary||ticket.action_taken||'',changedPaths:Array.isArray(meta.changed_paths)?meta.changed_paths:[],verificationPlan:Array.isArray(meta.verification_plan)?meta.verification_plan:[],changeSize:String(meta.change_size||'large'),featureUpdate:meta.feature_update===true,architectureImpact:String(meta.architecture_impact||'improves'),preservedCapabilities:Array.isArray(meta.preserved_capabilities)?meta.preserved_capabilities:[],branch,commitSha:String(claim.run.commit_sha),checks:Array.isArray(meta.checks)?meta.checks:[]};
+    fs.writeFileSync(STATE,JSON.stringify(state,null,2));
+    output('has_work','true'); output('resume','true'); output('branch',branch);
+    return;
+  }
+  output('resume','false');
   if(ticket.change_level!=='high_level' && protectedTicket(ticket)){
     await report(token,runId,'blocked',{diagnosis:'This ticket touches authentication, authorization, payments, schema/deployment, or another protected surface.',error:'Protected execution requires a separately Owner-approved high-level request.'});
     output('has_work','false');
@@ -134,10 +146,16 @@ async function prepare(){
       await report(token,runId,'blocked',{diagnosis:plan.diagnosis||null,error:plan.blocker||'No deterministic safe patch was produced.',metadata:{prior_history_count:(claim.history||[]).length}});
       output('has_work','false'); return;
     }
+    const removed=Array.isArray(plan.removedCapabilities)?plan.removedCapabilities.filter(Boolean):[];
+    const impact=String(plan.architectureImpact||'neutral');
+    if(impact==='regresses'||removed.length>0||(plan.featureUpdate===true&&impact!=='improves')){
+      await report(token,runId,'blocked',{diagnosis:plan.diagnosis||null,error:'Architecture regression blocked before patching.',metadata:{architecture_impact:impact,removed_capabilities:removed,preserved_capabilities:plan.preservedCapabilities||[]}});
+      output('has_work','false'); return;
+    }
     const changed=applyPlan(ticket,candidates,plan);
     const patchSummary=plan.edits.map(e=>`${e.path}: ${e.reason||'bounded repair'}`).join('; ').slice(0,3500);
     await report(token,runId,'patching',{diagnosis:plan.diagnosis||null,patchSummary,metadata:{changed_paths:changed,prior_history_count:(claim.history||[]).length}});
-    fs.writeFileSync(STATE,JSON.stringify({runId,ticketNumber:ticket.ticket_number,baseSha:git('rev-parse','HEAD'),diagnosis:plan.diagnosis||'',patchSummary,changedPaths:changed,verificationPlan:plan.verification||[]},null,2));
+    fs.writeFileSync(STATE,JSON.stringify({runId,ticketId:ticket.id,ticketNumber:ticket.ticket_number,baseSha:git('rev-parse','HEAD'),diagnosis:plan.diagnosis||'',patchSummary,changedPaths:changed,verificationPlan:plan.verification||[],changeSize:['small','medium','large'].includes(plan.changeSize)?plan.changeSize:'small',featureUpdate:plan.featureUpdate===true,architectureImpact:String(plan.architectureImpact||'neutral'),preservedCapabilities:Array.isArray(plan.preservedCapabilities)?plan.preservedCapabilities:[]},null,2));
     output('has_work','true');
   }catch(error){
     await report(token,runId,'failed',{error:String(error?.message||error)}).catch(()=>{});
@@ -176,7 +194,7 @@ async function checks(branch){
   const apiToken=process.env.GITHUB_TOKEN;
   if(!apiToken) throw new Error('GitHub workflow token missing.');
   const sha=git('rev-parse','HEAD');
-  await report(idToken,state.runId,'testing',{commitSha:sha,metadata:{branch}});
+  await report(idToken,state.runId,'testing',{commitSha:sha,metadata:{branch,base_sha:state.baseSha,changed_paths:state.changedPaths||[],verification_plan:state.verificationPlan||[],change_size:state.changeSize||'small',feature_update:state.featureUpdate===true,architecture_impact:state.architectureImpact||'neutral',preserved_capabilities:state.preservedCapabilities||[]}});
   const workflows=['portal-ci.yml','production-guard.yml','full-source-audit.yml'];
   const startedAt=Date.now();
   for(const file of workflows) await dispatchWorkflow(file,branch,apiToken);
@@ -185,7 +203,15 @@ async function checks(branch){
   state.branch=branch;
   state.commitSha=sha;
   state.checks=results;
+  const gateResult=await post(BRIDGE,idToken,{action:'deployment_gate',ticketId:state.ticketId,commitSha:sha,changeSize:state.changeSize||'small',featureUpdate:state.featureUpdate===true});
+  state.deploymentGate=gateResult.gate||{};
   fs.writeFileSync(STATE,JSON.stringify(state,null,2));
+  if(state.deploymentGate.allowed!==true){
+    await report(idToken,state.runId,'waiting_window',{commitSha:sha,patchSummary:state.patchSummary,verification:{checks:results},metadata:{branch,base_sha:state.baseSha,changed_paths:state.changedPaths||[],verification_plan:state.verificationPlan||[],checks:results,change_size:state.changeSize||'small',feature_update:state.featureUpdate===true,architecture_impact:state.architectureImpact||'neutral',preserved_capabilities:state.preservedCapabilities||[],deployment_gate:state.deploymentGate}});
+    output('deploy_allowed','false');
+    return;
+  }
+  output('deploy_allowed','true');
 }
 
 async function verifyLive(state){

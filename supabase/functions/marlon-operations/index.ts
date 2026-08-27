@@ -101,6 +101,121 @@ async function syncTechSupport() {
   };
 }
 
+function proposalDiscordPayload(suggestion: any, decidedBy = '') {
+  const pending = suggestion.owner_review_state === 'pending';
+  const approved = suggestion.owner_review_state === 'approved';
+  const stateLabel = pending ? 'Awaiting Owner Review' : approved ? `Approved by ${decidedBy || 'Owner'}` : `Declined by ${decidedBy || 'Owner'}`;
+  const fields: any[] = [
+    { name: 'Surface', value: clean(suggestion.surface || 'portal', 80), inline: true },
+    { name: 'Complexity', value: clean(suggestion.implementation_complexity || 'medium', 80), inline: true },
+    { name: 'Status', value: stateLabel, inline: false }
+  ];
+  if (suggestion.business_value) fields.push({ name: 'Business value', value: clean(suggestion.business_value, 900), inline: false });
+  if (suggestion.user_impact) fields.push({ name: 'User impact', value: clean(suggestion.user_impact, 900), inline: false });
+  return {
+    allowed_mentions: { parse: [] },
+    embeds: [{
+      title: pending ? 'Marlon feature proposal' : approved ? 'Marlon feature proposal approved' : 'Marlon feature proposal declined',
+      description: `**${clean(suggestion.title, 180)}**\n${clean(suggestion.description, 3000)}`,
+      color: pending ? 0x159bd3 : approved ? 0x2fbf71 : 0xe5484d,
+      fields,
+      footer: { text: pending ? 'GotCracked · Owner feature review' : `GotCracked · ${stateLabel}` },
+      timestamp: new Date(suggestion.owner_review_decided_at || suggestion.owner_review_requested_at || suggestion.created_at || Date.now()).toISOString()
+    }],
+    components: [{
+      type: 1,
+      components: [{ type: 2, style: 5, label: pending ? 'Review in Portal' : 'Open Portal', url: 'https://portal.gotcracked.co/#support-tickets' }]
+    }]
+  };
+}
+
+async function openDm(userId: string) {
+  return await discord('POST', '/users/@me/channels', { recipient_id: userId });
+}
+async function notifyFeatureProposal(body: any) {
+  const suggestionId = clean(body.suggestion_id, 80);
+  if (!suggestionId) throw new Error('suggestion_id is required.');
+  const db = admin();
+  const { data: suggestion, error } = await db.from('portal_suggestions').select('*').eq('id', suggestionId).maybeSingle();
+  if (error || !suggestion) throw error || new Error('Feature proposal not found.');
+  if (suggestion.source !== 'marlon' || suggestion.owner_review_state !== 'pending') return { ok: true, skipped: true };
+
+  const { data: owners, error: ownersError } = await db.from('profiles')
+    .select('id,display_name,discord_user_id')
+    .eq('location_id', suggestion.location_id)
+    .eq('role', 'owner')
+    .eq('active', true)
+    .not('discord_user_id', 'is', null);
+  if (ownersError) throw ownersError;
+
+  let sent = 0;
+  const failures: any[] = [];
+  for (const owner of owners || []) {
+    try {
+      const existing = await db.from('marlon_feature_proposal_discord_receipts')
+        .select('dm_channel_id,message_id')
+        .eq('proposal_id', suggestion.id)
+        .eq('owner_profile_id', owner.id)
+        .maybeSingle();
+      if (existing.data?.dm_channel_id && existing.data?.message_id) {
+        await discord('PATCH', `/channels/${existing.data.dm_channel_id}/messages/${existing.data.message_id}`, proposalDiscordPayload(suggestion));
+        sent += 1;
+        continue;
+      }
+      const channel = await openDm(String(owner.discord_user_id));
+      const message = await discord('POST', `/channels/${channel.id}/messages`, proposalDiscordPayload(suggestion));
+      const { error: receiptError } = await db.from('marlon_feature_proposal_discord_receipts').upsert({
+        proposal_id: suggestion.id,
+        owner_profile_id: owner.id,
+        discord_user_id: String(owner.discord_user_id),
+        dm_channel_id: String(channel.id),
+        message_id: String(message.id),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'proposal_id,owner_profile_id' });
+      if (receiptError) throw receiptError;
+      sent += 1;
+    } catch (err) {
+      failures.push({ owner: owner.id, error: clean(err instanceof Error ? err.message : err, 500) });
+    }
+  }
+  return { ok: failures.length === 0, sent, failures };
+}
+async function updateFeatureProposalMessages(body: any) {
+  const suggestionId = clean(body.suggestion_id, 80);
+  if (!suggestionId) throw new Error('suggestion_id is required.');
+  const db = admin();
+  const { data: suggestion, error } = await db.from('portal_suggestions').select('*').eq('id', suggestionId).maybeSingle();
+  if (error || !suggestion) throw error || new Error('Feature proposal not found.');
+  if (!['approved','denied'].includes(String(suggestion.owner_review_state || ''))) return { ok: true, skipped: true };
+
+  let decidedBy = 'Owner';
+  if (suggestion.owner_review_decided_by) {
+    const decider = await db.from('profiles').select('display_name').eq('id', suggestion.owner_review_decided_by).maybeSingle();
+    if (decider.data?.display_name) decidedBy = clean(decider.data.display_name, 120);
+  }
+
+  const { data: receipts, error: receiptError } = await db.from('marlon_feature_proposal_discord_receipts')
+    .select('owner_profile_id,dm_channel_id,message_id')
+    .eq('proposal_id', suggestion.id);
+  if (receiptError) throw receiptError;
+
+  let updated = 0;
+  const failures: any[] = [];
+  for (const receipt of receipts || []) {
+    try {
+      await discord('PATCH', `/channels/${receipt.dm_channel_id}/messages/${receipt.message_id}`, proposalDiscordPayload(suggestion, decidedBy));
+      await db.from('marlon_feature_proposal_discord_receipts')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('proposal_id', suggestion.id)
+        .eq('owner_profile_id', receipt.owner_profile_id);
+      updated += 1;
+    } catch (err) {
+      failures.push({ owner: receipt.owner_profile_id, error: clean(err instanceof Error ? err.message : err, 500) });
+    }
+  }
+  return { ok: failures.length === 0, updated, decidedBy, decision: suggestion.owner_review_state, failures };
+}
+
 function localClock(timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
   const get = (type: string) => parts.find(p => p.type === type)?.value || '';
@@ -195,6 +310,8 @@ Deno.serve(async request => {
       return json({ guild: { id: guild.id, name: guild.name }, channels: channels.map(c => ({ id: c.id, name: c.name, type: c.type, parent_id: c.parent_id })) });
     }
     if (action === 'sync-tech-support') return json(await syncTechSupport());
+    if (action === 'feature-proposal-notify') return json(await notifyFeatureProposal(body));
+    if (action === 'feature-proposal-update') return json(await updateFeatureProposalMessages(body));
     if (action === 'maintenance-check') return json(await maintenanceCheck(body));
     if (action === 'maintenance-start') return json(await maintenanceStart(body));
     if (action === 'maintenance-complete') return json(await maintenanceFinish(body, false));

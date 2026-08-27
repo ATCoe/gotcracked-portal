@@ -88,6 +88,22 @@ Deno.serve(async (request: Request) => {
       return json({ ok: true, executor, ...data, history });
     }
 
+    if (action === 'deployment_gate') {
+      const ticketId = String(body.ticketId || '').trim();
+      const commitSha = String(body.commitSha || '').trim();
+      const changeSize = String(body.changeSize || 'small').trim().toLowerCase();
+      const featureUpdate = body.featureUpdate === true;
+      if (!ticketId || !commitSha) return json({ error: 'ticketId and commitSha are required.' }, 400);
+      const { data, error } = await admin.rpc('marlon_deployment_gate', {
+        p_ticket: ticketId,
+        p_commit_sha: commitSha,
+        p_change_size: changeSize,
+        p_feature_update: featureUpdate
+      });
+      if (error) throw error;
+      return json({ ok: true, gate: data });
+    }
+
     if (action === 'report') {
       const runId = String(body.runId || '').trim();
       const status = String(body.status || '').trim();
