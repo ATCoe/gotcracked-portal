@@ -17,6 +17,7 @@
   let retryTimer = null;
 
   const isTraining = () => localStorage.getItem('gc-training-store') === '1';
+  let lastTrainingMode = isTraining();
   const localInteractionLocked = () => {
     if (document.visibilityState === 'hidden') return true;
     const active = document.activeElement;
@@ -91,10 +92,55 @@
     refreshAll(reason, revision);
   }
 
+  async function disconnectRealtime(status = 'idle') {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+    const channel = realtimeChannel;
+    realtimeChannel = null;
+    realtimeStatus = status;
+    if (channel) {
+      try { await client.removeChannel(channel); }
+      catch {}
+    }
+  }
+
+  async function handleStoreModeChange() {
+    const training = isTraining();
+    if (training === lastTrainingMode) return false;
+
+    lastTrainingMode = training;
+    lastRevision = null;
+    locationId = null;
+    deferredForInteraction = false;
+    refreshQueued = false;
+
+    if (training) {
+      await disconnectRealtime('training');
+      return true;
+    }
+
+    realtimeStatus = 'reconnecting';
+    const revision = await fetchRevision();
+    if (revision !== null) lastRevision = revision;
+    if (locationId) connectRealtime();
+
+    // operations-v1-core owns Blacksburg Main's operational websocket. If the
+    // Portal originally booted in Training Store it intentionally skipped that
+    // subscription, so resume the same recovery path it uses after reconnecting.
+    setTimeout(() => window.dispatchEvent(new Event('online')), 0);
+
+    document.dispatchEvent(new CustomEvent('gc-production-sync-resumed', {
+      detail: { revision: lastRevision, locationId }
+    }));
+    return true;
+  }
+
   async function pollNow() {
-    if (pollBusy || isTraining() || document.visibilityState === 'hidden') return;
+    if (pollBusy || document.visibilityState === 'hidden') return;
     pollBusy = true;
     try {
+      const modeChanged = await handleStoreModeChange();
+      if (modeChanged || isTraining()) return;
       const revision = await fetchRevision();
       if (revision !== null) acceptRevision(revision, 'revision-poll');
       if (locationId && !realtimeChannel) connectRealtime();
@@ -162,6 +208,11 @@
     }
   });
 
+  document.addEventListener('gc-store-mode-changed', () => setTimeout(handleStoreModeChange, 0));
+  document.addEventListener('click', event => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest('[data-v1-store-switch]')) setTimeout(handleStoreModeChange, 140);
+  }, true);
   document.addEventListener('focusout', () => setTimeout(resumeDeferredRefresh, 120));
   document.addEventListener('close', () => setTimeout(resumeDeferredRefresh, 50), true);
   document.addEventListener('gc-view-changed', () => setTimeout(resumeDeferredRefresh, 50));
@@ -187,10 +238,11 @@
   setTimeout(pollNow, 100);
 
   window.GotCrackedCrossUserSync = {
-    version:'20260827-sync4',
+    version:'20260827-sync5',
     pollNow,
     refreshNow:() => refreshAll('manual', lastRevision),
-    get status(){ return { lastRevision, locationId, realtimeStatus, pollBusy, refreshBusy, deferredForInteraction }; },
+    resumeProduction:handleStoreModeChange,
+    get status(){ return { lastRevision, locationId, realtimeStatus, pollBusy, refreshBusy, deferredForInteraction, training:isTraining() }; },
     stop(){ clearInterval(interval); clearTimeout(retryTimer); if (realtimeChannel) client.removeChannel(realtimeChannel).catch(() => {}); }
   };
 })();
