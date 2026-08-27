@@ -35,6 +35,23 @@ async function easy(apiKey:string,path:string,init:RequestInit={}){
   if(!r.ok) throw new Error(clean(data?.error?.message||data?.message||`Shipping provider returned ${r.status}`,500));
   return data;
 }
+function recommendRate(rates:any[], preference='balanced', neededBy?:string|null){
+  const usable=(rates||[]).filter(r=>r?.id&&Number.isFinite(Number(r.rate))).map(r=>({...r,_days:Number.isFinite(Number(r.deliveryDays))?Number(r.deliveryDays):99,_cost:Number(r.rate||0)}));
+  if(!usable.length)return null;
+  let daysAvailable:number|null=null;
+  if(neededBy){const diff=(new Date(neededBy).getTime()-Date.now())/86400000;if(Number.isFinite(diff))daysAvailable=Math.max(1,Math.ceil(diff));}
+  const meeting=daysAvailable==null?usable:usable.filter(r=>r._days<=daysAvailable);
+  const pool=meeting.length?meeting:usable;
+  let sorted:any[];
+  if(preference==='fastest') sorted=[...pool].sort((a,b)=>a._days-b._days||a._cost-b._cost);
+  else if(preference==='lowest_cost') sorted=[...pool].sort((a,b)=>a._cost-b._cost||a._days-b._days);
+  else {
+    const practical=pool.filter(r=>r._days<=3);
+    sorted=[...(practical.length?practical:pool)].sort((a,b)=>a._cost-b._cost||a._days-b._days);
+  }
+  const choice=sorted[0];
+  return {rateId:choice.id,carrier:choice.carrier,service:choice.service,rate:Number(choice.rate||0),deliveryDays:choice.deliveryDays??null,deliveryDate:choice.deliveryDate??null,preference,neededBy:neededBy||null,meetsNeedBy:daysAvailable==null?null:choice._days<=daysAvailable,reason:preference==='fastest'?'Fastest live carrier option for this shipment.':preference==='lowest_cost'?'Lowest-cost live carrier option for this shipment.':daysAvailable!=null?'Lowest-cost practical option that best fits the repair deadline.':'Lowest-cost practical live option, favoring services with a three-day-or-better estimate.'};
+}
 
 Deno.serve(async request => {
   if(request.method==='OPTIONS') return new Response('ok',{headers:cors});
@@ -59,11 +76,11 @@ Deno.serve(async request => {
   const canShip=workflowPerm.data===true||intakePerm.data===true||profile.role==='owner'||profile.role==='manager';
   const canSettings=settingsPerm.data===true||profile.role==='owner';
 
-  const settingsResult=await admin.from('business_settings').select('location_id,shipping_provider,shipping_provider_secret_id,shipping_provider_mode,shipping_default_parcel,shipping_require_label_confirmation,shipping_return_address,default_shipping_carrier').eq('location_id',profile.location_id).maybeSingle();
+  const settingsResult=await admin.from('business_settings').select('location_id,shipping_provider,shipping_provider_secret_id,shipping_provider_mode,shipping_default_parcel,shipping_require_label_confirmation,shipping_return_address,default_shipping_carrier,device_shipping_preference').eq('location_id',profile.location_id).maybeSingle();
   if(settingsResult.error) return response({ok:false,error:settingsResult.error.message},500);
   const settings=settingsResult.data||{};
 
-  if(action==='status') return response({ok:true,status:{provider:settings.shipping_provider||'easypost',mode:settings.shipping_provider_mode||'test',hasCredentials:Boolean(settings.shipping_provider_secret_id),defaultParcel:settings.shipping_default_parcel||{length:10,width:8,height:4,weight_oz:32},confirmationRequired:settings.shipping_require_label_confirmation!==false}});
+  if(action==='status') return response({ok:true,status:{provider:settings.shipping_provider||'easypost',mode:settings.shipping_provider_mode||'test',hasCredentials:Boolean(settings.shipping_provider_secret_id),defaultParcel:settings.shipping_default_parcel||{length:10,width:8,height:4,weight_oz:32},confirmationRequired:settings.shipping_require_label_confirmation!==false,preference:settings.device_shipping_preference||'balanced'}});
 
   if(action==='configure'){
     if(!canSettings) return response({ok:false,error:'Settings management permission required.'},403);
@@ -75,13 +92,22 @@ Deno.serve(async request => {
       secretId=stored.data;
     }
     const mode=['test','production'].includes(clean(body.mode,20))?clean(body.mode,20):(settings.shipping_provider_mode||'test');
+    const preference=['balanced','lowest_cost','fastest'].includes(clean(body.preference,30))?clean(body.preference,30):(settings.device_shipping_preference||'balanced');
     const defaultParcel=parcel(body.default_parcel,settings.shipping_default_parcel||{});
-    const update=await admin.from('business_settings').update({shipping_provider:'easypost',shipping_provider_secret_id:secretId,shipping_provider_mode:mode,shipping_default_parcel:{length:defaultParcel.length,width:defaultParcel.width,height:defaultParcel.height,weight_oz:defaultParcel.weight},shipping_require_label_confirmation:true,updated_at:new Date().toISOString()}).eq('location_id',profile.location_id);
+    const update=await admin.from('business_settings').update({shipping_provider:'easypost',shipping_provider_secret_id:secretId,shipping_provider_mode:mode,shipping_default_parcel:{length:defaultParcel.length,width:defaultParcel.width,height:defaultParcel.height,weight_oz:defaultParcel.weight},shipping_require_label_confirmation:true,device_shipping_preference:preference,updated_at:new Date().toISOString()}).eq('location_id',profile.location_id);
     if(update.error) return response({ok:false,error:update.error.message},500);
-    return response({ok:true,hasCredentials:Boolean(secretId),mode,manualPurchaseConfirmation:true});
+    return response({ok:true,hasCredentials:Boolean(secretId),mode,preference,manualPurchaseConfirmation:true});
   }
 
   if(!canShip) return response({ok:false,error:'Repair workflow permission required.'},403);
+
+  if(action==='prefer'){
+    const localId=clean(body.shipment_id,80),carrier=clean(body.carrier,80),service=clean(body.service,120),rateId=clean(body.rate_id,120)||null;
+    const selected=await userClient.rpc('set_device_shipping_preference',{p_shipment_id:localId,p_carrier:carrier,p_service:service,p_rate_id:rateId,p_source:body.source==='marlon'?'marlon':'staff'});
+    if(selected.error)return response({ok:false,error:selected.error.message},400);
+    return response({ok:true,preference:selected.data,postagePurchased:false});
+  }
+
   if(!settings.shipping_provider_secret_id) return response({ok:false,error:'Connect the shipping provider in Settings before buying or rating labels.'},400);
   const secretResult=await admin.rpc('server_read_vendor_secret',{p_secret_id:settings.shipping_provider_secret_id});
   if(secretResult.error||!secretResult.data) return response({ok:false,error:'Saved shipping credential could not be read.'},500);
@@ -94,7 +120,7 @@ Deno.serve(async request => {
     const direction=clean(body.direction,20)==='inbound'?'inbound':'outbound';
     let record:any=null, customer:any=null;
     if(ticketId){
-      const result=await admin.from('repair_tickets').select('id,location_id,ticket_number,shipping_address,customers(first_name,last_name,phone,email)').eq('id',ticketId).eq('location_id',profile.location_id).maybeSingle();
+      const result=await admin.from('repair_tickets').select('id,location_id,ticket_number,shipping_address,promised_at,customers(first_name,last_name,phone,email)').eq('id',ticketId).eq('location_id',profile.location_id).maybeSingle();
       if(result.error||!result.data) return response({ok:false,error:'Repair ticket not found.'},404);
       record=result.data; customer=(result.data as any).customers;
     }else{
@@ -110,9 +136,11 @@ Deno.serve(async request => {
     const parcelValue=parcel(body.parcel,settings.shipping_default_parcel||{});
     const shipment=await easy(apiKey,'/shipments',{method:'POST',body:JSON.stringify({shipment:{to_address:toAddress,from_address:fromAddress,parcel:parcelValue,reference:ticketId?`GC-${String(record.ticket_number).padStart(6,'0')}`:`MAILIN-${record.id}`}})});
     const rates=(shipment.rates||[]).map((r:any)=>({id:r.id,carrier:r.carrier,service:r.service,rate:Number(r.rate||0),currency:r.currency||'USD',deliveryDays:r.delivery_days??null,deliveryDate:r.delivery_date??null})).sort((a:any,b:any)=>a.rate-b.rate).slice(0,30);
-    const saved=await admin.from('shipping_shipments').insert({location_id:profile.location_id,repair_ticket_id:ticketId,lead_id:leadId,direction,provider:'easypost',provider_shipment_id:shipment.id,status:'rated',from_address:fromAddress,to_address:toAddress,parcel:{length:parcelValue.length,width:parcelValue.width,height:parcelValue.height,weight_oz:parcelValue.weight},rates,created_by:user.id}).select('id').single();
+    const neededBy=clean(body.needed_by,80)||record?.promised_at||null;
+    const recommendation=recommendRate(rates,settings.device_shipping_preference||'balanced',neededBy);
+    const saved=await admin.from('shipping_shipments').insert({location_id:profile.location_id,repair_ticket_id:ticketId,lead_id:leadId,direction,provider:'easypost',provider_shipment_id:shipment.id,status:'rated',from_address:fromAddress,to_address:toAddress,parcel:{length:parcelValue.length,width:parcelValue.width,height:parcelValue.height,weight_oz:parcelValue.weight},rates,marlon_recommended_rate_id:recommendation?.rateId||null,marlon_recommendation:recommendation||{},created_by:user.id}).select('id').single();
     if(saved.error) return response({ok:false,error:saved.error.message},500);
-    return response({ok:true,shipmentId:saved.data.id,providerShipmentId:shipment.id,rates,manualPurchaseRequired:true});
+    return response({ok:true,shipmentId:saved.data.id,providerShipmentId:shipment.id,rates,recommendation,manualPurchaseRequired:true});
   }
 
   if(action==='buy'){
