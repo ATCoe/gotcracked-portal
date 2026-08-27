@@ -53,28 +53,24 @@
 
     refreshBusy = true;
     deferredForInteraction = false;
+    const snapshot = window.GotCrackedRefreshStability?.capture?.(`cross-user-${reason}`) || null;
     try {
-      const ops = window.GotCrackedOperationsV1;
-      const workOrderId = ops?.state?.currentWorkOrder?.id || null;
-      const workOrderVisible = document.getElementById('work-order')?.classList.contains('active-view');
-
+      // operations-v1-core owns the core work-order/customer/lead realtime state.
+      // Cross-user sync is now only the revision broadcaster for specialized
+      // modules. Calling ops.reload() here used to create a second full renderer
+      // and was responsible for active-view/scroll resets during server sync.
       const jobs = [];
-      if (typeof ops?.reload === 'function') jobs.push(Promise.resolve(ops.reload()));
       if (typeof window.GotCrackedStaffProfiles?.load === 'function') jobs.push(Promise.resolve(window.GotCrackedStaffProfiles.load()));
       if (jobs.length) await Promise.allSettled(jobs);
 
       window.GotCrackedDirectory?.requestRefresh?.(`cross-user-${reason}`);
 
-      // Specialized command centers refresh only after the shared operational
-      // state has settled. This prevents old and new renderers racing each other.
       document.dispatchEvent(new CustomEvent('gc-cross-user-sync', {
         detail: { reason, revision, locationId }
       }));
 
-      if (workOrderVisible && workOrderId && typeof ops?.openWorkOrder === 'function') {
-        ops.openWorkOrder(workOrderId);
-      }
       window.GotCrackedRuntimeStability?.syncOverlays?.();
+      window.GotCrackedRefreshStability?.restore?.(snapshot);
     } finally {
       refreshBusy = false;
       if (refreshQueued && !interactionLocked()) {
@@ -191,7 +187,7 @@
   setTimeout(pollNow, 100);
 
   window.GotCrackedCrossUserSync = {
-    version:'20260827-sync3',
+    version:'20260827-sync4',
     pollNow,
     refreshNow:() => refreshAll('manual', lastRevision),
     get status(){ return { lastRevision, locationId, realtimeStatus, pollBusy, refreshBusy, deferredForInteraction }; },
