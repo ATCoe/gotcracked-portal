@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260827-production26';
+  const VERSION = '20260827-production27';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -33,7 +33,8 @@
     'sales-ops.js',
     'marlon-reporting-bridge.js',
     'dashboard-rail.js',
-    'reporting-bookkeeper.js'
+    'reporting-bookkeeper.js',
+    'reporting-capacity-enhancements.js'
   ];
 
   const deferredScripts = [
@@ -58,11 +59,11 @@
     appointments: ['appointments-board.js','appointments-owner-guard.js'],
     schedule: ['schedule-board.js','schedule-print.js'],
     customers: ['customers-board.js'],
-    reports: ['analytics.js','reconciliation-center.js','reporting-bookkeeper.js'],
+    reports: ['analytics.js','reconciliation-center.js','reporting-bookkeeper.js','reporting-capacity-enhancements.js'],
     shipping: ['shipping.js','shipping-integrated.js','shipping-marlon-support.js'],
     inventory: ['inventory-command-center.js','inventory-audit.js','parts-registry.js','shipping-marlon-support.js'],
     staff: ['avatar-presets.js','staff-profiles.js','account-page.js','workforce-premium.js','timesheets.js'],
-    settings: ['business-settings.js','google-settings-integration.js','pricing-settings.js','procurement-settings.js','mobilesentrix-integration.js','shipping-integrated.js','shipping-marlon-support.js']
+    settings: ['business-settings.js','google-settings-integration.js','pricing-settings.js','procurement-settings.js','mobilesentrix-integration.js','shipping-integrated.js','shipping-marlon-support.js','reporting-capacity-enhancements.js']
   };
 
   let started = false;
@@ -155,6 +156,7 @@
     if(trainingResyncWired)return;
     const ready=captureTrainingSyncReady();
     if(!ready)return;
+    trainingSyncReady=ready;
     trainingResyncWired=true;
     ready.then(()=>{
       if(!isTraining())return;
