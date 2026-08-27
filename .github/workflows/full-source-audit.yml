@@ -90,6 +90,51 @@ jobs:
               raise SystemExit(f'Production source audit found {len(violations)} issue(s).')
           print('No debug statements or stale intake fallback found.')
 
+      - name: Security-sensitive browser API and secret audit
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          violations = []
+          js = sorted(Path('.').glob('*.js'))
+          source_files = js + [Path('index.html'), Path('schedule-print.html')]
+          dangerous = [
+              (r'(?<![\w.])eval\s*\(', 'eval()'),
+              (r'\bnew\s+Function\s*\(', 'new Function()'),
+              (r'\bdocument\.write(?:ln)?\s*\(', 'document.write()'),
+              (r'\bset(?:Timeout|Interval)\s*\(\s*["\']', 'string-evaluated timer'),
+              (r'javascript\s*:', 'javascript: URL')
+          ]
+          secret_patterns = [
+              (r'\bsb_secret_[A-Za-z0-9_-]+', 'Supabase secret key'),
+              (r'\bservice_role\b\s*[:=]\s*["\'][^"\']+["\']', 'Supabase service-role credential'),
+              (r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----', 'private key'),
+              (r'\b(?:sk_live|rk_live)_[A-Za-z0-9_-]{12,}', 'live payment secret')
+          ]
+
+          for path in source_files:
+              text = path.read_text(encoding='utf-8', errors='replace')
+              for pattern, label in dangerous + secret_patterns:
+                  for match in re.finditer(pattern, text, re.I):
+                      line = text.count('\n', 0, match.start()) + 1
+                      violations.append(f'{path}:{line}: {label}')
+
+          if violations:
+              print('\n'.join(violations))
+              raise SystemExit(f'Security-sensitive source audit found {len(violations)} blocking issue(s).')
+          print('No executable-string APIs or private/server credentials found in frontend source.')
+
+          print('\nDynamic HTML sink locations for manual review:')
+          sink_count = 0
+          for path in js:
+              lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
+              for i, line in enumerate(lines, 1):
+                  if re.search(r'\.(?:innerHTML|outerHTML)\s*=|insertAdjacentHTML\s*\(', line):
+                      sink_count += 1
+                      print(f'{path}:{i}: {line.strip()[:240]}')
+          print(f'Dynamic HTML sink lines: {sink_count}')
+
       - name: Report source risk markers
         if: always()
         shell: python
