@@ -1,0 +1,33 @@
+name: Customer Command Center Guard
+
+on:
+  pull_request:
+    paths:
+      - 'customers-board.js'
+      - 'portal-runtime-loader.js'
+      - 'supabase/migrations/0041_customer_command_center.sql'
+      - '.github/workflows/customer-command-center-guard.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'customers-board.js'
+      - 'portal-runtime-loader.js'
+      - 'supabase/migrations/0041_customer_command_center.sql'
+      - '.github/workflows/customer-command-center-guard.yml'
+
+jobs:
+  verify-customers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify customer command center integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s customers-board.js
+          grep -q "customers-board.js" portal-runtime-loader.js
+          grep -q "customers: \['customers-board.js'\]" portal-runtime-loader.js
+          grep -q "get_customer_command_center" supabase/migrations/0041_customer_command_center.sql
+          grep -q "save_customer_profile" supabase/migrations/0041_customer_command_center.sql
+          grep -q "customers.view" supabase/migrations/0041_customer_command_center.sql
+          echo "Customer command center integration guard passed."

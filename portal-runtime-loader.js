@@ -1,9 +1,11 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-production6';
+  const VERSION = '20260827-production7';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260826-sales-ops2';
+  const APPOINTMENTS_VERSION = '20260827-production7';
+  const CUSTOMERS_VERSION = '20260827-production1';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
@@ -48,7 +50,9 @@
 
   const viewDependencies = {
     leads: ['leads.js'],
+    appointments: ['appointments-board.js'],
     schedule: ['schedule-board.js','schedule-print.js'],
+    customers: ['customers-board.js'],
     reports: ['analytics.js'],
     shipping: ['shipping.js'],
     inventory: ['inventory-audit.js'],
@@ -69,7 +73,9 @@
   function srcFor(file) {
     const versions = {
       'account-page.js': ACCOUNT_PAGE_VERSION,
-      'sales-ops.js': SALES_OPS_VERSION
+      'sales-ops.js': SALES_OPS_VERSION,
+      'appointments-board.js': APPOINTMENTS_VERSION,
+      'customers-board.js': CUSTOMERS_VERSION
     };
     return `${file}?v=${versions[file] || VERSION}`;
   }
