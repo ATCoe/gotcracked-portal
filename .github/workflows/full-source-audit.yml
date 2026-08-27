@@ -1,0 +1,187 @@
+name: Full Portal Source Audit
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check every Portal JavaScript file
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=0
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+            count=$((count+1))
+          done < <(find . -maxdepth 1 -type f -name '*.js' -print0 | sort -z)
+          echo "JavaScript files checked: $count"
+
+      - name: Audit stylesheets and page references
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          css = sorted(Path('.').glob('*.css'))
+          if not css:
+              raise SystemExit('No Portal CSS files found.')
+          for path in css:
+              text = path.read_text(encoding='utf-8')
+              if text.count('{') != text.count('}'):
+                  raise SystemExit(f'Unbalanced CSS braces: {path}')
+              if 'javascript:' in text.lower():
+                  raise SystemExit(f'javascript: URL found in CSS: {path}')
+          print(f'CSS files checked: {len(css)}')
+
+          for page in ['index.html', 'schedule-print.html']:
+              html = Path(page).read_text(encoding='utf-8')
+              refs = re.findall(r'(?:src|href)=["\']([^"\']+)["\']', html)
+              missing = []
+              for ref in refs:
+                  clean = ref.split('?',1)[0].split('#',1)[0]
+                  if not clean or clean.startswith(('http://','https://','mailto:','tel:','#')):
+                      continue
+                  if not Path(clean).exists():
+                      missing.append(clean)
+              if missing:
+                  raise SystemExit(f'Missing local references in {page}: {sorted(set(missing))}')
+
+      - name: Reject production debug statements and stale intake fallback
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          js = sorted(Path('.').glob('*.js'))
+          violations = []
+          for path in js:
+              text = path.read_text(encoding='utf-8')
+              for i, line in enumerate(text.splitlines(), 1):
+                  if re.search(r'\bdebugger\s*;', line):
+                      violations.append(f'{path}:{i}: debugger statement')
+                  if re.search(r'console\.(log|debug|trace|info)\s*\(', line):
+                      violations.append(f'{path}:{i}: production debug console -> {line.strip()[:180]}')
+
+          html = Path('index.html').read_text(encoding='utf-8')
+          app = Path('app.js').read_text(encoding='utf-8')
+          ci = Path('.github/workflows/portal-ci.yml').read_text(encoding='utf-8')
+
+          if 'id="new-ticket"' in html:
+              violations.append('index.html: legacy #new-ticket fallback remains in production shell')
+          if 'ticketModal?.showModal()' in app:
+              violations.append('app.js: New Repair can fall back to legacy weak intake instead of failing closed')
+          if 'Walk-in intake must require only customer name and phone.' in ci:
+              violations.append('portal-ci.yml: stale pre-v1.1 intake policy assertion remains')
+
+          if violations:
+              print('\n'.join(violations))
+              raise SystemExit(f'Production source audit found {len(violations)} issue(s).')
+          print('No debug statements or stale intake fallback found.')
+
+      - name: Security-sensitive browser API and secret audit
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          violations = []
+          reviewed_print_writers = []
+          js = sorted(Path('.').glob('*.js'))
+          source_files = js + [Path('index.html'), Path('schedule-print.html')]
+          dangerous = [
+              (r'(?<![\w.])eval\s*\(', 'eval()'),
+              (r'\bnew\s+Function\s*\(', 'new Function()'),
+              (r'\bdocument\.write(?:ln)?\s*\(', 'document.write()'),
+              (r'\bset(?:Timeout|Interval)\s*\(\s*["\']', 'string-evaluated timer'),
+              (r'javascript\s*:', 'javascript: URL')
+          ]
+          secret_patterns = [
+              (r'\bsb_secret_[A-Za-z0-9_-]+', 'Supabase secret key'),
+              (r'\bservice_role\b\s*[:=]\s*["\'][^"\']+["\']', 'Supabase service-role credential'),
+              (r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----', 'private key'),
+              (r'\b(?:sk_live|rk_live)_[A-Za-z0-9_-]{12,}', 'live payment secret')
+          ]
+
+          def is_reviewed_print_writer(path, line_text):
+              name = path.name
+              if name == 'checkout-receipts.js':
+                  return 'printWindow.document.write(printableReceiptHtml(receipt))' in line_text
+              if name in {'operations-v1-core.js', 'portal-live.js'}:
+                  return 'popup.document.write(`<!doctype html>' in line_text
+              return False
+
+          for path in source_files:
+              text = path.read_text(encoding='utf-8', errors='replace')
+              lines = text.splitlines()
+              for pattern, label in dangerous + secret_patterns:
+                  for match in re.finditer(pattern, text, re.I):
+                      line = text.count('\n', 0, match.start()) + 1
+                      line_text = lines[line - 1] if 0 < line <= len(lines) else ''
+                      if label == 'document.write()' and is_reviewed_print_writer(path, line_text):
+                          reviewed_print_writers.append(f'{path}:{line}')
+                          continue
+                      violations.append(f'{path}:{line}: {label}')
+
+          if violations:
+              print('\n'.join(violations))
+              raise SystemExit(f'Security-sensitive source audit found {len(violations)} blocking issue(s).')
+          print('No executable-string APIs or private/server credentials found in frontend source.')
+          print('Reviewed print-only document writers: ' + ', '.join(reviewed_print_writers))
+          if len(reviewed_print_writers) != 3:
+              raise SystemExit(f'Expected exactly 3 reviewed print-only document writers; found {len(reviewed_print_writers)}.')
+
+          print('\nDynamic HTML sink locations for manual review:')
+          sink_count = 0
+          for path in js:
+              lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
+              for i, line in enumerate(lines, 1):
+                  if re.search(r'\.(?:innerHTML|outerHTML)\s*=|insertAdjacentHTML\s*\(', line):
+                      sink_count += 1
+                      print(f'{path}:{i}: {line.strip()[:240]}')
+          print(f'Dynamic HTML sink lines: {sink_count}')
+
+      - name: Report source risk markers
+        if: always()
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          roots = [*Path('.').glob('*.js'), *Path('.').glob('*.css'), Path('index.html')]
+          markers = {'TODO':0,'FIXME':0,'TEMP':0,'LEGACY':0,'!important':0,'innerHTML':0,'console.error':0,'console.warn':0}
+          for path in roots:
+              text = path.read_text(encoding='utf-8', errors='replace')
+              for key in markers:
+                  markers[key] += len(re.findall(re.escape(key), text, re.I if key in {'TODO','FIXME','TEMP','LEGACY'} else 0))
+          for key, value in markers.items():
+              print(f'{key}: {value}')
+
+          print('\nConsole warning/error locations:')
+          for path in sorted(Path('.').glob('*.js')):
+              for i, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
+                  if re.search(r'console\.(warn|error)\s*\(', line):
+                      print(f'{path}:{i}: {line.strip()[:220]}')
+
+          print('\nLegacy/TODO/FIXME locations:')
+          for path in roots:
+              for i, line in enumerate(path.read_text(encoding='utf-8', errors='replace').splitlines(), 1):
+                  if re.search(r'\b(TODO|FIXME|legacy)\b', line, re.I):
+                      print(f'{path}:{i}: {line.strip()[:220]}')
+
+          print('\n!important by stylesheet:')
+          for path in sorted(Path('.').glob('*.css')):
+              count = path.read_text(encoding='utf-8').count('!important')
+              if count:
+                  print(f'{path}: {count}')

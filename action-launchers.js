@@ -162,9 +162,6 @@
     const current = document.getElementById('v1-intake-dialog');
     if (current?.open) return;
 
-    const legacy = document.getElementById('new-ticket');
-    if (legacy?.open) legacy.close();
-
     try {
       ops.openIntake();
       requestAnimationFrame(() => {
@@ -217,8 +214,8 @@
   }
 
   /* Own coarse/mobile activation at window capture on pointerdown. This fires
-     before document-level legacy handlers and before Android can cancel the
-     later synthesized click because a runtime render replaced the touched DOM. */
+     before document-level compatibility handlers and before Android can cancel
+     the later synthesized click because a runtime render replaced the touched DOM. */
   window.addEventListener('pointerdown', event => {
     handlePointerAction(event);
   }, true);

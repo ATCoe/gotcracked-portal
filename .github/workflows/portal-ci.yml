@@ -51,7 +51,7 @@ jobs:
               if missing:
                   raise SystemExit(f'Missing local references in {page}: ' + ', '.join(sorted(set(missing))))
 
-      - name: Portal 1.0 architecture invariants
+      - name: Portal v1.1 architecture invariants
         shell: python
         run: |
           from pathlib import Path
@@ -64,6 +64,7 @@ jobs:
           final_js = Path('portal-v1-final.js').read_text(encoding='utf-8')
           runtime = Path('portal-runtime-loader.js').read_text(encoding='utf-8')
           operations = Path('operations-v1-core.js').read_text(encoding='utf-8')
+          intake_profile = Path('intake-profile-validation-fix.js').read_text(encoding='utf-8')
           directory = Path('master-directory.js').read_text(encoding='utf-8')
           sales = Path('sales-ops.js').read_text(encoding='utf-8')
           sales_css = Path('sales-ops.css').read_text(encoding='utf-8')
@@ -149,12 +150,14 @@ jobs:
           required_runtime = [
               'leads.js','portal-live.js','analytics.js','shipping.js','inventory-audit.js',
               'operations-v1-core.js','training-store-guard.js','operations-v1-arrival.js',
-              'portal-v1-polish.js','portal-v1-final.js','master-directory.js',
+              'portal-v1-polish.js','intake-profile-validation-fix.js','portal-v1-final.js','master-directory.js',
               'time-clock.js','schedule-board.js','schedule-print.js'
           ]
           for name in required_runtime:
               if name not in runtime:
                   raise SystemExit(f'Authenticated runtime loader missing: {name}')
+          if runtime.find('operations-v1-core.js') > runtime.find('intake-profile-validation-fix.js'):
+              raise SystemExit('Portal v1.1 profile validation must load after operations-v1-core.js.')
           if "schedule: ['schedule-board.js','schedule-print.js']" not in runtime:
               raise SystemExit('Schedule and its print action must remain view-scoped.')
           if 'workforce.js' in runtime:
@@ -188,8 +191,19 @@ jobs:
               raise SystemExit('Realtime subscription must authenticate before channel join.')
           if 'setInterval' not in operations or 'visibilitychange' not in operations:
               raise SystemExit('Realtime must retain an authoritative refresh fallback.')
-          if 'first_name?.trim()&&x.newCustomer.phone?.trim()' not in operations:
-              raise SystemExit('Walk-in intake must require only customer name and phone.')
+
+          required_profile_fields = ['first_name','last_name','phone','address_line_1','city','state','postal_code']
+          for field in required_profile_fields:
+              if f"'{field}'" not in intake_profile:
+                  raise SystemExit(f'Portal v1.1 intake profile guard missing required field: {field}')
+          for optional in ['contact_phone','email']:
+              if f"'{optional}'" not in intake_profile:
+                  raise SystemExit(f'Portal v1.1 intake profile guard missing optional field declaration: {optional}')
+          if 'First name, last name, primary phone, and full mailing address are required.' not in intake_profile:
+              raise SystemExit('Portal v1.1 required-profile policy copy is missing.')
+          if 'event.stopImmediatePropagation()' not in intake_profile:
+              raise SystemExit('Portal v1.1 intake validation must block the legacy step handler when required data is incomplete.')
+
           for status_class in ['status-red','status-yellow','status-green','status-blue']:
               if status_class not in directory:
                   raise SystemExit(f'Master Directory status mapping missing {status_class}.')
@@ -217,4 +231,4 @@ jobs:
           if 'window.print()' not in schedule_print_page or 'schedule-print-table' not in schedule_print_page:
               raise SystemExit('Dedicated printable schedule rendering is incomplete.')
 
-          print('Portal 1.0 architecture checks passed.')
+          print('Portal v1.1 architecture checks passed.')

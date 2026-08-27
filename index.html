@@ -127,7 +127,6 @@
       </main>
     </div>
 
-    <dialog id="new-ticket"><form method="dialog" id="ticket-form"><div class="modal-head"><div><p class="eyebrow">New intake</p><h2>Create repair ticket</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><div class="form-grid"><label>Customer name<input required name="customer" placeholder="e.g. Taylor Morgan" /></label><label>Phone number<input required name="phone" placeholder="(555) 555-5555" /></label><label>Email<input name="email" type="email" placeholder="customer@example.com" /></label><label>Device<input required name="device" placeholder="e.g. iPhone 15 Pro" /></label><label>Repair type<select name="service"><option>Screen repair</option><option>Battery replacement</option><option>Diagnosis</option><option>Charging issue</option><option>Other repair</option></select></label><label>Intake method<select name="intake_method"><option value="walk_in">Walk-in / local</option><option value="mail_in">Mail-in repair</option></select></label><label>Initial shipping status<select name="shipping_status"><option value="not_applicable">Not applicable</option><option value="awaiting_inbound">Awaiting inbound package</option><option value="inbound_in_transit">Inbound in transit</option><option value="received">Received at shop</option></select></label><label class="full">Return shipping address<input name="shipping_address" placeholder="Street, unit, city, state, ZIP (mail-in only)"></label><label class="full">Customer-reported issue<textarea name="issue" placeholder="What is happening with the device?"></textarea></label></div><div class="modal-actions"><button value="cancel" class="secondary-button">Cancel</button><button class="primary-button" value="default">Create ticket</button></div></form></dialog>
     <dialog id="ticket-detail"><div id="ticket-detail-content"></div></dialog>
     <dialog id="operation-dialog"><form id="operation-form"><div id="operation-dialog-content"></div></form></dialog>
     <dialog id="inventory-audit-dialog"><div id="inventory-audit-content"></div></dialog>
@@ -137,8 +136,8 @@
     <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script defer src="supabase.js?v=20260826-release34"></script>
     <script defer src="discord-integration.js?v=20260826-release35"></script>
-    <script defer src="workflow.js?v=20260826-release34"></script>
-    <script defer src="app.js?v=20260826-release34"></script>
+    <script defer src="workflow.js?v=20260827-source-audit1"></script>
+    <script defer src="app.js?v=20260827-source-audit1"></script>
     <script defer src="mobile-nav-safe.js?v=20260826-release34"></script>
     <script defer src="portal-runtime-loader.js?v=20260826-loader2"></script>
   </body>
