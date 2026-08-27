@@ -43,7 +43,7 @@
   }
 
   async function loadMarlon() {
-    const version = '20260827-marlon12';
+    const version = '20260827-marlon13';
     loadStyle(`marlon-assistant.css?v=${version}`, 'gcMarlonStyle');
     loadStyle(`marlon-extensions.css?v=${version}`, 'gcMarlonExtensions');
     await loadScript(`marlon-config.js?v=${version}`, 'gcMarlonConfig');
@@ -52,6 +52,8 @@
     await loadScript(`staff-badges-v2.js?v=${version}`, 'gcStaffBadges');
     await loadScript(`marlon-releases.js?v=${version}`, 'gcMarlonReleases');
     await loadScript(`marlon-monitor.js?v=${version}`, 'gcMarlonMonitor');
+    await loadScript(`parts-registry.js?v=${version}`, 'gcPartsRegistry');
+    await loadScript(`pc-build-policy-settings.js?v=${version}`, 'gcPcBuildPolicy');
     const profile = window.GotCrackedRuntimeProfile || window.GotCrackedOperationsV1?.state?.profile || null;
     if (profile) window.dispatchEvent(new CustomEvent('gotcracked:staff-ready', { detail:profile }));
   }
