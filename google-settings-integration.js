@@ -17,6 +17,16 @@
     return result.data || {};
   }
 
+  function googleAuthorizationUrl(value) {
+    try {
+      const url = new URL(String(value || ''));
+      if (url.protocol !== 'https:' || url.hostname !== 'accounts.google.com') return '';
+      return url.toString();
+    } catch {
+      return '';
+    }
+  }
+
   function style() {
     if (document.getElementById('gc-google-live-style')) return;
     const node=document.createElement('style'); node.id='gc-google-live-style'; node.textContent=`
@@ -67,7 +77,21 @@
     rerender();
   }
 
-  async function start(){ if(busy)return; busy=true; rerender(); try{const data=await invoke('start'); if(data.authUrl) location.href=data.authUrl;}catch(error){document.querySelector('[data-google-message]')?.replaceChildren(document.createTextNode(error.message)); busy=false;rerender();}}
+  async function start(){
+    if(busy)return;
+    busy=true;
+    rerender();
+    try{
+      const data=await invoke('start');
+      const authUrl=googleAuthorizationUrl(data.authUrl);
+      if(!authUrl) throw new Error('Google returned an invalid authorization URL.');
+      location.assign(authUrl);
+    }catch(error){
+      document.querySelector('[data-google-message]')?.replaceChildren(document.createTextNode(error.message));
+      busy=false;
+      rerender();
+    }
+  }
   async function refresh(){if(busy)return;busy=true;rerender();try{metrics=await invoke('metrics');status=await invoke('status');}catch(error){metrics={connected:true,analytics:{error:error.message}};}finally{busy=false;rerender();}}
   async function disconnect(){if(busy||!confirm('Disconnect the Portal from this Google account?'))return;busy=true;rerender();try{await invoke('disconnect');status=await invoke('status');metrics=null;}finally{busy=false;rerender();}}
 
