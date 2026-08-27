@@ -105,6 +105,19 @@
     if (view) activate(view);
   }
 
+  function loadKnowledgeBase() {
+    if (window.GotCrackedKnowledgeBase || document.querySelector('script[data-gc-knowledge-base-runtime]')) return;
+    const script = document.createElement('script');
+    script.src = 'knowledge-base.js?v=20260827-kb1';
+    script.async = false;
+    script.dataset.gcKnowledgeBaseRuntime = '20260827-kb1';
+    script.addEventListener('error', () => {
+      console.error('Knowledge Base runtime failed to load.');
+      window.GotCrackedDiagnostics?.error?.(new Error('Knowledge Base runtime failed to load.'), { context: 'Knowledge Base' });
+    }, { once: true });
+    document.body.appendChild(script);
+  }
+
   document.addEventListener('click', event => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
@@ -151,9 +164,11 @@
   window.addEventListener('pageshow', scheduleDecorate);
   document.addEventListener('gc-view-changed', scheduleDecorate);
   document.addEventListener('gc-portal-runtime-ready', scheduleDecorate);
+  document.addEventListener('gc-portal-runtime-ready', loadKnowledgeBase, { once: true });
   window.addEventListener('load', scheduleDecorate, { once: true });
 
   syncLeadDrawerState();
+  loadKnowledgeBase();
   setTimeout(scheduleDecorate, 0);
   setTimeout(scheduleDecorate, 1200);
 })();
