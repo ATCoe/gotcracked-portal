@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const allowedOrigins = new Set(['https://gotcracked.co', 'https://www.gotcracked.co']);
+const PLANNED_OPENING_DATE = '2026-10-01';
 const headers = (origin: string | null) => ({
   'Access-Control-Allow-Origin': allowedOrigins.has(origin || '') ? origin! : 'https://gotcracked.co',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -65,7 +66,7 @@ async function sendConfirmationEmail(data: Record<string, any>) {
   const mailIn = data.intake_method === 'mail_in';
   const subject = mailIn ? `GotCracked mail-in request ${data.public_reference}` : `GotCracked repair request ${data.public_reference}`;
   const schedule = [data.preferred_date, data.preferred_time].filter(Boolean).join(' · ');
-  const html = `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#111827;background:#f6f8fb;padding:24px"><div style="max-width:680px;margin:auto;background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:28px"><h1 style="margin:0;color:#0a2342">GotCracked</h1><p style="color:#4b5563">Repair request ${esc(data.public_reference)}</p><p>Hi ${esc(data.first_name)},</p><p>We received your ${mailIn ? 'mail-in repair request' : 'repair request'}. This confirms receipt of the request; it is not a final repair estimate or appointment confirmation.</p><div style="background:#f3f6fa;border-radius:10px;padding:16px;margin:20px 0"><strong>${esc(data.device_type)} · ${esc(data.device_model)}</strong><p style="margin:8px 0 0">${esc(data.issue)}</p>${schedule ? `<p style="margin:8px 0 0"><strong>Requested time:</strong> ${esc(schedule)}</p>` : ''}${data.timing_note ? `<p style="margin:8px 0 0"><strong>Timing note:</strong> ${esc(data.timing_note)}</p>` : ''}<p style="margin:8px 0 0"><strong>Preferred contact:</strong> ${esc(data.preferred_contact)}</p></div>${mailIn ? '<p><strong>Do not ship your device yet.</strong> We will review the request and contact you before you send it.</p>' : '<p>We will review the request and contact you to confirm timing, availability, and next steps.</p>'}<p style="color:#4b5563">Keep request number <strong>${esc(data.public_reference)}</strong> with your records.</p><p style="color:#4b5563">GotCracked · 700 North Main St, Ste D · Blacksburg, VA 24060</p></div></body></html>`;
+  const html = `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#111827;background:#f6f8fb;padding:24px"><div style="max-width:680px;margin:auto;background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:28px"><h1 style="margin:0;color:#0a2342">GotCracked</h1><p style="color:#4b5563">Repair request ${esc(data.public_reference)}</p><p>Hi ${esc(data.first_name)},</p><p>We received your ${mailIn ? 'mail-in repair request' : 'repair request'}. This confirms receipt of the request; it is not a final repair estimate or appointment confirmation.</p><div style="background:#f3f6fa;border-radius:10px;padding:16px;margin:20px 0"><strong>${esc(data.device_type)} · ${esc(data.device_model)}</strong><p style="margin:8px 0 0">${esc(data.issue)}</p>${schedule ? `<p style="margin:8px 0 0"><strong>Requested time:</strong> ${esc(schedule)}</p>` : ''}${data.timing_note ? `<p style="margin:8px 0 0"><strong>Timing note:</strong> ${esc(data.timing_note)}</p>` : ''}${data.capacity_message ? `<p style="margin:8px 0 0"><strong>Current service timing:</strong> ${esc(data.capacity_message)}</p>` : ''}<p style="margin:8px 0 0"><strong>Preferred contact:</strong> ${esc(data.preferred_contact)}</p></div>${mailIn ? '<p><strong>Do not ship your device yet.</strong> We will review the request and contact you before you send it.</p>' : '<p>We will review the request and contact you to confirm timing, availability, and next steps.</p>'}<p style="color:#4b5563">Keep request number <strong>${esc(data.public_reference)}</strong> with your records.</p><p style="color:#4b5563">GotCracked · 700 North Main St, Ste D · Blacksburg, VA 24060</p></div></body></html>`;
   const response = await fetch('https://api.resend.com/emails', {
     method:'POST',
     headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},
@@ -154,7 +155,7 @@ Deno.serve(async request => {
 
     const locationId = Deno.env.get('DEFAULT_LOCATION_ID')!;
     if (!locationId) throw new Error('DEFAULT_LOCATION_ID is not configured.');
-    const settingsResult = await admin.from('business_settings').select('store_hours,store_timezone,accepts_mail_in_repairs').eq('location_id',locationId).maybeSingle();
+    const settingsResult = await admin.from('business_settings').select('store_hours,store_timezone,accepts_mail_in_repairs,public_booking_intelligence_mode,marlon_public_booking_auto_enable').eq('location_id',locationId).maybeSingle();
     if (settingsResult.error) throw settingsResult.error;
     const settings = settingsResult.data || {};
 
@@ -166,10 +167,28 @@ Deno.serve(async request => {
       const timezone = clean(settings.store_timezone, 80) || 'America/New_York';
       const today = localDateISO(timezone);
       if (preferredDate < today) return json(origin, { error:'Choose today or a future appointment date.' }, 400);
+      if (preferredDate < PLANNED_OPENING_DATE) return json(origin, { error:'GotCracked is not open yet. Please choose October 1, 2026 or a later appointment date.' }, 409);
       const hours = settings.store_hours && typeof settings.store_hours === 'object' ? settings.store_hours : DEFAULT_HOURS;
       const storeRange = (hours as Record<string, unknown>)[weekdayKey(preferredDate)];
       if (!overlaps(storeRange, WINDOWS[preferredTime])) {
         return json(origin, { error:'That appointment window is outside current store hours. Choose another date or time.' }, 409);
+      }
+    }
+
+    let partMapping: Record<string, any> = { matched:false, verified:false, parts_available:false };
+    let bookingRecommendation: Record<string, any> | null = null;
+    if (intakeMethod === 'walk_in') {
+      try {
+        const matchResult = await admin.rpc('match_public_repair_part_rules', { p_location_id:locationId, p_device_type:deviceType, p_model:model, p_service:issue });
+        if (!matchResult.error && matchResult.data) partMapping = matchResult.data;
+        const recommendationResult = await admin.rpc('evaluate_public_repair_booking_for_location', {
+          p_location_id:locationId, p_device_category:deviceType, p_manufacturer:null, p_model:model, p_service:issue,
+          p_parts_available:partMapping.verified === true && partMapping.parts_available === true, p_requested_date:preferredDate
+        });
+        if (!recommendationResult.error && recommendationResult.data) bookingRecommendation = recommendationResult.data;
+        else if (recommendationResult.error) console.error('Booking shadow recommendation unavailable:', recommendationResult.error.message);
+      } catch (error) {
+        console.error('Booking shadow intelligence failed open:', error);
       }
     }
 
@@ -200,22 +219,35 @@ Deno.serve(async request => {
       if (leadLink.error) throw leadLink.error;
     }
 
-    const alertRecord = { ...leadResult.data, appointment_id:appointmentId, customer_issue: issue, preferred_contact: preferredContact, timing_note: timingNote || null };
+    let bookingMode = clean(settings.public_booking_intelligence_mode, 20) || 'shadow';
+    if (intakeMethod === 'walk_in' && bookingRecommendation) {
+      try {
+        const evaluation = await admin.rpc('record_public_booking_shadow_evaluation', {
+          p_location_id:locationId,p_lead_id:leadResult.data.id,p_appointment_id:appointmentId,p_requested_date:preferredDate,
+          p_device_type:deviceType,p_device_model:model,p_service:issue,p_part_mapping:partMapping,p_recommendation:bookingRecommendation
+        });
+        if (!evaluation.error && evaluation.data?.current_mode) bookingMode = clean(evaluation.data.current_mode,20) || bookingMode;
+        else if (evaluation.error) console.error('Booking shadow evaluation was not recorded:', evaluation.error.message);
+      } catch (error) { console.error('Booking shadow evaluation failed open:', error); }
+    }
+    const customerTimingGuidance = bookingMode === 'active' && bookingRecommendation ? clean(bookingRecommendation.customer_message, 500) : '';
+
+    const alertRecord = { ...leadResult.data, appointment_id:appointmentId, customer_issue: issue, preferred_contact:preferredContact, timing_note:timingNote || null };
     let discordDelivered = false;
     try { discordDelivered = await sendDiscordAlert(alertRecord); } catch (error) { console.error(error); }
     let emailDelivered = false;
-    try { emailDelivered = await sendConfirmationEmail({ public_reference:reference, first_name:firstName, email, intake_method:intakeMethod, device_type:deviceType, device_model:model, issue, preferred_date:leadRecord.preferred_date, preferred_time:leadRecord.preferred_time, preferred_contact:preferredContact, timing_note:timingNote }); } catch (error) { console.error(error); }
+    try { emailDelivered = await sendConfirmationEmail({ public_reference:reference, first_name:firstName, email, intake_method:intakeMethod, device_type:deviceType, device_model:model, issue, preferred_date:leadRecord.preferred_date, preferred_time:leadRecord.preferred_time, preferred_contact:preferredContact, timing_note:timingNote, capacity_message:customerTimingGuidance }); } catch (error) { console.error(error); }
 
     const botUrl = Deno.env.get('BOT_LEAD_WEBHOOK_URL');
     const botSecret = Deno.env.get('LEAD_WEBHOOK_SECRET');
     if (botUrl && botSecret) fetch(botUrl, {
-      method: 'POST', headers: { Authorization: `Bearer ${botSecret}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: externalId, leadId:leadResult.data.id, appointmentId, portalUrl:`https://portal.gotcracked.co/#leads/${leadResult.data.id}`, appointmentUrl:appointmentId?`https://portal.gotcracked.co/#appointments/${appointmentId}`:null, locationId, name: leadRecord.name, phone, email, service: leadRecord.service, source: leadRecord.source, notes: `${intakeMethod === 'mail_in' ? '[MAIL-IN] ' : ''}${deviceType} ${model}: ${notes}` })
+      method: 'POST', headers: { Authorization: `Bearer ${botSecret}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ id:externalId, leadId:leadResult.data.id, appointmentId, portalUrl:`https://portal.gotcracked.co/#leads/${leadResult.data.id}`, appointmentUrl:appointmentId?`https://portal.gotcracked.co/#appointments/${appointmentId}`:null, locationId, name:leadRecord.name, phone, email, service:leadRecord.service, source:leadRecord.source, notes:`${intakeMethod === 'mail_in' ? '[MAIL-IN] ' : ''}${deviceType} ${model}: ${notes}` })
     }).catch(console.error);
-    return json(origin, { ok: true, reference, appointmentId, discordDelivered, emailDelivered }, 201);
+    return json(origin, { ok:true, reference, appointmentId, discordDelivered, emailDelivered, bookingIntelligenceMode:bookingMode, timingGuidance:customerTimingGuidance || null, sameDayEligible:bookingMode === 'active' ? bookingRecommendation?.same_day_promise_allowed === true : null }, 201);
   } catch (error) {
     console.error(error);
     if (error instanceof ServiceUnavailableError) return json(origin, { error:'Repair requests are temporarily unavailable. Please try again in a few minutes.' }, 503);
-    return json(origin, { error: 'Unable to submit the repair request. Please contact the shop.' }, 500);
+    return json(origin, { error:'Unable to submit the repair request. Please contact the shop.' }, 500);
   }
 });
