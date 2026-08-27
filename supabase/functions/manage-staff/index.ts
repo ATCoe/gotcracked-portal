@@ -26,6 +26,8 @@ function json(request: Request, body: unknown, status = 200) {
 Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: cors(request) });
   if (request.method !== 'POST') return json(request, { error: 'Method not allowed.' }, 405);
+  const origin = request.headers.get('origin') || '';
+  if (!allowedOrigins.has(origin)) return json(request, { error: 'Origin not allowed.' }, 403);
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
