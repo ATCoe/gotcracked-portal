@@ -1,0 +1,22 @@
+name: Appointment Command Center Guard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify-appointments:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify appointment command center integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s appointments-board.js
+          grep -q "appointments-board.js" portal-runtime-loader.js
+          grep -q "get_appointment_command_center" supabase/migrations/0039_appointment_command_center.sql
+          grep -q "create_staff_appointment" supabase/migrations/0039_appointment_command_center.sql
+          grep -q "appointments.view" supabase/migrations/0039_appointment_command_center.sql
+          echo "Appointment command center integration guard passed."
