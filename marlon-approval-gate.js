@@ -6,6 +6,7 @@
   const isOwner=()=>String(current()?.role||'')==='owner';
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
   const fmt=v=>v?new Date(v).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'—';
+  const approvalCache=new Map();
 
   function ensureStyle(){
     if(document.getElementById('gc-marlon-approval-style'))return;
@@ -16,6 +17,62 @@
       .gc-marlon-approve{border:1px solid #19b8ef;background:#0c9fd5;color:white}.gc-marlon-deny{border:1px solid #8c99a7;background:transparent;color:inherit}
       .gc-marlon-approval[data-state="denied"]{border-color:rgba(236,91,91,.45)}.gc-marlon-approval[data-state="approved"]{border-color:rgba(64,196,130,.45)}
     `;document.head.appendChild(s);
+  }
+
+  function highLevelIntent(value){
+    const text=String(value||'').toLowerCase();
+    const action=/\b(make|change|update|modify|deploy|release|replace|remove|delete|migrate|restructure|redesign|rewrite|restart|reboot|integrate|enable|disable|configure|implement|apply|ship|publish)\b/.test(text);
+    const risk=/\b(authentication|authorization|auth|permission|permissions|role|roles|rls|payment|payments|billing|checkout|database|schema|migration|migrations|secret|secrets|credential|credentials|production|deploy|deployment|cloudflare|downtime|restart|reboot|delete|purge|destructive|discord server|channel structure|webhook|integration|workflow|major|entire|whole|restructure|redesign|rewrite)\b/.test(text);
+    return action&&risk;
+  }
+
+  function surfaceFor(text,context){
+    const value=String(text||'').toLowerCase();
+    if(/\bcloudflare\b/.test(value))return 'cloudflare';
+    if(/\brepository|github|repo\b/.test(value))return 'repository';
+    if(/\bwebsite|site\b/.test(value))return 'website';
+    return String(context?.surface||'').toLowerCase()==='website'?'website':'portal';
+  }
+
+  async function createApproval(text,context={}){
+    const scope=String(text||'').trim().replace(/\s+/g,' ').slice(0,4000);if(!scope)return null;
+    const key=`${surfaceFor(scope,context)}|${scope}`;
+    if(approvalCache.has(key))return approvalCache.get(key);
+    const title=`Marlon high-level change: ${scope}`.slice(0,180);
+    const {data,error}=await client.rpc('create_ui_update_request',{
+      p_title:title,p_description:scope,p_surface:surfaceFor(scope,context),p_priority:'normal',
+      p_context:{source:'marlon_chat_failsafe',view:String(context?.view||location.hash||'#dashboard').slice(0,160),path:String(context?.path||location.pathname).slice(0,300),requested_scope:scope}
+    });
+    if(error)throw error;
+    const approval={required:true,ticketId:data?.id,ticketNumber:data?.ticket_number||null,title:data?.title||title,summary:data?.title||title,surface:data?.surface||surfaceFor(scope,context),status:'pending',fingerprint:data?.approval_fingerprint||null};
+    if(approval.ticketId)approvalCache.set(key,approval);
+    return approval.ticketId?approval:null;
+  }
+
+  function installChatFailsafe(){
+    if(window.__gcMarlonApprovalFetchPatched||!window.fetch)return;
+    const nativeFetch=window.fetch.bind(window);
+    window.fetch=async function marlonApprovalFetch(input,init){
+      const response=await nativeFetch(input,init);
+      const url=typeof input==='string'?input:input?.url||'';
+      if(!String(url).includes('/portal/chat'))return response;
+      try{
+        const requestBody=typeof init?.body==='string'?JSON.parse(init.body):{};
+        const messages=Array.isArray(requestBody?.messages)?requestBody.messages:[];
+        const lastUser=[...messages].reverse().find(message=>message?.role==='user')?.content||'';
+        const data=await response.clone().json();
+        let approval=data?.approvalRequest||data?.approval||null;
+        if(!approval&&isOwner()&&highLevelIntent(lastUser))approval=await createApproval(lastUser,requestBody?.context||{});
+        if(!approval)return response;
+        const normalized={...approval,summary:approval.summary||approval.title||'High-level change'};
+        const headers=new Headers(response.headers);headers.set('Content-Type','application/json');
+        return new Response(JSON.stringify({...data,approval:data?.approval||normalized,approvalRequest:normalized}),{status:response.status,statusText:response.statusText,headers});
+      }catch(error){
+        console.warn('Marlon approval failsafe could not enrich chat response:',error);
+        return response;
+      }
+    };
+    window.__gcMarlonApprovalFetchPatched=true;
   }
 
   async function ticket(id){
@@ -75,10 +132,12 @@
 
   document.addEventListener('click',event=>{
     const target=event.target instanceof Element?event.target:null;if(!target)return;
-    const decision=target.closest('[data-marlon-approval]');if(decision){event.preventDefault();event.stopPropagation();void decide(decision);return}
+    const decision=target.closest('[data-marlon-approval]');
+    if(decision&&decision.closest('[data-approval-ticket]')){event.preventDefault();event.stopPropagation();void decide(decision);return}
     const row=target.closest('[data-ticket-id]');if(row)setTimeout(()=>void decorate(row.dataset.ticketId),0);
   },true);
 
   ensureStyle();
-  window.GotCrackedMarlonApprovalGate={version:'1.1.0',decorate,refreshPanels,panelMarkup};
+  installChatFailsafe();
+  window.GotCrackedMarlonApprovalGate={version:'1.2.0',decorate,refreshPanels,panelMarkup,createApproval,highLevelIntent};
 })();
