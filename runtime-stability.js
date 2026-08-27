@@ -3,9 +3,9 @@
 
   if (window.GotCrackedRuntimeStability) return;
 
-  const VERSION = '20260827-stability1';
+  const VERSION = '20260827-stability2';
   const client = window.supabaseClient;
-  const legacyRealtimeTopics = topic => topic === 'portal-live' || String(topic || '').startsWith('portal-v1-operations-');
+  const operationsRealtimeTopic = topic => String(topic || '').startsWith('portal-v1-operations-');
   const callbackStates = new WeakMap();
   let syncFrame = 0;
   let observer = null;
@@ -69,13 +69,23 @@
     const nativeChannel = client.channel.bind(client);
     client.channel = function stabilityChannel(topic, options) {
       const channel = nativeChannel(topic, options);
-      if (!legacyRealtimeTopics(topic) || !channel || typeof channel.on !== 'function') return channel;
+      const isOperations = operationsRealtimeTopic(topic);
+      const isLegacyLive = topic === 'portal-live';
+      if ((!isOperations && !isLegacyLive) || !channel || typeof channel.on !== 'function') return channel;
 
       const nativeOn = channel.on.bind(channel);
       channel.on = function stabilityOn(type, filter, callback) {
         if (type !== 'postgres_changes' || typeof callback !== 'function') {
           return nativeOn(type, filter, callback);
         }
+
+        // Storewide revision sync is the single immediate refresh source for
+        // Operations. Keep this legacy channel alive for subscribe health, but
+        // do not let every table event independently redraw the same screens.
+        if (isOperations) return channel;
+
+        // portal-live still owns several legacy-only surfaces. Coalesce its
+        // broad reload callback and never let it redraw while a workflow is open.
         const guarded = payload => runWhenSafe(callback, payload);
         return nativeOn(type, filter, guarded);
       };
