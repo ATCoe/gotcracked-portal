@@ -14,7 +14,6 @@
     if (!body) return;
     const note = body.querySelector(':scope > .v1-intake-guidance');
     if (!note) return;
-
     const heading = body.querySelector(':scope > h3');
     const intro = heading?.nextElementSibling?.matches('p') ? heading.nextElementSibling : null;
     if (intro && note.previousElementSibling !== intro) intro.insertAdjacentElement('afterend', note);
@@ -44,13 +43,13 @@
   }
 
   async function loadMarlon() {
-    const version = '20260827-marlon11';
+    const version = '20260827-marlon12';
     loadStyle(`marlon-assistant.css?v=${version}`, 'gcMarlonStyle');
     loadStyle(`marlon-extensions.css?v=${version}`, 'gcMarlonExtensions');
     await loadScript(`marlon-config.js?v=${version}`, 'gcMarlonConfig');
     await loadScript(`marlon-assistant.js?v=${version}`, 'gcMarlonRuntime');
     await loadScript(`marlon-support.js?v=${version}`, 'gcMarlonSupport');
-    await loadScript(`staff-badges.js?v=${version}`, 'gcStaffBadges');
+    await loadScript(`staff-badges-v2.js?v=${version}`, 'gcStaffBadges');
     await loadScript(`marlon-releases.js?v=${version}`, 'gcMarlonReleases');
     await loadScript(`marlon-monitor.js?v=${version}`, 'gcMarlonMonitor');
     const profile = window.GotCrackedRuntimeProfile || window.GotCrackedOperationsV1?.state?.profile || null;
