@@ -6,7 +6,7 @@
     endpoint: 'https://crackwave-ai.austncoe.workers.dev',
     role: 'Employee Support',
     title: 'Employee Support & Portal Reliability AI',
-    version: '1.2.0',
+    version: '1.3.0',
     avatar: 'assets/marlon-avatar.svg',
     launcherLabel: 'Need Help?',
     badge: 'assets/marlon-badge.svg',
@@ -18,7 +18,7 @@
   window.GotCrackedMarlonConfig = Object.freeze({...DEFAULTS});
 
   const clean = value => String(value ?? '').trim();
-  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'})[c]);
   const training = () => localStorage.getItem('gc-training-store') === '1';
   let profile = null;
   let identity = {
@@ -29,6 +29,41 @@
     discordSync: true
   };
   let canManage = false;
+
+  function installKnowledgeBridge() {
+    if (window.__gcMarlonKnowledgeFetchWrapped) return;
+    window.__gcMarlonKnowledgeFetchWrapped = true;
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async (input, init = {}) => {
+      const url = typeof input === 'string' ? input : input?.url || '';
+      const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+      if (method !== 'POST' || !url.startsWith(DEFAULTS.endpoint) || !url.includes('/portal/chat')) return nativeFetch(input, init);
+
+      try {
+        const rawBody = init?.body ?? (input instanceof Request ? await input.clone().text() : '');
+        const payload = typeof rawBody === 'string' ? JSON.parse(rawBody || '{}') : null;
+        const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+        const latest = [...messages].reverse().find(message => message?.role === 'user');
+        const query = clean(latest?.content).slice(0,1200);
+        if (query && window.supabaseClient?.functions?.invoke) {
+          const knowledge = await window.supabaseClient.functions.invoke('marlon-knowledge-context',{body:{query}});
+          if (!knowledge.error && knowledge.data?.ok && knowledge.data?.context) {
+            payload.context = {
+              ...(payload.context || {}),
+              knowledge: knowledge.data.context,
+              knowledgePolicy: 'Ground the answer in GotCracked repair procedures, current OEM/manufacturer guidance, approved gaming/platform sources, supplier data, and business policy supplied here. Prefer current OEM safety/service guidance when sources conflict. Never confuse supplier availability with GotCracked on-hand inventory. State uncertainty instead of inventing facts.'
+            };
+            const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+            headers.set('Content-Type','application/json');
+            return nativeFetch(url,{...init,method:'POST',headers,body:JSON.stringify(payload)});
+          }
+        }
+      } catch (error) {
+        console.warn('Marlon knowledge grounding was unavailable for this turn.',error);
+      }
+      return nativeFetch(input,init);
+    };
+  }
 
   function safeHttpsUrl(value) {
     const text = clean(value);
@@ -218,5 +253,6 @@
     void syncDiscord(output).catch(error => { if (output) output.textContent = error.message || 'Unable to sync Marlon to Discord.'; }).finally(()=>{button.disabled=false;});
   });
 
+  installKnowledgeBridge();
   if (window.GotCrackedRuntimeProfile) void load(window.GotCrackedRuntimeProfile);
 })();
