@@ -12,9 +12,14 @@ const hex = (buffer: ArrayBuffer) => [...new Uint8Array(buffer)].map(value => va
 const hashToken = async (token: string) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)));
 const clientKey = (request: Request) => request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || `ua:${request.headers.get('user-agent') || 'unknown'}`;
 
+class ServiceUnavailableError extends Error {}
+
 async function allow(admin: ReturnType<typeof createClient>, request: Request, kind: string, limit: number, seconds: number) {
   const result = await admin.rpc('consume_public_rate_limit', { p_kind:kind, p_key_hash:await hashToken(clientKey(request)), p_limit:limit, p_window_seconds:seconds });
-  if (result.error) { console.error('Public chat rate limiter unavailable:', result.error.message); return true; }
+  if (result.error) {
+    console.error('Public chat rate limiter unavailable:', result.error.message);
+    throw new ServiceUnavailableError('Request protection is temporarily unavailable.');
+  }
   return result.data === true;
 }
 
@@ -75,7 +80,9 @@ Deno.serve(async request => {
       const posted = await discord(`/channels/${session.data.discord_thread_id}/messages`, { method:'POST', body:JSON.stringify({ allowed_mentions:{parse:[]}, content:`**Customer · ${session.data.customer_name}**\n${message}` }) });
       const saved = await admin.from('website_chat_messages').insert({ session_id:sessionId, sender:'customer', body:message, discord_message_id:posted.id });
       if (saved.error) throw saved.error;
-    } else if (action !== 'poll') {
+    } else if (action === 'poll') {
+      if (!(await allow(admin,request,'public-chat-poll',300,900))) return json(origin,{error:'Chat refresh limit reached. Please wait a moment and try again.'},429);
+    } else {
       return json(origin,{error:'Unsupported chat action.'},400);
     }
 
@@ -90,6 +97,7 @@ Deno.serve(async request => {
     return json(origin, { ok:true, messages:messages.data || [] });
   } catch (error) {
     console.error(error);
+    if (error instanceof ServiceUnavailableError) return json(origin, { error:'Chat is temporarily unavailable. Email hello@gotcracked.co for help.' }, 503);
     return json(origin, { error:'Chat is temporarily unavailable. Email hello@gotcracked.co for help.' }, 500);
   }
 });
