@@ -4,24 +4,28 @@
   const client = window.supabaseClient;
   if (!client || window.GotCrackedCrossUserSync) return;
 
-  const POLL_MS = 2500;
+  const POLL_MS = 10000;
   const RETRY_MS = 5000;
   let lastRevision = null;
   let locationId = null;
   let pollBusy = false;
   let refreshBusy = false;
   let refreshQueued = false;
-  let deferredForEditing = false;
+  let deferredForInteraction = false;
   let realtimeChannel = null;
   let realtimeStatus = 'idle';
   let retryTimer = null;
 
   const isTraining = () => localStorage.getItem('gc-training-store') === '1';
-  const isEditing = () => {
+  const localInteractionLocked = () => {
+    if (document.visibilityState === 'hidden') return true;
     const active = document.activeElement;
-    if (!(active instanceof Element)) return false;
-    return Boolean(active.closest('input, textarea, select, [contenteditable="true"]'));
+    if (active instanceof Element && active.closest('input,textarea,select,[contenteditable="true"]')) return true;
+    if (document.querySelector('dialog[open]')) return true;
+    if (document.getElementById('v1-lead-drawer')?.classList.contains('open')) return true;
+    return false;
   };
+  const interactionLocked = () => window.GotCrackedRuntimeStability?.isInteractionLocked?.() ?? localInteractionLocked();
 
   async function fetchRevision() {
     if (isTraining()) return null;
@@ -37,8 +41,8 @@
 
   async function refreshAll(reason = 'revision', revision = lastRevision) {
     if (isTraining()) return;
-    if (isEditing()) {
-      deferredForEditing = true;
+    if (interactionLocked()) {
+      deferredForInteraction = true;
       refreshQueued = true;
       return;
     }
@@ -48,7 +52,7 @@
     }
 
     refreshBusy = true;
-    deferredForEditing = false;
+    deferredForInteraction = false;
     try {
       const ops = window.GotCrackedOperationsV1;
       const workOrderId = ops?.state?.currentWorkOrder?.id || null;
@@ -57,19 +61,23 @@
       const jobs = [];
       if (typeof ops?.reload === 'function') jobs.push(Promise.resolve(ops.reload()));
       if (typeof window.GotCrackedStaffProfiles?.load === 'function') jobs.push(Promise.resolve(window.GotCrackedStaffProfiles.load()));
-      window.GotCrackedDirectory?.requestRefresh?.();
+      if (jobs.length) await Promise.allSettled(jobs);
 
+      window.GotCrackedDirectory?.requestRefresh?.(`cross-user-${reason}`);
+
+      // Specialized command centers refresh only after the shared operational
+      // state has settled. This prevents old and new renderers racing each other.
       document.dispatchEvent(new CustomEvent('gc-cross-user-sync', {
         detail: { reason, revision, locationId }
       }));
 
-      if (jobs.length) await Promise.allSettled(jobs);
       if (workOrderVisible && workOrderId && typeof ops?.openWorkOrder === 'function') {
         ops.openWorkOrder(workOrderId);
       }
+      window.GotCrackedRuntimeStability?.syncOverlays?.();
     } finally {
       refreshBusy = false;
-      if (refreshQueued && !isEditing()) {
+      if (refreshQueued && !interactionLocked()) {
         refreshQueued = false;
         queueMicrotask(() => refreshAll('queued', lastRevision));
       }
@@ -135,17 +143,18 @@
   }
 
   function resumeDeferredRefresh() {
-    if (!deferredForEditing && !refreshQueued) return;
-    if (isEditing()) return;
-    deferredForEditing = false;
+    if (!deferredForInteraction && !refreshQueued) return;
+    if (interactionLocked()) return;
+    deferredForInteraction = false;
     refreshQueued = false;
-    refreshAll('editing-finished', lastRevision);
+    refreshAll('interaction-finished', lastRevision);
   }
 
   client.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
       lastRevision = null;
       locationId = null;
+      clearTimeout(retryTimer);
       if (realtimeChannel) client.removeChannel(realtimeChannel).catch(() => {});
       realtimeChannel = null;
       realtimeStatus = 'signed-out';
@@ -157,15 +166,24 @@
     }
   });
 
-  document.addEventListener('focusout', () => setTimeout(resumeDeferredRefresh, 100));
+  document.addEventListener('focusout', () => setTimeout(resumeDeferredRefresh, 120));
+  document.addEventListener('close', () => setTimeout(resumeDeferredRefresh, 50), true);
+  document.addEventListener('gc-view-changed', () => setTimeout(resumeDeferredRefresh, 50));
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       pollNow();
+      resumeDeferredRefresh();
       if (!realtimeChannel) connectRealtime();
     }
   });
   window.addEventListener('online', () => {
     pollNow();
+    resumeDeferredRefresh();
+    if (!realtimeChannel) connectRealtime();
+  });
+  window.addEventListener('pageshow', () => {
+    pollNow();
+    resumeDeferredRefresh();
     if (!realtimeChannel) connectRealtime();
   });
 
@@ -173,10 +191,10 @@
   setTimeout(pollNow, 100);
 
   window.GotCrackedCrossUserSync = {
-    version:'20260826-sync2',
+    version:'20260827-sync3',
     pollNow,
     refreshNow:() => refreshAll('manual', lastRevision),
-    get status(){ return { lastRevision, locationId, realtimeStatus, pollBusy, refreshBusy }; },
+    get status(){ return { lastRevision, locationId, realtimeStatus, pollBusy, refreshBusy, deferredForInteraction }; },
     stop(){ clearInterval(interval); clearTimeout(retryTimer); if (realtimeChannel) client.removeChannel(realtimeChannel).catch(() => {}); }
   };
 })();
