@@ -11,7 +11,6 @@
   let updateLoaded = false;
   let decorateTimer = null;
   let decorating = false;
-  let ignoreObserverUntil = 0;
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[c]);
 
@@ -19,7 +18,7 @@
     if (document.querySelector('link[data-gc-directory-advanced]')) return;
     const link=document.createElement('link');
     link.rel='stylesheet';
-    link.href='directory-advanced.css?v=20260826-dir2';
+    link.href='directory-advanced.css?v=20260827-dir4';
     link.dataset.gcDirectoryAdvanced='true';
     document.head.appendChild(link);
   }
@@ -222,12 +221,18 @@
     const host=scopeHost(scope);
     if (!host) return;
     const state=readState(scope);
-    const actions=host.querySelector('.gc-dir-head-actions');
-    if (actions && !actions.querySelector('.gc-dir-saved-controls')) {
+    let utility=host.querySelector('.gc-dir-utility-row');
+    if (!utility) {
+      utility=document.createElement('div');
+      utility.className='gc-dir-utility-row';
+      const anchor=host.querySelector('.gc-dir-presets') || host.querySelector('.gc-dir-search-row');
+      if (anchor) anchor.insertAdjacentElement('afterend',utility); else host.querySelector('.gc-dir-head')?.insertAdjacentElement('afterend',utility);
+    }
+    if (utility && !utility.querySelector('.gc-dir-saved-controls')) {
       const controls=document.createElement('div');
       controls.className='gc-dir-saved-controls';
       controls.innerHTML=`${savedSelectMarkup(scope)}<button type="button" class="secondary-button" data-gc-save-filter>Save filter</button><button type="button" class="text-button" data-gc-delete-filter disabled>Delete</button>`;
-      actions.prepend(controls);
+      utility.appendChild(controls);
     }
     const panel=host.querySelector('.gc-dir-filter-panel');
     if (panel && !panel.querySelector('.gc-dir-advanced-row')) {
@@ -259,7 +264,6 @@
         injectControls(scope);
         applyAdvanced(scope);
       }
-      ignoreObserverUntil=Date.now()+80;
     } finally { decorating=false; }
   }
 
@@ -338,9 +342,10 @@
     setTimeout(()=>{syncPersistent(scope);scheduleDecorate();},0);
   });
 
-  const observer=new MutationObserver(()=>{if(Date.now()<ignoreObserverUntil)return;scheduleDecorate();});
-  const startObserver=()=>observer.observe(document.body,{childList:true,subtree:true});
-  if (document.body) startObserver(); else document.addEventListener('DOMContentLoaded',startObserver,{once:true});
+  document.addEventListener('gc-directory-rendered',event=>{
+    const scope=event.detail?.scope;
+    if (SCOPES.includes(scope)) scheduleDecorate();
+  });
 
   document.addEventListener('gc-cross-user-sync',()=>{updateLoaded=false;loadLastUpdates();});
   document.addEventListener('gc-portal-runtime-ready',()=>{updateLoaded=false;loadLastUpdates();scheduleDecorate();});
