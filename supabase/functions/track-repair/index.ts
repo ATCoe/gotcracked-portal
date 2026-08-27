@@ -8,9 +8,14 @@ const hex = (buffer: ArrayBuffer) => [...new Uint8Array(buffer)].map(value => va
 const hash = async (value: string) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
 const clientKey = (request: Request) => request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || `ua:${request.headers.get('user-agent') || 'unknown'}`;
 
+class ServiceUnavailableError extends Error {}
+
 async function allow(admin: ReturnType<typeof createClient>, kind: string, key: string, limit: number, seconds: number) {
   const result = await admin.rpc('consume_public_rate_limit', { p_kind:kind, p_key_hash:await hash(key), p_limit:limit, p_window_seconds:seconds });
-  if (result.error) { console.error('Repair tracker rate limiter unavailable:', result.error.message); return true; }
+  if (result.error) {
+    console.error('Repair tracker rate limiter unavailable:', result.error.message);
+    throw new ServiceUnavailableError('Request protection is temporarily unavailable.');
+  }
   return result.data === true;
 }
 
@@ -34,5 +39,9 @@ Deno.serve(async request => {
     const ticket = result.data;
     if (!ticket || digits(ticket.customers?.phone) !== phone) return response(origin, { error: 'We could not match that ticket and phone number.' }, 404);
     return response(origin, { ticket: `GC-${String(ticket.ticket_number).padStart(6, '0')}`, status: ticket.status, publicNotes: ticket.public_notes, updatedAt: ticket.updated_at, checkedInAt: ticket.checked_in_at, promisedAt: ticket.promised_at, completedAt: ticket.completed_at, warrantyExpiresAt: ticket.warranty_expires_at, intakeMethod: ticket.intake_method, shippingStatus: ticket.shipping_status, outboundCarrier: ticket.outbound_carrier, outboundTracking: ticket.outbound_tracking, shippedAt: ticket.shipped_at, deliveredAt: ticket.delivered_at, device: ticket.devices, events: (ticket.ticket_events || []).filter((e: { event_type: string }) => ['created','status_changed','customer_update'].includes(e.event_type)).map((e: { event_type: string; message: string; created_at: string }) => ({ type: e.event_type, message: e.message, createdAt: e.created_at })) });
-  } catch (error) { console.error(error); return response(origin, { error: 'Repair tracking is temporarily unavailable.' }, 500); }
+  } catch (error) {
+    console.error(error);
+    if (error instanceof ServiceUnavailableError) return response(origin, { error:'Repair tracking is temporarily unavailable. Please try again in a few minutes.' }, 503);
+    return response(origin, { error: 'Repair tracking is temporarily unavailable.' }, 500);
+  }
 });
