@@ -1,0 +1,68 @@
+name: New Work Order Profile Guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  profile-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce Portal v1.1 customer profile policy
+        shell: python
+        run: |
+          from pathlib import Path
+
+          runtime = Path('portal-runtime-loader.js').read_text(encoding='utf-8')
+          operations = Path('operations-v1-core.js').read_text(encoding='utf-8')
+          profile_fix = Path('intake-profile-validation-fix.js').read_text(encoding='utf-8')
+
+          if 'intake-profile-validation-fix.js' not in runtime:
+              raise SystemExit('New Work Order profile validation layer is not loaded by the authenticated Portal runtime.')
+          if runtime.index("'operations-v1-core.js'") > runtime.index("'intake-profile-validation-fix.js'"):
+              raise SystemExit('New Work Order profile validation must load after operations-v1-core.js.')
+
+          required_fields = [
+              "'first_name'",
+              "'last_name'",
+              "'phone'",
+              "'address_line_1'",
+              "'city'",
+              "'state'",
+              "'postal_code'",
+          ]
+          for token in required_fields:
+              if token not in profile_fix:
+                  raise SystemExit(f'Required New Work Order customer field is not guarded: {token}')
+
+          required_policy_tokens = [
+              "const optionalFields = ['contact_phone', 'email'];",
+              'First name, last name, primary phone, and full mailing address are required. Alternate phone and email are optional.',
+              "target.closest('[data-v1-intake-next]')",
+              'event.stopImmediatePropagation()',
+              'next.disabled = !ready;',
+              "version:'20260827-profile-policy3'",
+          ]
+          for token in required_policy_tokens:
+              if token not in profile_fix:
+                  raise SystemExit(f'New Work Order profile policy invariant is missing: {token}')
+
+          persisted_fields = [
+              'last_name:x.newCustomer.last_name',
+              'phone:x.newCustomer.phone',
+              'address_line_1:x.newCustomer.address_line_1',
+              'city:x.newCustomer.city',
+              'state:x.newCustomer.state',
+              'postal_code:x.newCustomer.postal_code',
+          ]
+          for token in persisted_fields:
+              if token not in operations:
+                  raise SystemExit(f'New Work Order customer persistence is missing: {token}')
+
+          print('Portal v1.1 New Work Order customer profile policy checks passed.')
