@@ -71,13 +71,13 @@ begin
     case when nullif(btrim(coalesce(new.diagnosis,'')),'') is not null then 'Diagnosis: ' || new.diagnosis || '.' end,
     case when nullif(btrim(coalesce(new.action_taken,'')),'') is not null then 'Fix: ' || new.action_taken || '.' end,
     case when nullif(btrim(coalesce(new.resolution,'')),'') is not null then 'Verified resolution: ' || new.resolution || '.' end
-  ),1800);
+  ),1150);
 
   insert into public.marlon_memories(
     location_id,scope,profile_id,category,memory_key,summary,confidence,evidence_count,status,source_type,created_by,first_learned_at,last_reinforced_at,metadata
   ) values (
-    new.location_id,'system',null,'reliability_lesson',v_key,v_summary,0.95,1,'active','support_ticket',new.created_by,now(),now(),
-    jsonb_build_object('ticket_id',new.id,'ticket_number',new.ticket_number,'surface',new.surface,'status',new.status)
+    new.location_id,'system',null,'reliability_lesson',v_key,v_summary,0.95,1,'active','incident',new.created_by,now(),now(),
+    jsonb_build_object('ticket_id',new.id,'ticket_number',new.ticket_number,'surface',new.surface,'status',new.status,'source','support_ticket')
   )
   on conflict (location_id,scope,memory_key,coalesce(profile_id,'00000000-0000-0000-0000-000000000000'::uuid))
   do update set
