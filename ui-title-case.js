@@ -3,7 +3,7 @@
 
   if (window.GotCrackedTitleCase) return;
 
-  const VERSION = '20260827-titlecase1';
+  const VERSION = '20260827-titlecase2';
   const minorWords = new Set([
     'a','an','and','as','at','but','by','for','from','in','into','nor','of','on','or','per','the','to','via','vs','with'
   ]);
@@ -31,10 +31,10 @@
   ]);
 
   const candidateSelector = [
-    'h1','h2','h3','h4','h5','h6','legend','summary','th',
+    'h1','h2','h3','h4','h5','h6','legend','summary','th','label','option',
     'button','[role="button"]','[role="tab"]','[role="menuitem"]',
-    '.sidebar nav a','.sidebar .nav-item','.nav-label','.tab-label',
-    '.badge','.chip','.pill','.tag','.status-badge','[data-status-label]',
+    'nav a','.sidebar .nav-item','.nav-label','.tab-label',
+    '.badge','.chip','.pill','.tag','.status','.status-badge','.status-chip','.status-pill','.status-label','[data-status-label]',
     '.gc-timeclock-state','.gc-dashboard-clock-copy > small',
     '.card-title','.panel-title','.section-title','.modal-title','.dialog-title'
   ].join(',');
