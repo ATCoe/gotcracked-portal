@@ -23,6 +23,7 @@ as $$
 declare
   loc uuid:=public.current_location_id();
   q text:=nullif(btrim(coalesce(search_input,'')),'');
+  q_digits text:=regexp_replace(coalesce(search_input,''),'\D','','g');
   lim integer:=least(greatest(coalesce(limit_input,50),1),100);
   off integer:=greatest(coalesce(offset_input,0),0);
   can_edit boolean:=coalesce(public.has_permission('customers.edit'),false);
@@ -170,7 +171,7 @@ begin
         or c.phone ilike '%'||q||'%'
         or coalesce(c.contact_phone,'') ilike '%'||q||'%'
         or coalesce(c.email,'') ilike '%'||q||'%'
-        or coalesce(c.phone_normalized,'') like '%'||regexp_replace(q,'\D','','g')||'%'
+        or (q_digits<>'' and coalesce(c.phone_normalized,'') like '%'||q_digits||'%')
         or exists(
           select 1 from public.devices d
           where d.customer_id=c.id and concat_ws(' ',d.manufacturer,d.model,d.model_number,d.serial_number,d.imei) ilike '%'||q||'%'
