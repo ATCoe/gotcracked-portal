@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260826-production5';
+  const VERSION = '20260826-production6';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260826-sales-ops2';
   const PROFILE_READY_TIMEOUT_MS = 15000;
@@ -15,6 +15,7 @@
     'action-launchers.js',
     'account-sync.js',
     'time-clock.js',
+    'workforce-premium.js',
     'timesheets.js',
     'portal-live.js',
     'portal-deep-links.js',
