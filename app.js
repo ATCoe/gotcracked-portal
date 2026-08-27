@@ -88,7 +88,6 @@
 
   const list = document.querySelector('#repair-list');
   const table = document.querySelector('#repair-table');
-  const ticketModal = document.querySelector('#new-ticket');
 
   function setMobileMenu(open) {
     window.GotCrackedMobileNav?.setOpen?.(Boolean(open));
@@ -233,8 +232,14 @@
     if (openTicketButton) {
       event.preventDefault();
       const guidedIntake = window.GotCrackedOperationsV1?.openIntake;
-      if (typeof guidedIntake === 'function') guidedIntake();
-      else ticketModal?.showModal();
+      if (typeof guidedIntake === 'function') {
+        guidedIntake();
+      } else {
+        window.GotCrackedDiagnostics?.error?.(
+          'Guided intake is still loading. Please try again.',
+          { context: 'Unable to open intake' }
+        );
+      }
       return;
     }
 
@@ -274,4 +279,3 @@
 
   window.GotCrackedUI = { renderRepairs, filterRepairs, showTicket, activateView, setMobileMenu };
 })();
-
