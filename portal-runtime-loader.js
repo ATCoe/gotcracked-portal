@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260827-production14';
+  const VERSION = '20260827-production15';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260826-sales-ops2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -13,15 +13,15 @@
     'training-shared-sync.js',
     'runtime-stability.js',
     'mobile-runtime-regression-fixes.js',
+    'portal-refresh-stability.js',
     'operations-v1-core.js',
-    'payment-center.js',
+    'portal-current-ui-fixes.js',
     'mobile-dialog-compat.js',
     'action-launchers.js',
     'account-sync.js',
     'time-clock.js',
     'workforce-premium.js',
     'timesheets.js',
-    'portal-live.js',
     'portal-deep-links.js',
     'avatar-presets.js',
     'staff-profiles.js',
@@ -41,9 +41,9 @@
     'checkout-receipts.js'
   ];
 
-  // Leads are owned by operations-v1-core + master-directory. The old leads.js
-  // runtime is intentionally retired so it cannot attach a second lead workflow,
-  // second auth loader, or legacy status writer against the current lead pipeline.
+  // Legacy portal-live.js and payment-center.js are intentionally retired.
+  // operations-v1-core owns the current operational UI, while checkout remains
+  // the only payment gate between Ready for Pickup and Sale Complete.
   const deferredScripts = [
     'schedule-board.js',
     'schedule-print.js',
@@ -77,6 +77,7 @@
     'training-shared-sync.js',
     'runtime-stability.js',
     'mobile-runtime-regression-fixes.js',
+    'portal-refresh-stability.js',
     'operations-v1-core.js'
   ]);
 
@@ -197,10 +198,9 @@
     started=true;
     document.documentElement.dataset.gcRuntimeState='starting';
     document.documentElement.dataset.gcPortalBoot='loading';
-    const files=isTraining() ? criticalScripts.filter(file=>file!=='portal-live.js') : criticalScripts;
-    preload(files);
+    preload(criticalScripts);
     try{
-      await loadSequence(files);
+      await loadSequence(criticalScripts);
       const currentView=location.hash.slice(1).split('/')[0]||'dashboard';
       await ensureViewRuntime(currentView);
       document.documentElement.dataset.gcRuntimeState='ready';
