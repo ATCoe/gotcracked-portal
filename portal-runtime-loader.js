@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260827-production10';
+  const VERSION = '20260827-production11';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260826-sales-ops2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -11,8 +11,8 @@
   const criticalScripts = [
     'theme-controller.js',
     'training-shared-sync.js',
-    'operations-v1-core.js',
     'mobile-runtime-regression-fixes.js',
+    'operations-v1-core.js',
     'payment-center.js',
     'mobile-dialog-compat.js',
     'action-launchers.js',
@@ -70,6 +70,12 @@
   const loading = new Map();
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   const isTraining = () => localStorage.getItem('gc-training-store') === '1';
+  const profileIndependentScripts = new Set([
+    'theme-controller.js',
+    'training-shared-sync.js',
+    'mobile-runtime-regression-fixes.js',
+    'operations-v1-core.js'
+  ]);
 
   function srcFor(file) {
     const versions = {
@@ -170,7 +176,7 @@
 
   async function loadSequence(files) {
     for(const file of files){
-      if(file!=='theme-controller.js'&&file!=='training-shared-sync.js'&&file!=='operations-v1-core.js') await waitForOperationsProfile();
+      if(!profileIndependentScripts.has(file)) await waitForOperationsProfile();
       if(file==='directory-advanced.js'||file==='master-directory.js') await waitForAccountSyncBeforeDirectory();
       await loadScript(file);
       if(file==='training-shared-sync.js') captureTrainingSyncReady();
