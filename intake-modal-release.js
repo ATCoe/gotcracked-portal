@@ -5,6 +5,6 @@
   const link = document.createElement('link');
   link.id = id;
   link.rel = 'stylesheet';
-  link.href = 'intake-modal-release.css?v=20260825-release16';
+  link.href = 'intake-modal-release.css?v=20260827-release17';
   document.head.appendChild(link);
 })();
