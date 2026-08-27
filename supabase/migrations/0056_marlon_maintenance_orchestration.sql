@@ -19,6 +19,10 @@ revoke all on table public.marlon_maintenance_events from anon, authenticated;
 create index if not exists marlon_maintenance_events_location_time_idx
   on public.marlon_maintenance_events(location_id, requested_at desc);
 
+insert into public.internal_runtime_secrets(key,secret)
+values ('marlon_operations_signing', encode(extensions.gen_random_bytes(32),'hex'))
+on conflict (key) do nothing;
+
 create schema if not exists private;
 revoke all on schema private from public, anon, authenticated;
 
