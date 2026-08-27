@@ -1,11 +1,34 @@
 (() => {
   'use strict';
 
-  /* Staff-facing live diagnostics. Messages intentionally contain only the
-     operation and provider error text—never form values or customer records. */
+  /* Staff-facing live diagnostics. Known signatures receive stable codes and
+     plain-language explanations. Unknown signatures stay explicitly unknown
+     and are queued for Marlon to investigate instead of being guessed. */
   const diagnostics = (() => {
     let sequence = 0;
     const normalize = value => String(value?.message || value || 'Unknown error').replace(/\s+/g,' ').trim().slice(0,500);
+    const catalog = [
+      {code:'GC-AUTH-001',title:'Portal session expired',match:/\b(jwt|token|session).*(expired|invalid)|invalid.*(jwt|token)|auth session missing\b/i,description:'Your Portal sign-in session could not be verified. Reconnect or sign in again, then retry the action.'},
+      {code:'GC-PERM-001',title:'Portal permission blocked',match:/\b(permission denied|not authorized|forbidden|row.level security|rls|42501)\b/i,description:'Your signed-in account is not allowed to perform this action. If the action should be available for your role, Marlon needs to check the permission rule.'},
+      {code:'GC-NET-001',title:'Portal connection interrupted',match:/\b(failed to fetch|networkerror|network error|load failed|connection.*(lost|failed)|timed?\s*out|timeout)\b/i,description:'The Portal could not complete a network request. Check connectivity and retry; Marlon will investigate if it keeps happening.'},
+      {code:'GC-SYNC-001',title:'Live sync disconnected',match:/\b(realtime|websocket|channel_error|channel error|timed_out|subscription).*(failed|closed|error|timeout|disconnected)|\bchannel_error\b/i,description:'The live cross-user sync connection dropped. Portal should reconnect automatically; refresh if data remains stale.'},
+      {code:'GC-DATA-001',title:'Duplicate record blocked',match:/\b(23505|duplicate key|unique constraint|already exists)\b/i,description:'Portal prevented a duplicate record from being saved. Review the existing record before trying again.'},
+      {code:'GC-DATA-002',title:'Related record is missing',match:/\b(23503|foreign key constraint|violates foreign key)\b/i,description:'This save depends on another record that is missing or no longer available. Refresh the Portal and retry from the current record.'},
+      {code:'GC-DATA-003',title:'Required data is missing',match:/\b(23502|not.null constraint|null value in column)\b/i,description:'Portal could not save because a required value was missing. Reopen the form and confirm the required fields before retrying.'},
+      {code:'GC-RUNTIME-001',title:'Portal feature is still loading',match:/guided intake is still loading|staff profile is not ready|has not finished loading yet/i,description:'The requested Portal feature has not finished loading. Wait a moment and try again; refresh if it does not become available.'},
+      {code:'GC-RUNTIME-002',title:'Portal module failed to load',match:/\b(failed to load .*module|failed to load .*script|runtime failed to load|failed to load [\w./-]+\.js)\b/i,description:'A Portal code module did not load correctly. Refresh once; if it repeats, Marlon should inspect the failed module and deployment.'}
+    ];
+    const classify = (message,context) => {
+      const source = `${context} ${message}`;
+      const known = catalog.find(item => item.match.test(source));
+      return known || null;
+    };
+    const queueUnknown = detail => {
+      const queue = window.GotCrackedDiagnosticLearningQueue ||= [];
+      queue.push(detail);
+      while(queue.length>12)queue.shift();
+      document.dispatchEvent(new CustomEvent('gc-diagnostic-learning-needed',{detail}));
+    };
     const ensureHost = () => {
       let host = document.getElementById('gc-diagnostic-stack');
       if (host) return host;
@@ -22,20 +45,27 @@
       const context = normalize(options.context || 'Portal operation failed');
       const id = `GC-${new Date().toISOString().slice(11,19).replaceAll(':','')}-${String(++sequence).padStart(2,'0')}`;
       const time = new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'});
+      const known = classify(message,context);
+      const displayCode = known?.code || id;
+      const title = known ? known.title : 'Unclassified Portal error';
+      const description = known ? known.description : `${context}. Marlon does not have a verified explanation for this error yet, so Portal is preserving the technical detail for investigation.`;
       const card = document.createElement('article');
       card.className = 'gc-diagnostic';
       card.dataset.diagnosticId = id;
+      card.dataset.errorCode = displayCode;
+      card.dataset.errorKnown = known ? 'true' : 'false';
       card.innerHTML = `<div class="gc-diagnostic-icon" aria-hidden="true">!</div><div class="gc-diagnostic-copy"><strong></strong><p></p><small></small><div class="gc-diagnostic-actions"><button type="button" data-gc-copy-diagnostic>Copy reference</button><button type="button" data-gc-dismiss-diagnostic>Dismiss</button></div></div>`;
-      card.querySelector('strong').textContent = context;
-      card.querySelector('p').textContent = message;
-      card.querySelector('small').textContent = `${id} · ${time}`;
-      card.dataset.copyText = `${id} | ${time} | ${context} | ${message}`;
+      card.querySelector('strong').textContent = `${displayCode} · ${title}`;
+      card.querySelector('p').textContent = description;
+      card.querySelector('small').textContent = `Technical detail: ${message} · ${time}`;
+      card.dataset.copyText = `${displayCode} | Ref ${id} | ${time} | ${context} | ${description} | Technical: ${message}`;
       const host = ensureHost();
       host.prepend(card);
       while (host.children.length > 4) host.lastElementChild.remove();
+      if(!known) queueUnknown({id,code:displayCode,context,message,path:location.pathname,view:location.hash||'#dashboard',at:new Date().toISOString()});
       setTimeout(() => card.classList.add('is-visible'), 20);
       setTimeout(() => dismiss(card), Number(options.duration || 12000));
-      return id;
+      return displayCode;
     };
     const dismiss = card => { if (!card?.isConnected) return; card.classList.remove('is-visible'); setTimeout(() => card.remove(), 180); };
     document.addEventListener('click', async event => {
@@ -49,7 +79,7 @@
     });
     window.addEventListener('unhandledrejection', event => report(event.reason, {context:'Unexpected Portal failure'}));
     window.addEventListener('error', event => report(event.error || event.message, {context:'Portal script failure'}));
-    return { error:report };
+    return { error:report, classify, catalog:Object.freeze(catalog.map(({code,title,description})=>({code,title,description}))) };
   })();
   window.GotCrackedDiagnostics = diagnostics;
 
