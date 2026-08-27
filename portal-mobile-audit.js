@@ -43,7 +43,7 @@
   }
 
   async function loadMarlon() {
-    const version = '20260827-marlon19';
+    const version = '20260827-marlon20';
     loadStyle(`marlon-assistant.css?v=${version}`, 'gcMarlonStyle');
     loadStyle(`marlon-extensions.css?v=${version}`, 'gcMarlonExtensions');
     await loadScript(`marlon-config.js?v=${version}`, 'gcMarlonConfig');
