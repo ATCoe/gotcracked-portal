@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260827-production25';
+  const VERSION = '20260827-production26';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -31,11 +31,11 @@
     'master-directory.js',
     'cross-user-sync.js',
     'sales-ops.js',
-    'dashboard-rail.js'
+    'marlon-reporting-bridge.js',
+    'dashboard-rail.js',
+    'reporting-bookkeeper.js'
   ];
 
-  // Non-dashboard modules load after the first usable Portal frame or when their
-  // view is opened. They remain part of production; they no longer block boot.
   const deferredScripts = [
     'workforce-premium.js',
     'timesheets.js',
@@ -58,7 +58,7 @@
     appointments: ['appointments-board.js','appointments-owner-guard.js'],
     schedule: ['schedule-board.js','schedule-print.js'],
     customers: ['customers-board.js'],
-    reports: ['analytics.js','reconciliation-center.js'],
+    reports: ['analytics.js','reconciliation-center.js','reporting-bookkeeper.js'],
     shipping: ['shipping.js','shipping-integrated.js','shipping-marlon-support.js'],
     inventory: ['inventory-command-center.js','inventory-audit.js','parts-registry.js','shipping-marlon-support.js'],
     staff: ['avatar-presets.js','staff-profiles.js','account-page.js','workforce-premium.js','timesheets.js'],
