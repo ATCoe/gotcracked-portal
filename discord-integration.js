@@ -101,13 +101,68 @@
     return { ...data, packageText, copied };
   }
 
+  function safeHttpsUrl(value) {
+    try {
+      const url = new URL(String(value || ''));
+      return url.protocol === 'https:' ? url.toString() : '';
+    } catch {
+      return '';
+    }
+  }
+
+  function appendLine(output, label, value, { code = false } = {}) {
+    output.append(document.createTextNode(`${label}: `));
+    if (code) {
+      const element = document.createElement('code');
+      element.textContent = String(value || '');
+      output.append(element);
+    } else {
+      output.append(document.createTextNode(String(value || '')));
+    }
+    output.append(document.createElement('br'));
+  }
+
+  function renderOnboardingPackage(output, result) {
+    if (!output) return;
+    output.replaceChildren();
+
+    const heading = document.createElement('strong');
+    heading.textContent = `Onboarding package ${result.copied ? 'copied' : 'created'}.`;
+    output.append(heading, document.createElement('br'));
+
+    appendLine(output, 'Login', result.staff?.portalEmail);
+    appendLine(output, 'Temporary password', result.temporaryPassword, { code:true });
+
+    output.append(document.createTextNode('Discord invite: '));
+    const inviteUrl = safeHttpsUrl(result.discordInviteUrl);
+    if (inviteUrl) {
+      const link = document.createElement('a');
+      link.href = inviteUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = inviteUrl;
+      output.append(link);
+    } else {
+      output.append(document.createTextNode('Invite URL unavailable'));
+    }
+    output.append(document.createElement('br'));
+
+    const note = document.createElement('small');
+    note.textContent = 'The invite expires in seven days and can be used once. Copy these details before leaving this page.';
+    output.append(note);
+  }
+
   function showOnboardingMessage(message) {
     if (!message || document.querySelector('.onboarding-notice')) return;
     const staffView = document.querySelector('#staff .page-heading');
     if (!staffView) return;
     const notice = document.createElement('div');
     notice.className = 'onboarding-notice';
-    notice.innerHTML = `<strong>Finish account setup</strong><span>${message}</span>`;
+    const heading = document.createElement('strong');
+    heading.textContent = 'Finish account setup';
+    const detail = document.createElement('span');
+    detail.textContent = String(message);
+    notice.append(heading, detail);
     staffView.insertAdjacentElement('afterend', notice);
   }
 
@@ -154,8 +209,10 @@
       try {
         const result = await createInvite(event.target);
         event.target.reset();
-        output.innerHTML = `<strong>Onboarding package ${result.copied?'copied':'created'}.</strong><br>Login: ${result.staff.portalEmail}<br>Temporary password: <code>${result.temporaryPassword}</code><br>Discord invite: <a href="${result.discordInviteUrl}" target="_blank" rel="noopener">${result.discordInviteUrl}</a><br><small>The invite expires in seven days and can be used once. Copy these details before leaving this page.</small>`;
-      } catch (error) { output.textContent = error.message; }
+        renderOnboardingPackage(output, result);
+      } catch (error) {
+        if (output) output.textContent = error.message;
+      }
     });
   }
 
