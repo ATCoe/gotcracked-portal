@@ -115,6 +115,16 @@
     if (view) activate(view);
   }
 
+  function loadTitleCaseLayer() {
+    if (window.GotCrackedTitleCase || document.querySelector('script[data-gc-title-case]')) return;
+    const script = document.createElement('script');
+    script.src = 'ui-title-case.js?v=20260827-titlecase1';
+    script.async = false;
+    script.dataset.gcTitleCase = 'true';
+    script.addEventListener('error', () => console.warn('Portal title-case layer failed to load.'), {once:true});
+    document.body.appendChild(script);
+  }
+
   document.addEventListener('click', event => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
@@ -168,6 +178,7 @@
      its full-screen backdrop before this release layer loads. */
   sanitizeRetiredMobileBackdrops();
   syncLeadDrawerState();
+  loadTitleCaseLayer();
   setTimeout(scheduleDecorate, 0);
   setTimeout(scheduleDecorate, 1200);
 })();
