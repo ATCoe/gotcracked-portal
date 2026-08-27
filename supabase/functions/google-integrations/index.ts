@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const portalUrl = (Deno.env.get('PORTAL_URL') || 'https://portal.gotcracked.co').replace(/\/$/, '');
+const portalOrigin = new URL(portalUrl).origin;
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const callbackUrl = `${supabaseUrl}/functions/v1/google-integrations?action=callback`;
 const googleClientId = () => (Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') || '').trim();
@@ -13,7 +14,7 @@ const coreScopes = [
   'https://www.googleapis.com/auth/analytics.readonly'
 ];
 const cors = {
-  'Access-Control-Allow-Origin': portalUrl,
+  'Access-Control-Allow-Origin': portalOrigin,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Content-Type': 'application/json',
   'Vary': 'Origin'
@@ -201,6 +202,7 @@ Deno.serve(async request => {
   const url = new URL(request.url);
   if (request.method === 'GET' && url.searchParams.get('action') === 'callback') return callback(request);
   if (request.method !== 'POST') return json({error:'Method not allowed.'},405);
+  if ((request.headers.get('Origin') || '') !== portalOrigin) return json({error:'Origin not allowed.'},403);
   try {
     const staff = await actor(request);
     if (!staff) return json({error:'Owner or manager access required.'},403);
