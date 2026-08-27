@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260827-production20';
+  const VERSION = '20260827-production21';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -20,13 +20,7 @@
     'action-launchers.js',
     'account-sync.js',
     'time-clock.js',
-    'workforce-premium.js',
-    'timesheets.js',
     'portal-deep-links.js',
-    'avatar-presets.js',
-    'staff-profiles.js',
-    'account-page.js',
-    'training-store-guard.js',
     'operations-v1-arrival.js',
     'portal-v1-polish.js',
     'intake-profile-validation-fix.js',
@@ -35,18 +29,22 @@
     'ui-title-case.js',
     'directory-advanced.js',
     'master-directory.js',
-    'pc-builds.js',
     'cross-user-sync.js',
     'sales-ops.js',
-    'dashboard-rail.js',
-    'checkout-receipts.js'
+    'dashboard-rail.js'
   ];
 
-  // Legacy portal-live.js, payment-center.js, and leads.js are intentionally
-  // retired from production. operations-v1-core owns the current operational UI,
-  // while checkout remains the only payment gate between Ready for Pickup and
-  // Sale Complete.
+  // Non-dashboard modules load after the first usable Portal frame or when their
+  // view is opened. They remain part of production; they no longer block boot.
   const deferredScripts = [
+    'workforce-premium.js',
+    'timesheets.js',
+    'avatar-presets.js',
+    'staff-profiles.js',
+    'account-page.js',
+    'training-store-guard.js',
+    'pc-builds.js',
+    'checkout-receipts.js',
     'schedule-board.js',
     'schedule-print.js',
     'analytics.js',
@@ -55,17 +53,20 @@
   ];
 
   const viewDependencies = {
+    repairs: ['checkout-receipts.js'],
     appointments: ['appointments-board.js','appointments-owner-guard.js'],
-    schedule: ['schedule-board.js','schedule-print.js'],
+    schedule: ['workforce-premium.js','timesheets.js','schedule-board.js','schedule-print.js'],
     customers: ['customers-board.js'],
     reports: ['analytics.js','reconciliation-center.js'],
     shipping: ['shipping.js'],
     inventory: ['inventory-audit.js'],
+    staff: ['avatar-presets.js','staff-profiles.js','account-page.js','workforce-premium.js','timesheets.js'],
     settings: ['business-settings.js','google-settings-integration.js','pricing-settings.js']
   };
 
   let started = false;
   let deferredStarted = false;
+  let deferredScheduled = false;
   let profileReady = null;
   let accountSyncReady = null;
   let accountSyncWaited = false;
@@ -195,6 +196,14 @@
     }
   }
 
+  function scheduleDeferredRuntime(){
+    if(deferredScheduled||deferredStarted)return;
+    deferredScheduled=true;
+    const run=()=>{deferredScheduled=false;void startDeferredRuntime()};
+    if('requestIdleCallback' in window) window.requestIdleCallback(run,{timeout:2500});
+    else setTimeout(run,1200);
+  }
+
   async function startCriticalRuntime(){
     if(started)return;
     started=true;
@@ -208,6 +217,7 @@
       document.documentElement.dataset.gcRuntimeState='ready';
       document.documentElement.dataset.gcPortalBoot='ready';
       document.dispatchEvent(new CustomEvent('gc-portal-runtime-ready',{detail:{profile:profileReady}}));
+      scheduleDeferredRuntime();
     }catch(error){
       console.error('Portal critical runtime load failed:',error);
       document.documentElement.dataset.gcRuntimeState='error';
