@@ -17,8 +17,6 @@
 
     const heading = body.querySelector(':scope > h3');
     const intro = heading?.nextElementSibling?.matches('p') ? heading.nextElementSibling : null;
-
-    // Validation belongs with the step instructions, never above/inside the title.
     if (intro && note.previousElementSibling !== intro) intro.insertAdjacentElement('afterend', note);
     else if (heading && !intro && note.previousElementSibling !== heading) heading.insertAdjacentElement('afterend', note);
   }
@@ -36,16 +34,25 @@
     });
   }
 
+  function loadStyle(href, marker) {
+    if (document.querySelector(`link[data-${marker}]`)) return;
+    const style = document.createElement('link');
+    style.rel = 'stylesheet';
+    style.href = href;
+    style.dataset[marker] = 'true';
+    document.head.appendChild(style);
+  }
+
   async function loadMarlon() {
-    if (!document.querySelector('link[data-gc-marlon-style]')) {
-      const style = document.createElement('link');
-      style.rel = 'stylesheet';
-      style.href = 'marlon-assistant.css?v=20260827-marlon2';
-      style.dataset.gcMarlonStyle = 'true';
-      document.head.appendChild(style);
-    }
-    await loadScript('marlon-config.js?v=20260827-marlon2', 'gcMarlonConfig');
-    await loadScript('marlon-assistant.js?v=20260827-marlon2', 'gcMarlonRuntime');
+    const version = '20260827-marlon11';
+    loadStyle(`marlon-assistant.css?v=${version}`, 'gcMarlonStyle');
+    loadStyle(`marlon-extensions.css?v=${version}`, 'gcMarlonExtensions');
+    await loadScript(`marlon-config.js?v=${version}`, 'gcMarlonConfig');
+    await loadScript(`marlon-assistant.js?v=${version}`, 'gcMarlonRuntime');
+    await loadScript(`marlon-support.js?v=${version}`, 'gcMarlonSupport');
+    await loadScript(`staff-badges.js?v=${version}`, 'gcStaffBadges');
+    await loadScript(`marlon-releases.js?v=${version}`, 'gcMarlonReleases');
+    await loadScript(`marlon-monitor.js?v=${version}`, 'gcMarlonMonitor');
     const profile = window.GotCrackedRuntimeProfile || window.GotCrackedOperationsV1?.state?.profile || null;
     if (profile) window.dispatchEvent(new CustomEvent('gotcracked:staff-ready', { detail:profile }));
   }
