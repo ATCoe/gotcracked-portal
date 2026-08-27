@@ -62,9 +62,13 @@
     try{
       const state=scheduleState();
       if(!state?.summary){setTimeout(()=>load({quiet:true}),180);return;}
-      const result=await client.rpc('get_workforce_premium_summary',{target_week:currentWeek()});
+      const [result,timeclockPermission]=await Promise.all([
+        client.rpc('get_workforce_premium_summary',{target_week:currentWeek()}),
+        client.rpc('has_permission',{permission_key:'timeclock.manage'})
+      ]);
       if(result.error)throw result.error;
       data=result.data||{};
+      data.can_manage_timeclock=timeclockPermission.error?false:Boolean(timeclockPermission.data);
       render();
     }catch(error){
       console.error('Workforce premium tools failed:',error);
@@ -95,6 +99,7 @@
     if(!page||!data)return;
     page.querySelector('.gc-workforce-premium')?.remove();
     const canManage=Boolean(data.can_manage);
+    const canManageTimeclock=Boolean(data.can_manage_timeclock);
     const conflicts=Array.isArray(data.conflicts)?data.conflicts:[];
     const requests=Array.isArray(data.shift_requests)?data.shift_requests:[];
     const pending=requests.filter(item=>item.status==='pending');
@@ -106,7 +111,7 @@
     const card=document.createElement('section');
     card.className='gc-workforce-premium';
     card.innerHTML=`
-      <div class="gc-workforce-premium-head"><div><p class="eyebrow">Premium workforce</p><h2>Schedule intelligence & team controls</h2><p>Availability, schedule health, shift changes, attendance policy, and reusable week planning.</p></div><div class="gc-workforce-tools"><button class="secondary-button" type="button" data-wf-availability>My availability</button>${myShifts.some(item=>item.status==='published')?'<button class="secondary-button" type="button" data-wf-request-first>Request shift change</button>':''}${canManage?'<button class="secondary-button" type="button" data-wf-copy-week>Copy previous week</button><button class="secondary-button" type="button" data-wf-policy>Time-clock policy</button>':''}</div></div>
+      <div class="gc-workforce-premium-head"><div><p class="eyebrow">Premium workforce</p><h2>Schedule intelligence & team controls</h2><p>Availability, schedule health, shift changes, attendance policy, and reusable week planning.</p></div><div class="gc-workforce-tools"><button class="secondary-button" type="button" data-wf-availability>My availability</button>${myShifts.some(item=>item.status==='published')?'<button class="secondary-button" type="button" data-wf-request-first>Request shift change</button>':''}${canManage?'<button class="secondary-button" type="button" data-wf-copy-week>Copy previous week</button>':''}${canManageTimeclock?'<button class="secondary-button" type="button" data-wf-policy>Time-clock policy</button>':''}</div></div>
       <div class="gc-workforce-metrics">
         <div class="gc-workforce-metric ${errors?'is-bad':warnings?'is-warning':''}"><small>Schedule health</small><strong>${canManage?(conflicts.length?`${conflicts.length} flag${conflicts.length===1?'':'s'}`:'Clear'):'Published view'}</strong><span>${canManage?`${errors} blocking · ${warnings} warning`:'Your schedule + requests'}</span></div>
         <div class="gc-workforce-metric ${pending.length?'is-warning':''}"><small>Shift requests</small><strong>${pending.length}</strong><span>${canManage?'Pending manager review':'Pending / involving you'}</span></div>
