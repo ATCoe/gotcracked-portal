@@ -1,0 +1,34 @@
+name: Repair Workflow Integrity Guard
+
+on:
+  pull_request:
+    paths:
+      - 'checkout-receipts.js'
+      - 'operations-v1-core.js'
+      - 'supabase/migrations/0042_repair_workflow_integrity.sql'
+      - '.github/workflows/repair-workflow-integrity-guard.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'checkout-receipts.js'
+      - 'operations-v1-core.js'
+      - 'supabase/migrations/0042_repair_workflow_integrity.sql'
+      - '.github/workflows/repair-workflow-integrity-guard.yml'
+
+jobs:
+  verify-repair-integrity:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify controlled checkout and repair integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s supabase/migrations/0042_repair_workflow_integrity.sql
+          grep -q "finalize_external_pos_sale" checkout-receipts.js
+          grep -q "status::text in ('repaired','ready_for_pickup')" supabase/migrations/0042_repair_workflow_integrity.sql
+          grep -q "set_config('app.repair_status_advance','allowed',true)" supabase/migrations/0042_repair_workflow_integrity.sql
+          grep -q "repair_relationship_integrity_guard" supabase/migrations/0042_repair_workflow_integrity.sql
+          grep -q "Repair device does not belong to this customer" supabase/migrations/0042_repair_workflow_integrity.sql
+          grep -q "selected pre-payment belongs to a different customer" supabase/migrations/0042_repair_workflow_integrity.sql
+          echo "Repair workflow integrity guard passed."
