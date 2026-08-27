@@ -1,0 +1,106 @@
+name: Full Portal Source Audit
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check every Portal JavaScript file
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=0
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+            count=$((count+1))
+          done < <(find . -maxdepth 1 -type f -name '*.js' -print0 | sort -z)
+          echo "JavaScript files checked: $count"
+
+      - name: Audit stylesheets and page references
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          css = sorted(Path('.').glob('*.css'))
+          if not css:
+              raise SystemExit('No Portal CSS files found.')
+          for path in css:
+              text = path.read_text(encoding='utf-8')
+              if text.count('{') != text.count('}'):
+                  raise SystemExit(f'Unbalanced CSS braces: {path}')
+              if 'javascript:' in text.lower():
+                  raise SystemExit(f'javascript: URL found in CSS: {path}')
+          print(f'CSS files checked: {len(css)}')
+
+          for page in ['index.html', 'schedule-print.html']:
+              html = Path(page).read_text(encoding='utf-8')
+              refs = re.findall(r'(?:src|href)=["\']([^"\']+)["\']', html)
+              missing = []
+              for ref in refs:
+                  clean = ref.split('?',1)[0].split('#',1)[0]
+                  if not clean or clean.startswith(('http://','https://','mailto:','tel:','#')):
+                      continue
+                  if not Path(clean).exists():
+                      missing.append(clean)
+              if missing:
+                  raise SystemExit(f'Missing local references in {page}: {sorted(set(missing))}')
+
+      - name: Reject production debug statements and stale intake fallback
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          js = sorted(Path('.').glob('*.js'))
+          violations = []
+          for path in js:
+              text = path.read_text(encoding='utf-8')
+              for i, line in enumerate(text.splitlines(), 1):
+                  if re.search(r'\bdebugger\s*;', line):
+                      violations.append(f'{path}:{i}: debugger statement')
+                  if re.search(r'console\.(log|debug|trace|info)\s*\(', line):
+                      violations.append(f'{path}:{i}: production debug console -> {line.strip()[:180]}')
+
+          html = Path('index.html').read_text(encoding='utf-8')
+          app = Path('app.js').read_text(encoding='utf-8')
+          ci = Path('.github/workflows/portal-ci.yml').read_text(encoding='utf-8')
+
+          if 'id="new-ticket"' in html:
+              violations.append('index.html: legacy #new-ticket fallback remains in production shell')
+          if 'ticketModal?.showModal()' in app:
+              violations.append('app.js: New Repair can fall back to legacy weak intake instead of failing closed')
+          if 'Walk-in intake must require only customer name and phone.' in ci:
+              violations.append('portal-ci.yml: stale pre-v1.1 intake policy assertion remains')
+
+          if violations:
+              print('\n'.join(violations))
+              raise SystemExit(f'Production source audit found {len(violations)} issue(s).')
+          print('No debug statements or stale intake fallback found.')
+
+      - name: Report source risk markers
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          roots = [*Path('.').glob('*.js'), *Path('.').glob('*.css'), Path('index.html')]
+          markers = {'TODO':0,'FIXME':0,'TEMP':0,'LEGACY':0,'!important':0,'innerHTML':0,'console.error':0,'console.warn':0}
+          for path in roots:
+              text = path.read_text(encoding='utf-8', errors='replace')
+              for key in markers:
+                  markers[key] += len(re.findall(re.escape(key), text, re.I if key in {'TODO','FIXME','TEMP','LEGACY'} else 0))
+          for key, value in markers.items():
+              print(f'{key}: {value}')
