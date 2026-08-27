@@ -1,0 +1,123 @@
+name: Source Audit Autofix
+
+on:
+  push:
+    branches: [audit/v1.1-full-source]
+
+permissions:
+  contents: write
+
+jobs:
+  autofix:
+    if: ${{ !contains(github.event.head_commit.message, '[source-audit-autofix]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/v1.1-full-source
+          fetch-depth: 0
+
+      - name: Apply audited production cleanup
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          def remove_console_log_statements(text):
+              lines = text.splitlines(keepends=True)
+              out = []
+              i = 0
+              while i < len(lines):
+                  line = lines[i]
+                  if 'console.log(' not in line:
+                      out.append(line)
+                      i += 1
+                      continue
+                  balance = line.count('(') - line.count(')')
+                  i += 1
+                  while i < len(lines) and balance > 0:
+                      balance += lines[i].count('(') - lines[i].count(')')
+                      i += 1
+              return ''.join(out)
+
+          workflow = Path('workflow.js')
+          text = remove_console_log_statements(workflow.read_text(encoding='utf-8'))
+          workflow.write_text(text, encoding='utf-8')
+
+          app = Path('app.js')
+          text = app.read_text(encoding='utf-8')
+          text = text.replace("  const ticketModal = document.querySelector('#new-ticket');\n", '')
+          old = """      if (typeof guidedIntake === 'function') guidedIntake();
+      else ticketModal?.showModal();"""
+          new = """      if (typeof guidedIntake === 'function') guidedIntake();
+      else window.GotCrackedDiagnostics?.error?.(
+        'Guided intake is still loading. Please try again.',
+        { context: 'Unable to open intake' }
+      );"""
+          if old not in text:
+              raise SystemExit('Expected app.js intake fallback was not found.')
+          app.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          index = Path('index.html')
+          text = index.read_text(encoding='utf-8')
+          text, count = re.subn(r'\n\s*<dialog id="new-ticket".*?</dialog>\n', '\n', text, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit('Expected legacy #new-ticket dialog was not found exactly once.')
+          text = text.replace('workflow.js?v=20260826-release34', 'workflow.js?v=20260827-source-audit1')
+          text = text.replace('app.js?v=20260826-release34', 'app.js?v=20260827-source-audit1')
+          index.write_text(text, encoding='utf-8')
+
+          launchers = Path('action-launchers.js')
+          text = launchers.read_text(encoding='utf-8')
+          text = text.replace("\n    const legacy = document.getElementById('new-ticket');\n    if (legacy?.open) legacy.close();\n", '\n')
+          launchers.write_text(text, encoding='utf-8')
+
+          ci = Path('.github/workflows/portal-ci.yml')
+          text = ci.read_text(encoding='utf-8')
+          old = """          if 'first_name?.trim()&&x.newCustomer.phone?.trim()' not in operations:
+              raise SystemExit('Walk-in intake must require only customer name and phone.')"""
+          new = """          intake_profile = Path('intake-profile-validation-fix.js').read_text(encoding='utf-8')
+          required_profile_fields = ['first_name','last_name','phone','address_line_1','city','state','postal_code']
+          for field in required_profile_fields:
+              if f\"'{field}'\" not in intake_profile:
+                  raise SystemExit(f'Portal v1.1 intake profile guard missing required field: {field}')
+          for optional in ['contact_phone','email']:
+              if f\"'{optional}'\" not in intake_profile:
+                  raise SystemExit(f'Portal v1.1 intake profile guard missing optional field declaration: {optional}')
+          if runtime.find('operations-v1-core.js') > runtime.find('intake-profile-validation-fix.js'):
+              raise SystemExit('Portal v1.1 profile validation must load after operations-v1-core.js.')
+          if 'First name, last name, primary phone, and full mailing address are required.' not in intake_profile:
+              raise SystemExit('Portal v1.1 required-profile policy copy is missing.')"""
+          if old not in text:
+              raise SystemExit('Expected stale Portal CI intake assertion was not found.')
+          text = text.replace(old, new, 1)
+          old_runtime = "'operations-v1-arrival.js','portal-v1-polish.js','portal-v1-final.js','master-directory.js',"
+          new_runtime = "'operations-v1-arrival.js','portal-v1-polish.js','intake-profile-validation-fix.js','portal-v1-final.js','master-directory.js',"
+          if old_runtime not in text:
+              raise SystemExit('Expected Portal CI runtime list was not found.')
+          text = text.replace(old_runtime, new_runtime, 1)
+          ci.write_text(text, encoding='utf-8')
+
+      - name: Verify cleanup before commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in *.js; do node --check "$file"; done
+          ! grep -RInE 'console\.(log|debug|trace|info)\s*\(' --include='*.js' .
+          ! grep -q 'id="new-ticket"' index.html
+          ! grep -q 'ticketModal?.showModal()' app.js
+          ! grep -q 'Walk-in intake must require only customer name and phone.' .github/workflows/portal-ci.yml
+
+      - name: Commit audit fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'No source cleanup changes were needed.'
+            exit 0
+          fi
+          git config user.name 'gotcracked-source-audit'
+          git config user.email 'actions@users.noreply.github.com'
+          git add workflow.js app.js index.html action-launchers.js .github/workflows/portal-ci.yml
+          git commit -m 'Harden Portal v1.1 production source [source-audit-autofix]'
+          git push origin HEAD:audit/v1.1-full-source
