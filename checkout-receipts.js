@@ -57,7 +57,7 @@
     const email = receipt.customer_email || '';
     return `<div class="gc-receipt-shell">
       <div class="modal-head"><div><p class="eyebrow">Sale Complete</p><h2>Receipt ${esc(receipt.receipt_number || '')}</h2></div><button type="button" class="icon-button" data-gc-receipt-close aria-label="Close">×</button></div>
-      <div class="gc-receipt-success"><span>✓</span><div><strong>Sale recorded</strong><p>${money(receipt.amount_paid_cents ?? receipt.total_cents)} is now included in Portal sales/profit reporting for ${esc(receipt.business_date || 'today')}.</p></div></div>
+      <div class="gc-receipt-success"><span>✓</span><div><strong>Sale recorded</strong><p>${money(receipt.amount_paid_cents ?? receipt.total_cents)} is now posted to the Portal sales and reconciliation ledger for ${esc(receipt.business_date || 'today')}.</p></div></div>
       <section class="gc-receipt-paper" aria-label="Receipt preview">
         <header><div><strong class="gc-receipt-brand">GotCracked</strong><small>WE FIX WHAT LIFE CRACKS</small></div><div class="gc-receipt-number"><small>Receipt</small><strong>${esc(receipt.receipt_number || '')}</strong></div></header>
         <div class="gc-receipt-meta"><div><small>Customer</small><strong>${esc(receipt.customer_name || 'Customer')}</strong></div><div><small>Work order</small><strong>${ticketCode(receipt.ticket_number)}</strong></div><div><small>Device</small><strong>${esc(receipt.device_description || 'Device repair')}</strong></div><div><small>Date</small><strong>${esc(receipt.business_date || '')}</strong></div></div>
@@ -92,7 +92,39 @@
     return result.data;
   }
 
-  function checkoutMarkup(ticket, summary) {
+  async function getPaymentConfig() {
+    if (training()) return {
+      methods:{cash:true,external_pos_card:true,external_pos_other:true,cash_app:true,zelle:true,chime:true,paypal:false},
+      routes:{cash:{channel:'external_pos',requires_reference:true},external_pos_card:{channel:'external_pos',requires_reference:true},external_pos_other:{channel:'external_pos',requires_reference:true},cash_app:{channel:'internal',requires_reference:true},zelle:{channel:'internal',requires_reference:true},chime:{channel:'internal',requires_reference:true}}
+    };
+    const result=await client.rpc('get_payment_configuration');
+    if(result.error) throw result.error;
+    return result.data || {methods:{},routes:{}};
+  }
+
+  function paymentOptions(config) {
+    const methods=config?.methods || {}, routes=config?.routes || {};
+    const definitions=[
+      ['cash','Cash'],['external_pos_card','Card'],['external_pos_other','Other / mixed tender'],
+      ['cash_app','Cash App'],['zelle','Zelle'],['chime','Chime'],['paypal','PayPal']
+    ];
+    const enabled=definitions.filter(([key])=>Boolean(methods[key]));
+    const external=enabled.filter(([key])=>(routes[key]?.channel || (key.startsWith('external_pos')||key==='cash'?'external_pos':'internal'))==='external_pos');
+    const internal=enabled.filter(([key])=>(routes[key]?.channel || 'internal')==='internal');
+    const options=rows=>rows.map(([key,label])=>`<option value="${esc(key)}" data-channel="${esc(routes[key]?.channel || (key.startsWith('external_pos')||key==='cash'?'external_pos':'internal'))}" data-reference="${routes[key]?.requires_reference===false?'optional':'required'}">${esc(label)}</option>`).join('');
+    return `${external.length?`<optgroup label="External POS">${options(external)}</optgroup>`:''}${internal.length?`<optgroup label="Direct / internal">${options(internal)}</optgroup>`:''}` || '<option value="external_pos_card">Card</option>';
+  }
+
+  function paymentGuidance(select) {
+    const option=select?.selectedOptions?.[0];
+    const channel=option?.dataset.channel || 'external_pos';
+    const label=option?.textContent?.trim() || 'payment';
+    return channel==='internal'
+      ? `Confirm the ${label} payment directly, then enter its confirmation or transaction reference. This sale will be classified as direct/internal revenue.`
+      : `Complete the remaining balance in the external POS, then enter the POS receipt or transaction reference. Portal will include it in expected external sales for End Day reconciliation.`;
+  }
+
+  function checkoutMarkup(ticket, summary, config) {
     const total = Number(summary?.total_cents ?? ticket?.total_cents ?? 0);
     const prepaid = Number(summary?.prepayment_amount_cents || 0);
     const balance = Number(summary?.balance_due_cents || 0);
@@ -108,15 +140,16 @@
         <p class="operation-status" role="status"></p>`;
     }
 
+    const options=paymentOptions(config);
     return `<h3>${balance > 0 ? 'Final checkout' : 'Payment reconciliation'}</h3>
       <div class="gc-pos-checkout-callout"><strong>Work-order total</strong><span>${money(total)}</span></div>
       <div class="gc-pos-checkout-callout"><strong>Verified prepayment credit</strong><span>− ${money(prepaid)}</span></div>
       <p class="gc-payment-note">${esc(prepaidDetail)}</p>
       <div class="gc-pos-checkout-callout"><strong>Remaining balance</strong><span>${money(balance)}</span></div>
-      ${balance > 0 ? `<p>Ring <strong>${money(balance)}</strong> in the external POS—not the original work-order total—then enter the POS reference below.</p>
-      <label>POS tender<select name="tender"><option value="external_pos_card">Card</option><option value="external_pos_cash">Cash</option><option value="external_pos_other">Other / mixed tender</option></select></label>
-      <label>POS receipt / transaction reference<input name="reference" autocomplete="off" required placeholder="Required POS receipt or transaction reference"></label>
-      <label class="gc-pos-confirm"><input type="checkbox" name="confirmed" required><span>I completed the ${money(balance)} remaining-balance transaction in the external POS.</span></label>` : `<div class="gc-receipt-success"><span>✓</span><div><strong>Nothing else is due.</strong><p>The verified prepayment fully covers the final work-order total.</p></div></div>
+      ${balance > 0 ? `<label>Payment method<select name="tender" data-gc-payment-method>${options}</select></label>
+      <p class="gc-payment-note" data-gc-payment-guidance></p>
+      <label>Receipt / transaction reference<input name="reference" autocomplete="off" required placeholder="Required receipt or transaction reference"></label>
+      <label class="gc-pos-confirm"><input type="checkbox" name="confirmed" required><span>I verified the ${money(balance)} customer payment and payment method above.</span></label>` : `<div class="gc-receipt-success"><span>✓</span><div><strong>Nothing else is due.</strong><p>The verified prepayment fully covers the final work-order total.</p></div></div>
       <label class="gc-pos-confirm"><input type="checkbox" name="confirmed" required><span>I verified the prepayment and final total. No additional customer payment is due.</span></label>`}
       <input type="hidden" name="ticket_id" value="${esc(ticket.id)}">
       <input type="hidden" name="balance_due" value="${balance}">
@@ -131,18 +164,21 @@
     if (!form || !ticket) return;
     if (!['repaired','ready_for_pickup'].includes(String(ticket.status))) return;
     if (form.dataset.gcCheckoutLoading === 'true') return;
-    if (form.dataset.gcCheckoutTicket === ticket.id && form.dataset.gcExternalPos === 'true') return;
+    if (form.dataset.gcCheckoutTicket === ticket.id && form.dataset.gcReconciledCheckout === 'true') return;
 
     form.dataset.gcCheckoutLoading = 'true';
     form.dataset.gcCheckoutTicket = ticket.id;
     try {
-      const summary = await getCheckoutSummary(ticket);
+      const [summary,config] = await Promise.all([getCheckoutSummary(ticket),getPaymentConfig()]);
       if (!document.body.contains(form) || currentTicket()?.id !== ticket.id) return;
-      form.dataset.gcExternalPos = 'true';
-      form.innerHTML = checkoutMarkup(ticket,summary);
+      form.dataset.gcReconciledCheckout = 'true';
+      form.innerHTML = checkoutMarkup(ticket,summary,config);
+      const select=form.querySelector('[data-gc-payment-method]');
+      const guidance=form.querySelector('[data-gc-payment-guidance]');
+      if(select&&guidance)guidance.textContent=paymentGuidance(select);
     } catch (error) {
       if (!document.body.contains(form)) return;
-      form.dataset.gcExternalPos = 'error';
+      form.dataset.gcReconciledCheckout = 'error';
       form.innerHTML = `<h3>Checkout unavailable</h3><div class="gc-payment-warning">Portal could not verify this work order’s payment balance. Sale Complete is blocked until the payment summary can be loaded.</div><p class="operation-status v1-error">${esc(error?.message || 'Unable to load payment summary.')}</p>`;
       window.GotCrackedDiagnostics?.error?.(error,{context:'Failure to load checkout payment reconciliation'});
     } finally {
@@ -233,7 +269,7 @@
     if (!form.elements.confirmed?.checked) { status.textContent='Confirm the payment reconciliation before completing the sale.'; return; }
     const tender = balance > 0 ? (form.elements.tender?.value || 'external_pos_card') : 'prepaid';
     const reference = balance > 0 ? (form.elements.reference?.value?.trim() || null) : null;
-    if (balance > 0 && !reference) { status.textContent='Enter the external POS receipt or transaction reference.'; return; }
+    if (balance > 0 && !reference) { status.textContent='Enter the receipt, confirmation, or transaction reference.'; return; }
     const button = form.querySelector('button[type="submit"]');
     button.disabled=true;button.textContent='Recording sale…';status.textContent='';
 
@@ -243,7 +279,7 @@
         const summary=await getCheckoutSummary(ticket);
         receipt=saveTrainingReceipt(ticket,tender,reference,summary);
       } else {
-        const result=await client.rpc('finalize_external_pos_sale',{target_ticket:ticket.id,pos_reference:reference,pos_tender:tender,paid_amount_cents:balance});
+        const result=await client.rpc('finalize_repair_sale',{target_ticket:ticket.id,payment_method:tender,payment_reference:reference,paid_amount_cents:balance});
         if(result.error)throw result.error;
         receipt=result.data;
       }
@@ -290,22 +326,26 @@
 
   async function refreshDashboardSales() {
     if(training())return;
-    const result=await client.rpc('get_sales_day_summary',{target_date:null});if(result.error||!result.data)return;
-    const s=result.data;
+    if(window.GotCrackedSalesOps?.loadSummary) return window.GotCrackedSalesOps.loadSummary({quiet:true});
+    const result=await client.rpc('get_sales_day_summary',{target_date:null});
+    if(result.error||!result.data)return;
     const metric=[...document.querySelectorAll('#dashboard .metrics article')].find(card=>card.querySelector('p')?.textContent?.includes('Today’s sales'));
-    if(metric){const strong=metric.querySelector('strong');if(strong)strong.textContent=money(s.current_sales_cents);}
-    const card=document.getElementById('gc-sales-card');if(!card)return;
-    const percent=Number(s.goal_cents)?Math.max(0,Number(s.percent_to_goal||0)):0,fill=Math.min(percent,100);
-    const thermo=card.querySelector('.gc-thermo-fill'),progress=card.querySelector('.gc-sales-progress span');if(thermo)thermo.style.height=`${fill}%`;if(progress)progress.style.width=`${fill}%`;
-    const primary=card.querySelector('.gc-sales-primary');if(primary)primary.innerHTML=`<strong>${money(s.current_sales_cents)}</strong><span>${Number(s.goal_cents)?`of ${money(s.goal_cents)}`:'· goal not configured'}</span>`;
-    const toGoal=card.querySelector('.gc-sales-fact strong');if(toGoal)toGoal.textContent=Number(s.goal_cents)?(percent>=100?`${percent.toFixed(1)}% · goal met`:`${money(s.remaining_cents)} remaining`):'Set a launch goal';
+    if(metric){const strong=metric.querySelector('strong');if(strong)strong.textContent=money(result.data.current_sales_cents);}
   }
 
   document.addEventListener('submit',event=>{
     const form=event.target;
-    if(!(form instanceof HTMLFormElement)||form.id!=='v1-checkout-form'||form.dataset.gcExternalPos!=='true')return;
+    if(!(form instanceof HTMLFormElement)||form.id!=='v1-checkout-form'||form.dataset.gcReconciledCheckout!=='true')return;
     event.preventDefault();event.stopImmediatePropagation();finalizeCheckout(form);
   },true);
+
+  document.addEventListener('change',event=>{
+    const select=event.target instanceof Element ? event.target.closest('[data-gc-payment-method]') : null;
+    if(!select)return;
+    const form=select.closest('#v1-checkout-form');
+    const guidance=form?.querySelector('[data-gc-payment-guidance]');
+    if(guidance)guidance.textContent=paymentGuidance(select);
+  });
 
   document.addEventListener('click',async event=>{
     const target=event.target instanceof Element?event.target:null;if(!target)return;
@@ -320,5 +360,5 @@
   document.addEventListener('gc-portal-runtime-ready',()=>setTimeout(watchWorkOrder,0));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(watchWorkOrder,0),{once:true});else setTimeout(watchWorkOrder,0);
 
-  window.GotCrackedCheckoutReceipts={version:'20260827-payment-reconcile1',refresh:enhanceCheckoutForm};
+  window.GotCrackedCheckoutReceipts={version:'20260827-payment-reconcile2',refresh:enhanceCheckoutForm};
 })();

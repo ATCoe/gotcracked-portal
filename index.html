@@ -21,13 +21,16 @@
     <link rel="stylesheet" href="operations-v1.css?v=20260826-release34" />
     <link rel="stylesheet" href="operations-v1-extra.css?v=20260826-release34" />
     <link rel="stylesheet" href="portal-v1-polish.css?v=20260826-release34" data-gc-v1-polish="true" />
-    <link rel="stylesheet" href="master-directory.css?v=20260826-release34" data-gc-master-directory="true" />
+    <link rel="stylesheet" href="master-directory.css?v=20260827-directory4" data-gc-master-directory="true" />
+    <link rel="stylesheet" href="directory-advanced.css?v=20260827-dir4" data-gc-directory-advanced="true" />
     <link rel="stylesheet" href="portal-v1-release.css?v=20260826-release34" data-gc-v1-final="true" />
     <link rel="stylesheet" href="portal-theme.css?v=20260826-release34" data-gc-theme-style="true" />
     <link rel="stylesheet" href="portal-dark-components.css?v=20260825-dark3" data-gc-dark-components="true" />
     <link rel="stylesheet" href="theme-switch.css?v=20260825-switch2" data-gc-theme-switch="true" />
     <link rel="stylesheet" href="intake-modal-release.css?v=20260826-release34" />
-    <link rel="stylesheet" href="sales-ops.css?v=20260826-release34" />
+    <link rel="stylesheet" href="sales-ops.css?v=20260827-reconciliation2" />
+    <link rel="stylesheet" href="dashboard-rail.css?v=20260827-dashboard-rail2" />
+    <link rel="stylesheet" href="reconciliation-center.css?v=20260827-reconciliation2" />
     <link rel="stylesheet" href="checkout-receipts.css?v=20260826-release34" />
     <link rel="stylesheet" href="schedule-board.css?v=20260826-release34" />
     <link rel="stylesheet" href="time-clock.css?v=20260826-release34" />
@@ -77,10 +80,6 @@
           <a class="nav-link" href="#staff" data-view="staff"><span>♟</span>Staff access</a>
         </nav>
         <div class="sidebar-bottom">
-          <div id="sidebar-time-clock" class="gc-timeclock-mini" data-state="off_clock" aria-label="Time clock">
-            <div class="gc-timeclock-mini-head"><span class="gc-timeclock-state">Time clock</span><strong>0:00</strong></div>
-            <div class="gc-timeclock-mini-actions"><button type="button" class="gc-clock-primary" disabled>Loading…</button></div>
-          </div>
           <a class="nav-link" href="#settings" data-view="settings"><span>⚙</span>Settings</a>
           <div class="profile"><div id="staff-initials" class="avatar">GC</div><div><strong id="staff-name">Loading staff…</strong><small id="staff-role">Authorized staff</small></div><button id="sign-out" class="icon-button" aria-label="Sign out">↪</button></div>
         </div>
@@ -99,9 +98,6 @@
 
         <section id="dashboard" class="view active-view">
           <div class="page-heading"><div><p class="eyebrow">Today</p><h1>Loading your dashboard…</h1><p class="subtle">Here’s what needs attention at GotCracked today.</p></div><button class="primary-button" data-open-ticket>+ New repair</button></div>
-          <div id="dashboard-time-clock" class="gc-dashboard-clock" data-state="off_clock" aria-label="Your time clock">
-            <div class="gc-dashboard-clock-main"><span class="gc-dashboard-clock-icon" aria-hidden="true">◷</span><div class="gc-dashboard-clock-copy"><small>Time clock</small><strong>Loading…</strong><span>Checking your current shift.</span></div></div>
-          </div>
           <section class="metrics" aria-label="Today at a glance">
             <article><span class="metric-icon blue">⌁</span><div><p>Open repairs</p><strong>0</strong><small>Live shop data</small></div></article>
             <article><span class="metric-icon amber">◷</span><div><p>Today’s appointments</p><strong>0</strong><small>Live shop data</small></div></article>
@@ -110,11 +106,24 @@
           </section>
           <section class="content-grid">
             <article class="card work-queue"><div class="card-title"><div><h2>Repair work queue</h2><p>Active tickets by current stage</p></div><a href="#repairs" data-view="repairs">View all →</a></div><div id="repair-list" class="repair-list"></div></article>
-            <aside class="right-column"><article class="card"><div class="card-title"><div><h2>Today’s schedule</h2><p>Next appointments</p></div><a href="#appointments" data-view="appointments">Calendar →</a></div><p class="empty-state">Loading live appointments…</p></article><article class="card attention"><div class="card-title"><div><h2>Needs attention</h2><p>Keep repairs moving</p></div></div><p class="empty-state">Loading live operating alerts…</p></article></aside>
+            <aside class="right-column"><article class="card attention"><div class="card-title"><div><h2>Needs attention</h2><p>Keep repairs moving</p></div></div><p class="empty-state">Loading live operating alerts…</p></article></aside>
           </section>
+          <aside id="gc-dashboard-rail" class="gc-dashboard-rail" aria-label="Dashboard utilities">
+            <div id="gc-dashboard-sales-slot"><div class="card gc-rail-loading">Loading daily sales goal…</div></div>
+            <section class="card gc-dashboard-appointments-card" aria-label="Today's appointments">
+              <div class="gc-rail-section-head"><div><p class="eyebrow">Today</p><h2>Appointments</h2></div><a href="#appointments" data-view="appointments">View all →</a></div>
+              <div id="gc-dashboard-appointments"><p class="gc-rail-empty">Loading today’s appointments…</p></div>
+            </section>
+            <div class="gc-dashboard-rail-bottom">
+              <div id="dashboard-time-clock" class="gc-dashboard-clock" data-state="off_clock" aria-label="Your time clock">
+                <div class="gc-dashboard-clock-main"><span class="gc-dashboard-clock-icon" aria-hidden="true">◷</span><div class="gc-dashboard-clock-copy"><small>Time clock</small><strong>Loading…</strong><span>Checking your current shift.</span></div></div>
+              </div>
+              <section id="gc-dashboard-day-controls" class="card gc-day-controls" aria-label="Business day controls"><p class="gc-rail-empty">Loading business-day controls…</p></section>
+            </div>
+          </aside>
         </section>
 
-        <section id="repairs" class="view"><div class="page-heading"><div><p class="eyebrow">Repair workflow</p><h1>Repair tickets</h1><p class="subtle">Controlled repair stages, pickup, payment, and archived outcomes.</p></div><button class="primary-button" data-open-ticket>+ New repair</button></div><div class="card"><div class="toolbar"><div class="search">⌕ <input id="repair-search" placeholder="Search ticket, customer, device, phone, or email" /></div><select id="status-filter" aria-label="Filter repair status"><option value="active" selected>Active repair queue</option><option value="archive">Archive / closed outcomes</option><option value="all">All statuses</option><option value="awaiting_repair">Awaiting Repair</option><option value="need_to_order_parts">Need to Order Parts</option><option value="awaiting_parts">Awaiting Parts</option><option value="diagnostic_in_progress">Diagnostic in Progress</option><option value="repair_in_progress">Repair in Progress</option><option value="quality_inspection">Quality Inspection</option><option value="awaiting_callback">Awaiting Callback</option><option value="repaired">Repaired – Ready for Pickup</option><option value="sale_complete">Sale Complete</option><option value="unrepairable">Unrepairable</option><option value="customer_declined">Customer Declined</option><option value="cancelled">Cancelled</option></select></div><div class="table-wrap"><table><thead><tr><th>Ticket</th><th>Customer / device</th><th>Service</th><th>Assigned to</th><th>Status</th><th>Updated</th></tr></thead><tbody id="repair-table"></tbody></table></div></div></section>
+        <section id="repairs" class="view"><div class="page-heading"><div><p class="eyebrow">Repair workflow</p><h1>Repair tickets</h1><p class="subtle">Controlled repair stages, pickup, payment, and archived outcomes.</p></div><button class="primary-button" data-open-ticket>+ New repair</button></div><div class="card"><div class="toolbar"><div class="search">⌕ <input id="repair-search" placeholder="Search ticket, customer, device, phone, or email" /></div><select id="status-filter" aria-label="Filter repair status"><option value="active" selected>Active repair queue</option><option value="archive">Archive / closed outcomes</option><option value="all">All statuses</option><option value="awaiting_repair">Awaiting Repair</option><option value="awaiting_diagnostic">Awaiting Diagnostic</option><option value="testing_in_progress">Testing in Progress</option><option value="need_to_order_parts">Need to Order Parts</option><option value="awaiting_parts">Awaiting Parts</option><option value="diagnostic_in_progress">Diagnostic in Progress</option><option value="repair_in_progress">Repair in Progress</option><option value="quality_inspection">Quality Inspection</option><option value="awaiting_callback">Awaiting Callback</option><option value="repaired">Repaired – Ready for Pickup</option><option value="sale_complete">Sale Complete</option><option value="unrepairable">Unrepairable</option><option value="customer_declined">Customer Declined</option><option value="cancelled">Cancelled</option></select></div><div class="table-wrap"><table><thead><tr><th>Ticket</th><th>Customer / device</th><th>Service</th><th>Assigned to</th><th>Status</th><th>Updated</th></tr></thead><tbody id="repair-table"></tbody></table></div></div></section>
         <section id="shipping" class="view"><div class="page-heading"><div><p class="eyebrow">Mail-in operations</p><h1>Shipping desk</h1><p class="subtle">Receive inbound devices, prepare insured returns, and keep customers informed.</p></div><a class="primary-button" href="https://ship.pirateship.com/" target="_blank" rel="noopener">Create carrier label ↗</a></div><div id="shipping-workspace"><div class="empty-card"><span>▰</span><h2>Loading mail-in repairs…</h2></div></div></section>
         <section id="leads" class="view"><div class="page-heading"><div><p class="eyebrow">Unified lead pipeline</p><h1>Leads</h1><p class="subtle">Create leads manually or work the same live queue shared with Discord.</p></div><button class="primary-button" data-live-action="lead">+ New lead</button></div><div class="card"><div class="toolbar"><div class="search">⌕ <input id="lead-search" placeholder="Search leads"></div><select id="lead-status"><option value="all">All statuses</option><option value="new">New</option><option value="claimed">Claimed</option><option value="qualified">Qualified</option><option value="won">Won</option><option value="lost">Lost</option></select></div><div id="portal-leads"></div></div></section>
         <section id="appointments" class="view"><div class="page-heading"><div><p class="eyebrow">Appointments</p><h1>Appointments</h1><p class="subtle">Reserve customer time without losing room for walk-ins.</p></div><button class="primary-button" data-open-ticket>+ Walk-in repair</button></div><div class="empty-card"><span>◷</span><h2>Appointment calendar is ready for your schedule.</h2><p>Connect your booking page when you’re ready; today’s appointments already appear on the dashboard.</p></div></section>
@@ -139,6 +148,6 @@
     <script defer src="workflow.js?v=20260827-source-audit1"></script>
     <script defer src="app.js?v=20260827-source-audit1"></script>
     <script defer src="mobile-nav-safe.js?v=20260826-release34"></script>
-    <script defer src="portal-runtime-loader.js?v=20260826-loader2"></script>
+    <script defer src="portal-runtime-loader.js?v=20260827-production20"></script>
   </body>
 </html>

@@ -1,9 +1,9 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260827-production16';
+  const VERSION = '20260827-production20';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
-  const SALES_OPS_VERSION = '20260826-sales-ops2';
+  const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
   const CUSTOMERS_VERSION = '20260827-production1';
   const PROFILE_READY_TIMEOUT_MS = 15000;
@@ -38,6 +38,7 @@
     'pc-builds.js',
     'cross-user-sync.js',
     'sales-ops.js',
+    'dashboard-rail.js',
     'checkout-receipts.js'
   ];
 
@@ -57,7 +58,7 @@
     appointments: ['appointments-board.js','appointments-owner-guard.js'],
     schedule: ['schedule-board.js','schedule-print.js'],
     customers: ['customers-board.js'],
-    reports: ['analytics.js'],
+    reports: ['analytics.js','reconciliation-center.js'],
     shipping: ['shipping.js'],
     inventory: ['inventory-audit.js'],
     settings: ['business-settings.js','google-settings-integration.js','pricing-settings.js']
@@ -149,22 +150,22 @@
   }
 
   function wireTrainingResyncAfterOperations(){
-    if(trainingResyncWired) return;
+    if(trainingResyncWired)return;
     const ready=captureTrainingSyncReady();
-    if(!ready) return;
+    if(!ready)return;
     trainingResyncWired=true;
     ready.then(()=>{
-      if(!isTraining()) return;
+      if(!isTraining())return;
       const ops=window.GotCrackedOperationsV1;
-      if(typeof ops?.reload!=='function') return;
+      if(typeof ops?.reload!=='function')return;
       requestAnimationFrame(()=>Promise.resolve(ops.reload()).catch(error=>console.warn('Training Store post-sync refresh failed:',error)));
     });
   }
 
   function captureAccountSyncReady(){
-    if(accountSyncReady) return accountSyncReady;
+    if(accountSyncReady)return accountSyncReady;
     const ready=window.GotCrackedAccountSync?.ready;
-    if(!ready) return null;
+    if(!ready)return null;
     accountSyncReady=Promise.resolve(ready).catch(error=>{
       console.warn('Account preference sync did not finish during startup; local Portal preferences remain available.',error);
       return null;
@@ -173,10 +174,10 @@
   }
 
   async function waitForAccountSyncBeforeDirectory(){
-    if(accountSyncWaited) return;
+    if(accountSyncWaited)return;
     accountSyncWaited=true;
     const ready=captureAccountSyncReady();
-    if(ready) await ready;
+    if(ready)await ready;
   }
 
   async function loadSequence(files) {

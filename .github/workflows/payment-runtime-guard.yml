@@ -17,17 +17,21 @@ jobs:
         run: |
           node --check checkout-receipts.js
           node --check portal-runtime-loader.js
-          node --check payment-center.js
       - name: Verify single runtime ownership
         run: |
           node <<'NODE'
           const fs = require('fs');
           const loader = fs.readFileSync('portal-runtime-loader.js','utf8');
           const index = fs.readFileSync('index.html','utf8');
-          const banned = ['leads.js','intake-modal-release.js','sales-ops-bootstrap.js'];
-          for (const file of banned) {
+          const retiredRuntime = ['leads.js','portal-live.js','payment-center.js','intake-modal-release.js','sales-ops-bootstrap.js'];
+          for (const file of retiredRuntime) {
             if (loader.includes(`'${file}'`) || loader.includes(`"${file}"`)) throw new Error(`${file} must not be loaded by the production runtime`);
-            if (fs.existsSync(file)) throw new Error(`${file} is retired and must not remain in the repository`);
+          }
+          for (const file of ['leads.js','intake-modal-release.js','sales-ops-bootstrap.js']) {
+            if (fs.existsSync(file)) throw new Error(`${file} is fully retired and must not remain in the repository`);
+          }
+          for (const file of ['sales-ops.js','dashboard-rail.js','checkout-receipts.js']) {
+            if (!loader.includes(`'${file}'`) && !loader.includes(`"${file}"`)) throw new Error(`${file} must be loaded by the authenticated runtime`);
           }
           for (const css of ['intake-modal-release.css','sales-ops.css','checkout-receipts.css']) {
             if (!index.includes(css)) throw new Error(`${css} must be owned by index.html`);
@@ -41,23 +45,26 @@ jobs:
           const checkout = fs.readFileSync('checkout-receipts.js','utf8');
           const migration47 = fs.readFileSync('supabase/migrations/0047_payment_reconciliation_and_checkout_balance.sql','utf8');
           const migration48 = fs.readFileSync('supabase/migrations/0048_checkout_controlled_status_transition.sql','utf8');
+          const premium = fs.readFileSync('supabase/migrations/0052_premium_sales_reconciliation.sql','utf8');
+          const openDay = fs.readFileSync('supabase/migrations/0053_sale_requires_open_business_day.sql','utf8');
+          const closeGuard = fs.readFileSync('supabase/migrations/0054_closeout_integrity_guard.sql','utf8');
           const requiredCheckout = [
-            "get_checkout_payment_summary",
-            "prepayment_amount_cents",
-            "balance_due_cents",
-            "paid_amount_cents:balance",
-            "Remaining balance",
-            "overpayment"
+            "get_checkout_payment_summary","get_payment_configuration","prepayment_amount_cents",
+            "balance_due_cents","paid_amount_cents:balance","Remaining balance","overpayment",
+            "finalize_repair_sale","Direct / internal","Cash App","Zelle","Chime"
           ];
           for (const token of requiredCheckout) if (!checkout.includes(token)) throw new Error(`Checkout reconciliation token missing: ${token}`);
           const requiredSql = [
-            "create or replace function public.get_checkout_payment_summary",
-            "prepayment_amount_cents",
-            "checkout_amount_cents",
+            "create or replace function public.get_checkout_payment_summary","prepayment_amount_cents","checkout_amount_cents",
             "Checkout amount must equal the remaining balance after verified prepayment."
           ];
           for (const token of requiredSql) if (!migration47.includes(token) && !migration48.includes(token)) throw new Error(`Payment SQL contract missing: ${token}`);
+          for (const token of ['sales_ledger_entries','payment_method_routes','finalize_repair_sale','get_sales_day_summary','close_business_day','predict_daily_sales_goal']) {
+            if (!premium.includes(token)) throw new Error(`Premium reconciliation SQL contract missing: ${token}`);
+          }
+          if (!openDay.includes('Start Day must be completed before a sale can be posted.')) throw new Error('Sale-complete business-day guard is missing');
+          if (!closeGuard.includes('POS net sales must match gross sales minus discounts and refunds.')) throw new Error('End Day accounting integrity guard is missing');
           if (!migration48.includes("set_config('app.repair_status_advance','allowed',true)")) throw new Error('Checkout must use the controlled repair status transition context');
           if (!migration48.includes("Verified prepayment exceeds the final work-order total")) throw new Error('Overpayment must block Sale Complete');
-          console.log('Payment reconciliation contract is present.');
+          console.log('Premium payment and reconciliation contract is present.');
           NODE
