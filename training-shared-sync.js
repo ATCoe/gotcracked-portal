@@ -23,6 +23,7 @@
   let interval = null;
 
   const isTraining = () => localStorage.getItem('gc-training-store') === '1';
+  let lastTrainingMode = isTraining();
 
   function localSnapshot() {
     const storage = {};
@@ -132,7 +133,11 @@
       if (initial || lastRevision === null) {
         lastRevision = revision;
         if (revision > 0 && remoteHasStorage) {
-          applySnapshot(remotePayload);
+          const applied = applySnapshot(remotePayload);
+          // The first pull may happen after Operations has already loaded the
+          // browser's local Training Store copy. Hydrate the visible state now
+          // instead of waiting for a second remote revision.
+          if (applied) await refreshTrainingUI();
         } else {
           lastLocalFingerprint = fingerprint();
           if (hasLocalTrainingData()) {
@@ -167,8 +172,31 @@
     }
   }
 
+  async function handleStoreModeChange({ force = false } = {}) {
+    const training = isTraining();
+    if (!force && training === lastTrainingMode) return false;
+
+    const previousTraining = lastTrainingMode;
+    lastTrainingMode = training;
+    lastRevision = null;
+    lastLocalFingerprint = null;
+    lastRemoteUpdate = null;
+    pushQueued = false;
+
+    if (training) {
+      await pull({ initial: true });
+      lastLocalFingerprint = fingerprint();
+    }
+
+    document.dispatchEvent(new CustomEvent('gc-store-mode-changed', {
+      detail: { training, previousTraining }
+    }));
+    return true;
+  }
+
   async function tick() {
-    if (!isTraining() || document.visibilityState === 'hidden' || applyingRemote) return;
+    const modeChanged = await handleStoreModeChange();
+    if (modeChanged || !isTraining() || document.visibilityState === 'hidden' || applyingRemote) return;
 
     const currentFingerprint = fingerprint();
     if (lastLocalFingerprint !== null && currentFingerprint !== lastLocalFingerprint) {
@@ -179,7 +207,6 @@
   }
 
   function scheduleMutationCheck() {
-    if (!isTraining()) return;
     setTimeout(tick, 80);
     setTimeout(tick, 300);
   }
@@ -192,7 +219,8 @@
   document.addEventListener('change', scheduleMutationCheck, true);
 
   const ready = (async () => {
-    if (!isTraining()) return;
+    lastTrainingMode = isTraining();
+    if (!lastTrainingMode) return;
     await pull({ initial: true });
     lastLocalFingerprint = fingerprint();
   })();
@@ -204,11 +232,12 @@
   window.addEventListener('online', tick);
 
   window.GotCrackedTrainingSync = {
-    version: '20260825-training-sync3',
+    version: '20260827-training-sync4',
     ready,
     pull,
     push,
     tick,
+    resync: () => handleStoreModeChange({ force: true }),
     markDirty: scheduleMutationCheck,
     get revision() { return lastRevision; },
     get status() {
@@ -217,6 +246,7 @@
         pollBusy,
         pushBusy,
         lastRemoteUpdate,
+        training: isTraining(),
         localDirty: lastLocalFingerprint !== null && fingerprint() !== lastLocalFingerprint
       };
     },
