@@ -55,29 +55,19 @@
       setBackdropInteractive(backdrop, open);
     });
 
-    if (!rightDrawer) {
-      document.body.classList.remove('v1-overlay-open');
-      return;
-    }
-
+    if (!rightDrawer) return;
     rightDrawer.setAttribute('aria-label', 'Lead workflow panel');
     rightDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
-    document.body.classList.toggle('v1-overlay-open', open);
-  }
 
-  function sanitizeRetiredMobileBackdrops() {
-    document.querySelectorAll('.sidebar-backdrop').forEach(backdrop => {
-      backdrop.hidden = true;
-      backdrop.setAttribute('inert', '');
-      backdrop.style.setProperty('display', 'none', 'important');
-      backdrop.style.setProperty('pointer-events', 'none', 'important');
-    });
+    // Global overlay body state is owned by runtime-stability / the polish layer,
+    // because native dialogs and the lead drawer both participate in it. This
+    // release layer only owns the lead drawer's own backdrop.
+    window.GotCrackedRuntimeStability?.syncOverlays?.();
   }
 
   function decorate() {
     decorateFrame = 0;
 
-    sanitizeRetiredMobileBackdrops();
     syncLeadDrawerState();
 
     document.querySelectorAll('.v1-drawer-backdrop').forEach(backdrop => {
@@ -115,16 +105,6 @@
     if (view) activate(view);
   }
 
-  function loadTitleCaseLayer() {
-    if (window.GotCrackedTitleCase || document.querySelector('script[data-gc-title-case]')) return;
-    const script = document.createElement('script');
-    script.src = 'ui-title-case.js?v=20260827-titlecase2';
-    script.async = false;
-    script.dataset.gcTitleCase = 'true';
-    script.addEventListener('error', () => console.warn('Portal title-case layer failed to load.'), {once:true});
-    document.body.appendChild(script);
-  }
-
   document.addEventListener('click', event => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
@@ -159,9 +139,7 @@
   });
 
   /* Dynamic operational views still insert DOM after authentication. Observe
-     inserted/removed nodes only and coalesce them to one frame. The backdrop
-     synchronizer also guarantees that a closed operational drawer can never
-     leave an invisible full-screen hit target over the Portal. */
+     inserted/removed nodes only and coalesce them to one frame. */
   const main = document.querySelector('main');
   if (main) {
     const observer = new MutationObserver(scheduleDecorate);
@@ -170,15 +148,12 @@
 
   workflowMedia.addEventListener?.('change', scheduleDecorate);
   window.addEventListener('resize', scheduleDecorate, { passive: true });
+  window.addEventListener('pageshow', scheduleDecorate);
   document.addEventListener('gc-view-changed', scheduleDecorate);
   document.addEventListener('gc-portal-runtime-ready', scheduleDecorate);
   window.addEventListener('load', scheduleDecorate, { once: true });
 
-  /* Run once immediately because the operational shell may already have created
-     its full-screen backdrop before this release layer loads. */
-  sanitizeRetiredMobileBackdrops();
   syncLeadDrawerState();
-  loadTitleCaseLayer();
   setTimeout(scheduleDecorate, 0);
   setTimeout(scheduleDecorate, 1200);
 })();
