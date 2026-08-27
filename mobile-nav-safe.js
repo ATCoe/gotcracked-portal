@@ -3,8 +3,11 @@
 
   const MOBILE_MAX = 750;
   const NAV_CLASS = 'gc-mobile-nav';
+  const BACKDROP_CLASS = 'gc-mobile-nav-backdrop';
+  const CLOSE_CLASS = 'gc-mobile-nav-close';
   const mobileQuery = window.matchMedia(`(max-width: ${MOBILE_MAX}px)`);
   let lastPointerToggleAt = 0;
+  let returnFocus = null;
 
   const navItems = {
     primary: [
@@ -32,6 +35,50 @@
   const sidebar = () => document.querySelector('.sidebar');
   const buttons = () => Array.from(document.querySelectorAll('.mobile-menu'));
   const currentView = () => window.location.hash.slice(1).split('/')[0] || 'dashboard';
+
+  function injectStyle() {
+    if (document.getElementById('gc-mobile-nav-safe-style')) return;
+    const style = document.createElement('style');
+    style.id = 'gc-mobile-nav-safe-style';
+    style.textContent = `
+      .${BACKDROP_CLASS}, .${CLOSE_CLASS}{display:none}
+      @media(max-width:${MOBILE_MAX}px){
+        :root{--gc-sidebar-mobile:min(88vw,360px)!important}
+        html[data-gc-mobile-nav-open="true"],
+        html[data-gc-mobile-nav-open="true"] body{overflow:hidden!important;overscroll-behavior:none!important}
+        .${BACKDROP_CLASS}{
+          display:block!important;position:fixed!important;inset:0!important;z-index:55!important;
+          background:rgba(3,11,20,.52)!important;opacity:0;visibility:hidden;pointer-events:none;
+          transition:opacity .18s ease,visibility .18s ease;touch-action:manipulation;
+          -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+        }
+        html[data-gc-mobile-nav-open="true"] .${BACKDROP_CLASS}{opacity:1;visibility:visible;pointer-events:auto}
+        .sidebar{width:var(--gc-sidebar-mobile)!important}
+        .sidebar>.${NAV_CLASS}{
+          overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior-y:contain!important;
+          -webkit-overflow-scrolling:touch!important;scrollbar-width:none!important;padding-bottom:10px!important;
+        }
+        .sidebar>.${NAV_CLASS}::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+        .${CLOSE_CLASS}{
+          display:grid!important;place-items:center!important;position:absolute!important;
+          top:max(10px,env(safe-area-inset-top))!important;right:10px!important;z-index:3!important;
+          width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;
+          padding:0!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:12px!important;
+          background:rgba(255,255,255,.075)!important;color:#e9f2fb!important;font-size:28px!important;
+          font-weight:400!important;line-height:1!important;cursor:pointer!important;touch-action:manipulation!important;
+          -webkit-tap-highlight-color:transparent;user-select:none;
+        }
+        .${CLOSE_CLASS}:active{background:rgba(255,255,255,.15)!important;transform:scale(.96)}
+        .mobile-menu{
+          width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;
+          display:grid!important;place-items:center!important;padding:0!important;border-radius:10px!important;
+          touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;user-select:none!important;
+        }
+        .${NAV_CLASS} a,.${NAV_CLASS} summary{-webkit-touch-callout:none;user-select:none}
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
   function linkMarkup([view, icon, label]) {
     return `<a class="nav-link" href="#${view}" data-view="${view}" data-mobile-nav-item="true"><span>${icon}</span>${label}</a>`;
@@ -69,10 +116,38 @@
     }
   }
 
+  function ensureBackdrop() {
+    let backdrop = document.querySelector(`.${BACKDROP_CLASS}`);
+    if (!backdrop) {
+      backdrop = document.createElement('div');
+      backdrop.className = BACKDROP_CLASS;
+      backdrop.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(backdrop);
+    }
+    return backdrop;
+  }
+
+  function ensureCloseButton(panel) {
+    if (!panel) return null;
+    let close = panel.querySelector(`.${CLOSE_CLASS}`);
+    if (!close) {
+      close = document.createElement('button');
+      close.type = 'button';
+      close.className = CLOSE_CLASS;
+      close.setAttribute('aria-label', 'Close menu');
+      close.textContent = '×';
+      panel.prepend(close);
+    }
+    return close;
+  }
+
   function buildOnce() {
     const panel = sidebar();
     if (!panel) return null;
     if (!panel.id) panel.id = 'portal-sidebar';
+
+    ensureBackdrop();
+    ensureCloseButton(panel);
 
     let nav = panel.querySelector(`.${NAV_CLASS}`);
     if (!nav) {
@@ -93,19 +168,25 @@
     return nav;
   }
 
-  function setOpen(open) {
+  function setOpen(open, options = {}) {
     const panel = sidebar();
     if (!panel) return;
 
     const shouldOpen = Boolean(open) && mobileQuery.matches;
+    const backdrop = ensureBackdrop();
+    ensureCloseButton(panel);
+
     document.documentElement.dataset.gcMobileNavOpen = shouldOpen ? 'true' : 'false';
+    document.body?.classList.toggle('mobile-nav-open', shouldOpen);
     panel.classList.toggle('open', shouldOpen);
     panel.dataset.mobileOpen = shouldOpen ? 'true' : 'false';
     panel.setAttribute('aria-hidden', shouldOpen ? 'false' : String(mobileQuery.matches));
+    backdrop.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
     forcePanelVisualState(panel, shouldOpen);
     syncButtons(shouldOpen);
 
     if (shouldOpen) {
+      if (options.trigger instanceof HTMLElement) returnFocus = options.trigger;
       requestAnimationFrame(() => {
         if (document.documentElement.dataset.gcMobileNavOpen !== 'true') return;
         const current = sidebar();
@@ -114,7 +195,11 @@
         current.dataset.mobileOpen = 'true';
         forcePanelVisualState(current, true);
         syncButtons(true);
+        current.querySelector(`.${CLOSE_CLASS}`)?.focus({preventScroll:true});
       });
+    } else if (options.restoreFocus && returnFocus?.isConnected) {
+      requestAnimationFrame(() => returnFocus?.focus?.({preventScroll:true}));
+      returnFocus = null;
     }
   }
 
@@ -160,7 +245,7 @@
     event.preventDefault();
     event.stopImmediatePropagation();
     lastPointerToggleAt = performance.now();
-    setOpen(panel.dataset.mobileOpen !== 'true');
+    setOpen(panel.dataset.mobileOpen !== 'true', {trigger:toggle, restoreFocus:true});
     return true;
   }
 
@@ -168,11 +253,29 @@
     if (document.documentElement.dataset.gcMobileNavBound === 'true') return;
     document.documentElement.dataset.gcMobileNavBound = 'true';
 
-    /* Android can cancel a synthesized click when late Portal rendering changes
-       the DOM during a tap. Own the hamburger on pointerdown at window capture,
-       before document-level runtime handlers or overlays can consume it. */
+    /* Own the hamburger on pointerdown so late Android/Samsung DOM updates cannot
+       cancel the tap before the menu opens. */
     window.addEventListener('pointerdown', event => {
       toggleAtPoint(event);
+    }, true);
+
+    /* Backdrop and in-drawer close button are first-class close controls. */
+    document.addEventListener('pointerdown', event => {
+      if (!mobileQuery.matches) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) return;
+
+      if (target.closest(`.${CLOSE_CLASS}`) || target.closest(`.${BACKDROP_CLASS}`)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setOpen(false, {restoreFocus:true});
+        return;
+      }
+
+      const panel = sidebar();
+      if (!panel || panel.dataset.mobileOpen !== 'true') return;
+      if (panel.contains(target) || target.closest('.mobile-menu')) return;
+      setOpen(false, {restoreFocus:false});
     }, true);
 
     /* Keyboard activation and browsers without Pointer Events keep a click
@@ -188,29 +291,28 @@
 
       const panel = sidebar();
       if (!panel) return;
-      setOpen(panel.dataset.mobileOpen !== 'true');
-    }, true);
-
-    document.addEventListener('pointerdown', event => {
-      const panel = sidebar();
-      if (!panel || !mobileQuery.matches || panel.dataset.mobileOpen !== 'true') return;
-
-      const target = event.target instanceof Node ? event.target : null;
-      const toggle = target instanceof Element ? target.closest?.('.mobile-menu') : null;
-      if (!target || panel.contains(target) || toggle) return;
-      setOpen(false);
+      setOpen(panel.dataset.mobileOpen !== 'true', {trigger:toggle, restoreFocus:true});
     }, true);
 
     document.addEventListener('click', event => {
       const target = event.target instanceof Element ? event.target : null;
       if (!target?.closest(`.${NAV_CLASS} .nav-link[data-view]`)) return;
-      setOpen(false);
+      setOpen(false, {restoreFocus:false});
+    });
+
+    /* Keep the drawer app-like on phones: a long press should not open the
+       browser's Copy/Download-link context menu over Portal navigation. */
+    document.addEventListener('contextmenu', event => {
+      if (!mobileQuery.matches) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(`.${NAV_CLASS}, .mobile-menu, .${CLOSE_CLASS}`)) event.preventDefault();
     });
 
     window.addEventListener('hashchange', () => {
-      setOpen(false);
+      setOpen(false, {restoreFocus:false});
       syncActive();
     });
+    window.addEventListener('popstate', () => setOpen(false, {restoreFocus:false}));
 
     document.addEventListener('gc-view-changed', syncActive);
 
@@ -221,33 +323,39 @@
     });
 
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') setOpen(false, {restoreFocus:true});
     });
 
     mobileQuery.addEventListener?.('change', event => {
-      if (!event.matches) setOpen(false);
+      if (!event.matches) setOpen(false, {restoreFocus:false});
       else {
         buildOnce();
         syncButtons(false);
       }
     });
 
-    window.addEventListener('orientationchange', () => setOpen(false));
+    window.addEventListener('orientationchange', () => setOpen(false, {restoreFocus:false}));
     window.addEventListener('pageshow', () => {
       buildOnce();
-      setOpen(false);
+      setOpen(false, {restoreFocus:false});
     });
   }
 
   function init() {
     document.querySelectorAll('.sidebar-backdrop').forEach(node => node.remove());
+    injectStyle();
     buildOnce();
     bind();
-    setOpen(false);
+    setOpen(false, {restoreFocus:false});
   }
 
-  window.GotCrackedMobileNav = { build: buildOnce, setOpen, syncActive };
+  window.GotCrackedMobileNav = {
+    version:'20260827-mobile-nav4',
+    build:buildOnce,
+    setOpen,
+    syncActive
+  };
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, {once:true});
   else init();
 })();
