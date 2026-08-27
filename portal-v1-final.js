@@ -118,7 +118,7 @@
   function loadTitleCaseLayer() {
     if (window.GotCrackedTitleCase || document.querySelector('script[data-gc-title-case]')) return;
     const script = document.createElement('script');
-    script.src = 'ui-title-case.js?v=20260827-titlecase1';
+    script.src = 'ui-title-case.js?v=20260827-titlecase2';
     script.async = false;
     script.dataset.gcTitleCase = 'true';
     script.addEventListener('error', () => console.warn('Portal title-case layer failed to load.'), {once:true});
