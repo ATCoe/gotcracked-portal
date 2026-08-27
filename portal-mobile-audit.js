@@ -43,12 +43,13 @@
   }
 
   async function loadMarlon() {
-    const version = '20260827-marlon16';
+    const version = '20260827-marlon17';
     loadStyle(`marlon-assistant.css?v=${version}`, 'gcMarlonStyle');
     loadStyle(`marlon-extensions.css?v=${version}`, 'gcMarlonExtensions');
     await loadScript(`marlon-config.js?v=${version}`, 'gcMarlonConfig');
     await loadScript(`marlon-assistant.js?v=${version}`, 'gcMarlonRuntime');
     await loadScript(`marlon-support.js?v=${version}`, 'gcMarlonSupport');
+    await loadScript(`marlon-approval-gate.js?v=${version}`, 'gcMarlonApprovalGate');
     await loadScript(`staff-badges-v2.js?v=${version}`, 'gcStaffBadges');
     await loadScript(`marlon-releases.js?v=${version}`, 'gcMarlonReleases');
     await loadScript(`marlon-monitor.js?v=${version}`, 'gcMarlonMonitor');
