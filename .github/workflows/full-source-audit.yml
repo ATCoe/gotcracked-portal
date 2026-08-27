@@ -91,6 +91,7 @@ jobs:
           print('No debug statements or stale intake fallback found.')
 
       - name: Report source risk markers
+        if: always()
         shell: python
         run: |
           from pathlib import Path
@@ -104,3 +105,21 @@ jobs:
                   markers[key] += len(re.findall(re.escape(key), text, re.I if key in {'TODO','FIXME','TEMP','LEGACY'} else 0))
           for key, value in markers.items():
               print(f'{key}: {value}')
+
+          print('\nConsole warning/error locations:')
+          for path in sorted(Path('.').glob('*.js')):
+              for i, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
+                  if re.search(r'console\.(warn|error)\s*\(', line):
+                      print(f'{path}:{i}: {line.strip()[:220]}')
+
+          print('\nLegacy/TODO/FIXME locations:')
+          for path in roots:
+              for i, line in enumerate(path.read_text(encoding='utf-8', errors='replace').splitlines(), 1):
+                  if re.search(r'\b(TODO|FIXME|legacy)\b', line, re.I):
+                      print(f'{path}:{i}: {line.strip()[:220]}')
+
+          print('\n!important by stylesheet:')
+          for path in sorted(Path('.').glob('*.css')):
+              count = path.read_text(encoding='utf-8').count('!important')
+              if count:
+                  print(f'{path}: {count}')
