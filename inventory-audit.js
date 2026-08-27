@@ -10,6 +10,7 @@
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[char]);
   const money = cents => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format((cents||0)/100);
   const canCount = () => window.GotCrackedOperationsV1?.state?.permissions?.get?.('inventory.count') ?? ['owner','manager'].includes(profile?.role);
+  const showFailure = (error,context,status) => { const message=error?.message||String(error||'Inventory audit failed.'); if(status)status.textContent=message; window.GotCrackedDiagnostics?.error?.(error||message,{context}); };
 
   function ensureButton() {
     const actions = document.querySelector('#inventory .page-heading .quick-actions');
@@ -45,30 +46,31 @@
     if(!profile?.location_id){window.GotCrackedDiagnostics?.error?.('Staff profile is unavailable.',{context:'Unable to load inventory audit'});return;}
     ensureButton();
     const auditResult=await client.from('inventory_audits').select('*').eq('location_id',profile.location_id).eq('status','in_progress').maybeSingle();
+    if(auditResult.error){showFailure(auditResult.error,'Unable to load inventory audit');return;}
     audit=auditResult.data||null;
-    if(audit){const result=await client.from('inventory_audit_items').select('*,inventory_items(name,sku,cost_cents,quantity_on_hand)').eq('audit_id',audit.id);items=(result.data||[]).sort((a,b)=>String(a.inventory_items?.name||'').localeCompare(String(b.inventory_items?.name||'')));}else items=[];
+    if(audit){const result=await client.from('inventory_audit_items').select('*,inventory_items(name,sku,cost_cents,quantity_on_hand)').eq('audit_id',audit.id);if(result.error){showFailure(result.error,'Unable to load inventory audit items');return;}items=(result.data||[]).sort((a,b)=>String(a.inventory_items?.name||'').localeCompare(String(b.inventory_items?.name||'')));}else items=[];
     render();
   }
 
   document.addEventListener('click',async event=>{
     if(event.target.closest('[data-open-inventory-audit]')){event.preventDefault();dialog.showModal();await load();}
     if(event.target.closest('[data-close-audit]'))dialog.close();
-    if(event.target.closest('[data-start-audit]')){const status=host.querySelector('.audit-status');const {error}=await client.rpc('start_inventory_audit',{audit_notes:'Barcode cycle count'});if(error)status.textContent=error.message;else await load();}
-    if(event.target.closest('[data-complete-audit]')){const unscanned=items.filter(item=>!item.last_scanned_at).length;const variance=items.filter(item=>item.counted_quantity!==item.expected_quantity).length;if(!confirm(`Complete this audit and adjust inventory? ${unscanned} unscanned items will be counted as zero; ${variance} items currently have a variance.`))return;const {error}=await client.rpc('complete_inventory_audit',{target_audit:audit.id});if(error)host.querySelector('.audit-status').textContent=error.message;else{audit=null;items=[];render();}}
-    if(event.target.closest('[data-cancel-audit]')){if(!confirm('Cancel this audit? No inventory quantities will be changed.'))return;const {error}=await client.rpc('cancel_inventory_audit',{target_audit:audit.id});if(error)host.querySelector('.audit-status').textContent=error.message;else{audit=null;items=[];render();}}
+    if(event.target.closest('[data-start-audit]')){const status=host.querySelector('.audit-status');const {error}=await client.rpc('start_inventory_audit',{audit_notes:'Barcode cycle count'});if(error)showFailure(error,'Unable to start inventory audit',status);else await load();}
+    if(event.target.closest('[data-complete-audit]')){const unscanned=items.filter(item=>!item.last_scanned_at).length;const variance=items.filter(item=>item.counted_quantity!==item.expected_quantity).length;if(!confirm(`Complete this audit and adjust inventory? ${unscanned} unscanned items will be counted as zero; ${variance} items currently have a variance.`))return;const {error}=await client.rpc('complete_inventory_audit',{target_audit:audit.id});if(error)showFailure(error,'Unable to complete inventory audit',host.querySelector('.audit-status'));else{audit=null;items=[];render();}}
+    if(event.target.closest('[data-cancel-audit]')){if(!confirm('Cancel this audit? No inventory quantities will be changed.'))return;const {error}=await client.rpc('cancel_inventory_audit',{target_audit:audit.id});if(error)showFailure(error,'Unable to cancel inventory audit',host.querySelector('.audit-status'));else{audit=null;items=[];render();}}
   });
 
   document.addEventListener('submit',async event=>{
     if(event.target.id!=='audit-scan-form')return;
     event.preventDefault();const form=event.target,data=Object.fromEntries(new FormData(form)),status=host.querySelector('.audit-status');
     const {error}=await client.rpc('scan_inventory_audit',{target_audit:audit.id,scanned_sku:data.sku.trim(),scan_quantity:Number(data.quantity)});
-    if(error){status.textContent=error.message;form.elements.sku.select();return;}
+    if(error){showFailure(error,'Unable to record inventory scan',status);form.elements.sku.select();return;}
     await load();
   });
 
   document.addEventListener('change',async event=>{
     if(event.target.matches('[data-audit-filter]')){filter=event.target.value;render();return;}
-    if(event.target.matches('[data-audit-count]')){const status=host.querySelector('.audit-status');const {error}=await client.rpc('set_inventory_audit_count',{target_audit:audit.id,target_item:event.target.dataset.auditCount,new_count:Number(event.target.value)});if(error)status.textContent=error.message;else await load();}
+    if(event.target.matches('[data-audit-count]')){const status=host.querySelector('.audit-status');const {error}=await client.rpc('set_inventory_audit_count',{target_audit:audit.id,target_item:event.target.dataset.auditCount,new_count:Number(event.target.value)});if(error)showFailure(error,'Unable to update inventory count',status);else await load();}
   });
 
   const observer=new MutationObserver(ensureButton);observer.observe(document.querySelector('#inventory'),{childList:true,subtree:true});ensureButton();

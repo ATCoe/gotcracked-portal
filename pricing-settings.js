@@ -113,8 +113,8 @@
     if(training()){
       const local=trainingState(); local.settings={...local.settings,target_gross_margin_percent:value}; localStorage.setItem('gc-training-pricing-v1',JSON.stringify(local)); settings=local.settings; status.textContent='Training pricing target saved.'; return;
     }
-    const result=await client.from('business_settings').update({target_gross_margin_percent:value,updated_at:new Date().toISOString()}).eq('location_id',profile.location_id);
-    if(result.error){status.textContent=result.error.message;return;}
+    const result=await client.from('business_settings').upsert({location_id:profile.location_id,target_gross_margin_percent:value,updated_at:new Date().toISOString()},{onConflict:'location_id'});
+    if(result.error){status.textContent=result.error.message;window.GotCrackedDiagnostics?.error?.(result.error,{context:'Unable to save pricing target'});return;}
     settings={...settings,target_gross_margin_percent:value}; status.textContent='Pricing target saved. New part lines will use it.';
   }
 
@@ -126,8 +126,8 @@
     if(training()){
       const local=trainingState(); local.settings={...local.settings,custom_pc_build_service_charge_cents:chargeCents,custom_pc_build_estimate_valid_days:validDays}; localStorage.setItem('gc-training-pricing-v1',JSON.stringify(local)); settings=local.settings; status.textContent='Training PC build settings saved.'; return;
     }
-    const result=await client.from('business_settings').update({custom_pc_build_service_charge_cents:chargeCents,custom_pc_build_estimate_valid_days:validDays,updated_at:new Date().toISOString()}).eq('location_id',profile.location_id);
-    if(result.error){status.textContent=result.error.message;return;}
+    const result=await client.from('business_settings').upsert({location_id:profile.location_id,custom_pc_build_service_charge_cents:chargeCents,custom_pc_build_estimate_valid_days:validDays,updated_at:new Date().toISOString()},{onConflict:'location_id'});
+    if(result.error){status.textContent=result.error.message;window.GotCrackedDiagnostics?.error?.(result.error,{context:'Unable to save PC build settings'});return;}
     settings={...settings,custom_pc_build_service_charge_cents:chargeCents,custom_pc_build_estimate_valid_days:validDays}; status.textContent='Custom PC build settings saved. New estimates will use these values.';
   }
 
@@ -140,7 +140,7 @@
       part.repair_guide_id=guideId; part.estimated_repair_minutes=minutes; const local=trainingState(); local.inventory=inventory; localStorage.setItem('gc-training-pricing-v1',JSON.stringify(local)); status.textContent='Training part pricing profile saved.'; return;
     }
     const result=await client.from('inventory_items').update({repair_guide_id:guideId,estimated_repair_minutes:minutes,updated_at:new Date().toISOString()}).eq('id',partId).eq('location_id',profile.location_id);
-    if(result.error){status.textContent=result.error.message;return;}
+    if(result.error){status.textContent=result.error.message;window.GotCrackedDiagnostics?.error?.(result.error,{context:'Unable to save part pricing profile'});return;}
     part.repair_guide_id=guideId; part.estimated_repair_minutes=minutes; status.textContent='Part pricing profile saved. New work-order additions will use it.';
   }
 

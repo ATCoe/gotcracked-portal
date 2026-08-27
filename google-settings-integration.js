@@ -88,6 +88,7 @@
       location.assign(authUrl);
     }catch(error){
       document.querySelector('[data-google-message]')?.replaceChildren(document.createTextNode(error.message));
+      window.GotCrackedDiagnostics?.error?.(error,{context:'Unable to start Google authorization'});
       busy=false;
       rerender();
     }
@@ -102,6 +103,6 @@
   });
   const observer=new MutationObserver(()=>render()); observer.observe(document.body,{childList:true,subtree:true});
   const outcome=new URL(location.href).searchParams.get('google');
-  if(outcome){history.replaceState(null,'',`${location.pathname}${location.hash||'#settings'}`);setTimeout(()=>window.GotCrackedDiagnostics?.error?.(outcome==='connected'?'Google account connected successfully.':'Google authorization did not complete.',{context:outcome==='connected'?'Google connection':'Google connection issue',duration:8000}),700);}
+  if(outcome){history.replaceState(null,'',`${location.pathname}${location.hash||'#settings'}`);if(outcome!=='connected')setTimeout(()=>window.GotCrackedDiagnostics?.error?.('Google authorization did not complete.',{context:'Google connection issue',duration:8000}),700);}
   setTimeout(load,500);
 })();

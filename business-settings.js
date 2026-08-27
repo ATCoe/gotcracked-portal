@@ -176,8 +176,8 @@
         render();
         return;
       }
-      const result = await client.from('business_settings').update({store_hours:storeHours,store_timezone:storeTimezone,updated_at:new Date().toISOString()}).eq('location_id',profile.location_id);
-      if (result.error) throw result.error;
+      const result = await client.from('business_settings').upsert({location_id:profile.location_id,store_hours:storeHours,store_timezone:storeTimezone,updated_at:new Date().toISOString()},{onConflict:'location_id'});
+      if (result.error) { window.GotCrackedDiagnostics?.error?.(result.error,{context:'Unable to save store hours'}); throw result.error; }
       settings = {...settings,store_hours:storeHours,store_timezone:storeTimezone};
       status.textContent = 'Store hours saved.';
     } catch (error) { status.textContent = error.message || 'Unable to save store hours.'; }
@@ -209,8 +209,8 @@
         render();
         return;
       }
-      const result = await client.from('business_settings').update({...payload,updated_at:new Date().toISOString()}).eq('location_id',profile.location_id);
-      if (result.error) throw result.error;
+      const result = await client.from('business_settings').upsert({location_id:profile.location_id,...payload,updated_at:new Date().toISOString()},{onConflict:'location_id'});
+      if (result.error) { window.GotCrackedDiagnostics?.error?.(result.error,{context:'Unable to save Google & web settings'}); throw result.error; }
       settings = {...settings,...payload};
       status.textContent = 'Google & web settings saved.';
       setTimeout(render,350);
