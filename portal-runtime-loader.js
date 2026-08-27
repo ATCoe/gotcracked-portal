@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260827-production21';
+  const VERSION = '20260827-production22';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -53,7 +53,8 @@
   ];
 
   const viewDependencies = {
-    repairs: ['checkout-receipts.js'],
+    repairs: ['checkout-receipts.js','part-availability-workflow.js'],
+    'work-order': ['part-availability-workflow.js'],
     appointments: ['appointments-board.js','appointments-owner-guard.js'],
     schedule: ['workforce-premium.js','timesheets.js','schedule-board.js','schedule-print.js'],
     customers: ['customers-board.js'],
