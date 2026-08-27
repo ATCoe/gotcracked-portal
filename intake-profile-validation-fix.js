@@ -3,15 +3,17 @@
 
   if (window.GotCrackedIntakeProfileValidationFix) return;
 
-  const optionalFields = [
+  const requiredFields = [
+    'first_name',
     'last_name',
+    'phone',
     'contact_phone',
-    'email',
     'address_line_1',
     'city',
     'state',
     'postal_code'
   ];
+  const optionalFields = ['email'];
 
   function profileState() {
     const state = window.GotCrackedOperationsV1?.state;
@@ -24,32 +26,55 @@
     return dialog.querySelector(`[data-intake-customer="${key}"]`);
   }
 
+  function labelFor(input) {
+    return input?.closest('label') || null;
+  }
+
+  function setLeadingLabelText(label, text) {
+    if (!label) return;
+    const node = [...label.childNodes].find(child => child.nodeType === Node.TEXT_NODE);
+    if (node) node.textContent = text;
+  }
+
+  function markRequired(input, required) {
+    if (!input) return;
+    const label = labelFor(input);
+    input.required = required;
+    if (required) {
+      input.setAttribute('aria-required', 'true');
+      label?.classList.add('v1-required-field');
+    } else {
+      input.removeAttribute('aria-required');
+      label?.classList.remove('v1-required-field');
+      label?.querySelector('.v1-required')?.remove();
+    }
+  }
+
+  function syncProfileCopy(dialog) {
+    const body = dialog.querySelector('.v1-intake-body');
+    const heading = body?.querySelector('h3');
+    const intro = heading?.nextElementSibling;
+    if (intro?.tagName === 'P') {
+      intro.textContent = 'First name, last name, primary phone, alternate phone, and full mailing address are required. Email is optional.';
+    }
+
+    setLeadingLabelText(labelFor(field(dialog, 'last_name')), 'Last name ');
+    setLeadingLabelText(labelFor(field(dialog, 'email')), 'Email (optional) ');
+  }
+
   function syncProfileValidation() {
     const current = profileState();
     const dialog = document.getElementById('v1-intake-dialog');
-    if (!current || !dialog?.open) return;
+    if (!current || !dialog?.open) return false;
 
-    const firstName = field(dialog, 'first_name');
-    const phone = field(dialog, 'phone');
+    syncProfileCopy(dialog);
+
+    for (const key of requiredFields) markRequired(field(dialog, key), true);
+    for (const key of optionalFields) markRequired(field(dialog, key), false);
+
+    const missing = requiredFields.filter(key => !field(dialog, key)?.value.trim());
+    const ready = missing.length === 0;
     const next = dialog.querySelector('[data-v1-intake-next]');
-
-    for (const key of optionalFields) {
-      const input = field(dialog, key);
-      if (!input) continue;
-      input.required = false;
-      input.removeAttribute('aria-required');
-    }
-
-    if (firstName) {
-      firstName.required = true;
-      firstName.setAttribute('aria-required', 'true');
-    }
-    if (phone) {
-      phone.required = true;
-      phone.setAttribute('aria-required', 'true');
-    }
-
-    const ready = Boolean(firstName?.value.trim() && phone?.value.trim());
     if (next) next.disabled = !ready;
 
     const body = dialog.querySelector('.v1-intake-body');
@@ -62,30 +87,16 @@
     if (note) {
       note.className = `v1-intake-guidance ${ready ? 'success' : 'warning'}`;
       note.textContent = ready
-        ? 'Customer name and phone number are ready. Optional details can be completed now or later.'
-        : 'Customer name and phone number are required. Everything else is optional.';
+        ? 'Required customer contact and address details are complete. Email remains optional.'
+        : 'Complete first name, last name, both phone fields, address, city, state, and ZIP before continuing. Email is optional.';
     }
+
+    return ready;
   }
 
   function scheduleSync() {
     requestAnimationFrame(() => requestAnimationFrame(syncProfileValidation));
   }
-
-  const style = document.createElement('style');
-  style.id = 'gc-intake-profile-validation-fix-style';
-  style.textContent = `
-    #v1-intake-dialog label.v1-required-field:has([data-intake-customer="last_name"])::after,
-    #v1-intake-dialog label.v1-required-field:has([data-intake-customer="contact_phone"])::after,
-    #v1-intake-dialog label.v1-required-field:has([data-intake-customer="email"])::after,
-    #v1-intake-dialog label.v1-required-field:has([data-intake-customer="address_line_1"])::after,
-    #v1-intake-dialog label.v1-required-field:has([data-intake-customer="city"])::after,
-    #v1-intake-dialog label.v1-required-field:has([data-intake-customer="state"])::after,
-    #v1-intake-dialog label.v1-required-field:has([data-intake-customer="postal_code"])::after {
-      display:none!important;
-      content:none!important;
-    }
-  `;
-  document.head.appendChild(style);
 
   document.addEventListener('input', event => {
     if (!(event.target instanceof Element) || !event.target.closest('#v1-intake-dialog')) return;
@@ -95,8 +106,17 @@
     if (!(event.target instanceof Element) || !event.target.closest('#v1-intake-dialog')) return;
     scheduleSync();
   });
+
   document.addEventListener('click', event => {
-    if (!(event.target instanceof Element) || !event.target.closest('#v1-intake-dialog')) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest('#v1-intake-dialog')) return;
+    if (target.closest('[data-v1-intake-next]') && Number(window.GotCrackedOperationsV1?.state?.intake?.step || 0) === 1) {
+      if (!syncProfileValidation()) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+    }
     scheduleSync();
   }, true);
 
@@ -115,7 +135,9 @@
   scheduleSync();
 
   window.GotCrackedIntakeProfileValidationFix = {
-    version:'20260827-video4-1',
+    version:'20260827-profile-policy2',
+    requiredFields:[...requiredFields],
+    optionalFields:[...optionalFields],
     sync:syncProfileValidation
   };
 })();
