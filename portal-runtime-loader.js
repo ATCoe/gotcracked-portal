@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260827-production13';
+  const VERSION = '20260827-production14';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260826-sales-ops2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -33,18 +33,18 @@
     'portal-mobile-audit.js',
     'portal-v1-final.js',
     'ui-title-case.js',
-    'intake-modal-release.js',
     'directory-advanced.js',
     'master-directory.js',
     'pc-builds.js',
     'cross-user-sync.js',
-    'sales-ops-bootstrap.js',
     'sales-ops.js',
     'checkout-receipts.js'
   ];
 
+  // Leads are owned by operations-v1-core + master-directory. The old leads.js
+  // runtime is intentionally retired so it cannot attach a second lead workflow,
+  // second auth loader, or legacy status writer against the current lead pipeline.
   const deferredScripts = [
-    'leads.js',
     'schedule-board.js',
     'schedule-print.js',
     'analytics.js',
@@ -53,7 +53,6 @@
   ];
 
   const viewDependencies = {
-    leads: ['leads.js'],
     appointments: ['appointments-board.js','appointments-owner-guard.js'],
     schedule: ['schedule-board.js','schedule-print.js'],
     customers: ['customers-board.js'],
