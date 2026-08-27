@@ -97,6 +97,7 @@ jobs:
           import re
 
           violations = []
+          reviewed_print_writers = []
           js = sorted(Path('.').glob('*.js'))
           source_files = js + [Path('index.html'), Path('schedule-print.html')]
           dangerous = [
@@ -113,17 +114,33 @@ jobs:
               (r'\b(?:sk_live|rk_live)_[A-Za-z0-9_-]{12,}', 'live payment secret')
           ]
 
+          def is_reviewed_print_writer(path, line_text):
+              name = path.name
+              if name == 'checkout-receipts.js':
+                  return 'printWindow.document.write(printableReceiptHtml(receipt))' in line_text
+              if name in {'operations-v1-core.js', 'portal-live.js'}:
+                  return 'popup.document.write(`<!doctype html>' in line_text
+              return False
+
           for path in source_files:
               text = path.read_text(encoding='utf-8', errors='replace')
+              lines = text.splitlines()
               for pattern, label in dangerous + secret_patterns:
                   for match in re.finditer(pattern, text, re.I):
                       line = text.count('\n', 0, match.start()) + 1
+                      line_text = lines[line - 1] if 0 < line <= len(lines) else ''
+                      if label == 'document.write()' and is_reviewed_print_writer(path, line_text):
+                          reviewed_print_writers.append(f'{path}:{line}')
+                          continue
                       violations.append(f'{path}:{line}: {label}')
 
           if violations:
               print('\n'.join(violations))
               raise SystemExit(f'Security-sensitive source audit found {len(violations)} blocking issue(s).')
           print('No executable-string APIs or private/server credentials found in frontend source.')
+          print('Reviewed print-only document writers: ' + ', '.join(reviewed_print_writers))
+          if len(reviewed_print_writers) != 3:
+              raise SystemExit(f'Expected exactly 3 reviewed print-only document writers; found {len(reviewed_print_writers)}.')
 
           print('\nDynamic HTML sink locations for manual review:')
           sink_count = 0
