@@ -79,7 +79,13 @@ Deno.serve(async (request: Request) => {
     if (action === 'claim') {
       const { data, error } = await admin.rpc('claim_next_marlon_execution', { p_executor: executor });
       if (error) throw error;
-      return json({ ok: true, executor, ...data });
+      let history: any[] = [];
+      if (data?.ticket?.id) {
+        const prior = await admin.rpc('marlon_execution_history_context', { p_ticket_id: data.ticket.id, p_limit: 8 });
+        if (prior.error) console.error('Marlon execution history lookup failed', prior.error);
+        else if (Array.isArray(prior.data)) history = prior.data;
+      }
+      return json({ ok: true, executor, ...data, history });
     }
 
     if (action === 'report') {

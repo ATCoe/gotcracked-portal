@@ -1,0 +1,101 @@
+name: Marlon Execution Worker
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: write
+  actions: write
+  id-token: write
+
+concurrency:
+  group: marlon-execution-worker
+  cancel-in-progress: false
+
+jobs:
+  execute-one-ticket:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Claim, diagnose, and prepare bounded patch
+        id: prepare
+        run: node scripts/marlon-executor.mjs prepare
+      - name: Local preflight
+        if: steps.prepare.outputs.has_work == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          for file in *.js; do node --check "$file"; done
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          for path in Path('.').glob('*.css'):
+              text=path.read_text(encoding='utf-8')
+              if text.count('{') != text.count('}'):
+                  raise SystemExit(f'Unbalanced CSS braces: {path}')
+          for page in ['index.html','schedule-print.html']:
+              html=Path(page).read_text(encoding='utf-8')
+              refs=re.findall(r'(?:src|href)=["\']([^"\']+)["\']',html)
+              for ref in refs:
+                  ref=ref.split('?',1)[0].split('#',1)[0]
+                  if ref and not ref.startswith(('http://','https://','mailto:','tel:','#')) and not Path(ref).exists():
+                      raise SystemExit(f'Missing local reference in {page}: {ref}')
+          PY
+
+      - name: Commit patch to isolated branch
+        id: commit
+        if: steps.prepare.outputs.has_work == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ticket="${{ steps.prepare.outputs.ticket_number }}"
+          branch="marlon/sup-${ticket}-run-${GITHUB_RUN_ID}"
+          git config user.name 'Marlon'
+          git config user.email 'marlon@gotcracked.co'
+          git checkout -b "$branch"
+          git add -u
+          git commit -m "Marlon: execute SUP-${ticket}"
+          git push origin "$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Run full guards against patch branch
+        if: steps.prepare.outputs.has_work == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/marlon-executor.mjs checks "${{ steps.commit.outputs.branch }}"
+
+      - name: Fast-forward production only if main is unchanged
+        if: steps.prepare.outputs.has_work == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=$(node -e "const fs=require('fs');console.log(JSON.parse(fs.readFileSync('.marlon-executor-state.json','utf8')).baseSha)")
+          git fetch origin main
+          current=$(git rev-parse origin/main)
+          if [ "$current" != "$base" ]; then
+            echo "main changed during Marlon execution; refusing to overwrite newer work" >&2
+            exit 1
+          fi
+          git push origin HEAD:main
+
+      - name: Verify Cloudflare production and resolve ticket
+        if: steps.prepare.outputs.has_work == 'true'
+        run: node scripts/marlon-executor.mjs complete
+      - name: Remove successful patch branch
+        if: success() && steps.prepare.outputs.has_work == 'true'
+        shell: bash
+        run: git push origin --delete "${{ steps.commit.outputs.branch }}" || true
+
+      - name: Record executor failure
+        if: failure() && steps.prepare.outputs.has_work == 'true'
+        run: node scripts/marlon-executor.mjs fail "GitHub execution workflow failed before verified completion. Review this run for the exact failing step."
