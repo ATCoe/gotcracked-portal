@@ -40,12 +40,14 @@
     if (!document.querySelector('link[data-gc-marlon-style]')) {
       const style = document.createElement('link');
       style.rel = 'stylesheet';
-      style.href = 'marlon-assistant.css?v=20260827-marlon1';
+      style.href = 'marlon-assistant.css?v=20260827-marlon2';
       style.dataset.gcMarlonStyle = 'true';
       document.head.appendChild(style);
     }
-    await loadScript('marlon-config.js?v=20260827-marlon1', 'gcMarlonConfig');
-    await loadScript('marlon-assistant.js?v=20260827-marlon1', 'gcMarlonRuntime');
+    await loadScript('marlon-config.js?v=20260827-marlon2', 'gcMarlonConfig');
+    await loadScript('marlon-assistant.js?v=20260827-marlon2', 'gcMarlonRuntime');
+    const profile = window.GotCrackedRuntimeProfile || window.GotCrackedOperationsV1?.state?.profile || null;
+    if (profile) window.dispatchEvent(new CustomEvent('gotcracked:staff-ready', { detail:profile }));
   }
 
   const observer = new MutationObserver(() => normalizeIntakeGuidance());
