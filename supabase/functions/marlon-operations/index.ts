@@ -9,7 +9,6 @@ const enc = new TextEncoder();
 const admin = () => createClient(SUPABASE_URL, SERVICE_KEY);
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const clean = (v: unknown, max = 600) => String(v ?? '').trim().replace(/\s+/g, ' ').slice(0, max);
-const plainName = (v: unknown) => String(v ?? '').toLowerCase().replace(/[^a-z0-9-]+/g, '');
 
 async function hmacHex(secret: string, message: string) {
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
@@ -61,16 +60,11 @@ async function syncTechSupport() {
   const channels: any[] = await discord('GET', `/guilds/${guild.id}/channels`);
   let category = channels.find(c => c.type === 4 && /^tech[ -]?support$/i.test(String(c.name || '')));
   if (!category) category = await discord('POST', `/guilds/${guild.id}/channels`, { name: 'TECH SUPPORT', type: 4 });
-  const textChannels = channels.filter(c => c.type === 0);
-  let channel = textChannels.find(c => /^tech-support$/i.test(String(c.name || '')));
-  if (!channel) channel = textChannels.find(c => {
-    const name = plainName(c.name);
-    return /^(debug|debugging|debug-log|debug-logs|bug-reports|portal-bug-reports-and-suggestions)$/.test(name) || name.includes('portal-bug-reports-and-suggestions');
-  });
-  const topic = 'GotCracked employee tech support — report Portal, website, device, account, workflow, and deployment issues here. Marlon may triage issues and link them to Support Tickets.';
-  if (channel) channel = await discord('PATCH', `/channels/${channel.id}`, { name: 'tech-support', parent_id: category.id, topic });
+  let channel = channels.find(c => c.type === 0 && /^tech-support$/i.test(String(c.name || '')));
+  const topic = 'GotCracked Tech Support with Marlon — hardware, software, accounts, connectivity, internal tools, website issues, and Portal issues when relevant. This Discord support space is independent from Portal chat.';
+  if (channel) channel = await discord('PATCH', `/channels/${channel.id}`, { parent_id: category.id, topic });
   else channel = await discord('POST', `/guilds/${guild.id}/channels`, { name: 'tech-support', type: 0, parent_id: category.id, topic });
-  return { guild: { id: guild.id, name: guild.name }, category: { id: category.id, name: category.name }, channel: { id: channel.id, name: channel.name, parent_id: channel.parent_id }, preservedHistory: true };
+  return { guild: { id: guild.id, name: guild.name }, category: { id: category.id, name: category.name }, channel: { id: channel.id, name: channel.name, parent_id: channel.parent_id }, standalone: true };
 }
 
 function localClock(timeZone: string) {
