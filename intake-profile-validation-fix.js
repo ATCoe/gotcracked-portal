@@ -7,13 +7,12 @@
     'first_name',
     'last_name',
     'phone',
-    'contact_phone',
     'address_line_1',
     'city',
     'state',
     'postal_code'
   ];
-  const optionalFields = ['email'];
+  const optionalFields = ['contact_phone', 'email'];
 
   function profileState() {
     const state = window.GotCrackedOperationsV1?.state;
@@ -55,10 +54,11 @@
     const heading = body?.querySelector('h3');
     const intro = heading?.nextElementSibling;
     if (intro?.tagName === 'P') {
-      intro.textContent = 'First name, last name, primary phone, alternate phone, and full mailing address are required. Email is optional.';
+      intro.textContent = 'First name, last name, primary phone, and full mailing address are required. Alternate phone and email are optional.';
     }
 
     setLeadingLabelText(labelFor(field(dialog, 'last_name')), 'Last name ');
+    setLeadingLabelText(labelFor(field(dialog, 'contact_phone')), 'Alternate phone (optional) ');
     setLeadingLabelText(labelFor(field(dialog, 'email')), 'Email (optional) ');
   }
 
@@ -87,8 +87,8 @@
     if (note) {
       note.className = `v1-intake-guidance ${ready ? 'success' : 'warning'}`;
       note.textContent = ready
-        ? 'Required customer contact and address details are complete. Email remains optional.'
-        : 'Complete first name, last name, both phone fields, address, city, state, and ZIP before continuing. Email is optional.';
+        ? 'Required customer contact and address details are complete. Alternate phone and email remain optional.'
+        : 'Complete first name, last name, primary phone, address, city, state, and ZIP before continuing. Alternate phone and email are optional.';
     }
 
     return ready;
@@ -135,7 +135,7 @@
   scheduleSync();
 
   window.GotCrackedIntakeProfileValidationFix = {
-    version:'20260827-profile-policy2',
+    version:'20260827-profile-policy3',
     requiredFields:[...requiredFields],
     optionalFields:[...optionalFields],
     sync:syncProfileValidation
