@@ -8,6 +8,7 @@
   const mobileQuery = window.matchMedia(`(max-width: ${MOBILE_MAX}px)`);
   let lastPointerToggleAt = 0;
   let returnFocus = null;
+  let sidebarGuard = null;
 
   const navItems = {
     primary: [
@@ -51,9 +52,18 @@
           background:rgba(3,11,20,.52)!important;opacity:0;visibility:hidden;pointer-events:none;
           transition:opacity .18s ease,visibility .18s ease;touch-action:manipulation;
           -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+          -webkit-filter:none!important;filter:none!important;
         }
         html[data-gc-mobile-nav-open="true"] .${BACKDROP_CLASS}{opacity:1;visibility:visible;pointer-events:auto}
         .sidebar{width:var(--gc-sidebar-mobile)!important}
+        html[data-gc-mobile-nav-open="true"] .sidebar,
+        .sidebar.open{
+          z-index:60!important;opacity:1!important;-webkit-filter:none!important;filter:none!important;
+          background:var(--navy,#111b2b)!important;mix-blend-mode:normal!important;isolation:isolate!important;
+        }
+        .sidebar #sidebar-time-clock,
+        .sidebar .gc-timeclock-mini,
+        .sidebar [data-sidebar-time-clock]{display:none!important}
         .sidebar>.${NAV_CLASS}{
           overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior-y:contain!important;
           -webkit-overflow-scrolling:touch!important;scrollbar-width:none!important;padding-bottom:10px!important;
@@ -108,12 +118,29 @@
       panel.style.setProperty('visibility', 'visible', 'important');
       panel.style.setProperty('pointer-events', 'auto', 'important');
       panel.style.setProperty('opacity', '1', 'important');
+      panel.style.setProperty('filter', 'none', 'important');
+      panel.style.setProperty('-webkit-filter', 'none', 'important');
+      panel.style.setProperty('mix-blend-mode', 'normal', 'important');
     } else {
       panel.style.removeProperty('transform');
       panel.style.removeProperty('visibility');
       panel.style.removeProperty('pointer-events');
       panel.style.removeProperty('opacity');
+      panel.style.removeProperty('filter');
+      panel.style.removeProperty('-webkit-filter');
+      panel.style.removeProperty('mix-blend-mode');
     }
+  }
+
+  function removeSidebarTimeClock(panel = sidebar()) {
+    if (!panel) return;
+    panel.querySelectorAll('#sidebar-time-clock,.gc-timeclock-mini,[data-sidebar-time-clock]').forEach(node => node.remove());
+  }
+
+  function guardSidebar(panel) {
+    if (!panel || sidebarGuard) return;
+    sidebarGuard = new MutationObserver(() => removeSidebarTimeClock(panel));
+    sidebarGuard.observe(panel, {childList:true, subtree:true});
   }
 
   function ensureBackdrop() {
@@ -122,8 +149,13 @@
       backdrop = document.createElement('div');
       backdrop.className = BACKDROP_CLASS;
       backdrop.setAttribute('aria-hidden', 'true');
-      document.body.appendChild(backdrop);
     }
+
+    /* Keep the backdrop in the same app-shell stacking context as the sidebar.
+       As body siblings, a parent stacking context can cause the backdrop to tint
+       the drawer itself even when the sidebar has the larger child z-index. */
+    const host = document.querySelector('.app-shell') || document.body;
+    if (backdrop.parentElement !== host) host.appendChild(backdrop);
     return backdrop;
   }
 
@@ -146,6 +178,8 @@
     if (!panel) return null;
     if (!panel.id) panel.id = 'portal-sidebar';
 
+    removeSidebarTimeClock(panel);
+    guardSidebar(panel);
     ensureBackdrop();
     ensureCloseButton(panel);
 
@@ -172,6 +206,7 @@
     const panel = sidebar();
     if (!panel) return;
 
+    removeSidebarTimeClock(panel);
     const shouldOpen = Boolean(open) && mobileQuery.matches;
     const backdrop = ensureBackdrop();
     ensureCloseButton(panel);
@@ -191,6 +226,7 @@
         if (document.documentElement.dataset.gcMobileNavOpen !== 'true') return;
         const current = sidebar();
         if (!current) return;
+        removeSidebarTimeClock(current);
         current.classList.add('open');
         current.dataset.mobileOpen = 'true';
         forcePanelVisualState(current, true);
@@ -318,6 +354,7 @@
 
     document.addEventListener('gc-portal-runtime-ready', () => {
       buildOnce();
+      removeSidebarTimeClock();
       syncActive();
       syncButtons(document.documentElement.dataset.gcMobileNavOpen === 'true');
     });
@@ -337,6 +374,7 @@
     window.addEventListener('orientationchange', () => setOpen(false, {restoreFocus:false}));
     window.addEventListener('pageshow', () => {
       buildOnce();
+      removeSidebarTimeClock();
       setOpen(false, {restoreFocus:false});
     });
   }
@@ -350,7 +388,7 @@
   }
 
   window.GotCrackedMobileNav = {
-    version:'20260827-mobile-nav4',
+    version:'20260827-mobile-nav5',
     build:buildOnce,
     setOpen,
     syncActive
