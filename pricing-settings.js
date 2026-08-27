@@ -10,16 +10,27 @@
   let settings = null;
   let inventory = [];
   let guides = [];
+  let canManageSettings = false;
+  let canManageInventory = false;
 
-  function isManager(){ return ['owner','manager'].includes(profile?.role); }
+  function isManager(){ return canManageSettings; }
 
   async function identity(){
-    profile = window.GotCrackedOperationsV1?.state?.profile || profile;
-    if (profile?.id) return profile;
-    const { data:{user} } = await client.auth.getUser();
-    if (!user) return null;
-    const result = await client.from('profiles').select('id,location_id,display_name,role,active').eq('id',user.id).maybeSingle();
-    if (!result.error) profile = result.data;
+    profile = window.GotCrackedRuntimeProfile || window.GotCrackedOperationsV1?.state?.profile || profile;
+    if (!profile?.id) {
+      const { data:{user} } = await client.auth.getUser();
+      if (!user) return null;
+      const result = await client.from('profiles').select('id,location_id,display_name,role,active').eq('id',user.id).maybeSingle();
+      if (!result.error) profile = result.data;
+    }
+    if (!profile?.id) return null;
+    const [settingsPermission,inventoryPermission] = await Promise.all([
+      client.rpc('has_permission',{permission_key:'settings.manage'}),
+      client.rpc('has_permission',{permission_key:'inventory.manage'})
+    ]);
+    const roleFallback = ['owner','manager'].includes(profile.role);
+    canManageSettings = settingsPermission.error ? roleFallback : Boolean(settingsPermission.data);
+    canManageInventory = inventoryPermission.error ? roleFallback : Boolean(inventoryPermission.data);
     return profile;
   }
 
@@ -76,6 +87,7 @@
         <div class="demo-note"><strong>Compatibility gate:</strong> an automatic estimate is released only after Newegg PC Builder compatibility evidence, manufacturer specifications, and Portal server assertions all pass. Otherwise the request is held for manual review.</div>
         <p class="auth-message" role="status"></p><button class="primary-button" type="submit">Save PC build settings</button>
       </form>
+      <div ${canManageInventory?'':'hidden'}>
       <hr style="border:0;border-top:1px solid var(--line,#27384f);margin:22px 0">
       <div class="card-title"><div><h2>Part repair-time mapping</h2></div></div>
       <form id="gc-part-pricing-map-form" class="settings-list">
@@ -84,7 +96,7 @@
         <label>Bench-time override (minutes)<input name="minutes" type="number" min="1" max="1440" step="1" placeholder="Leave blank to use guide/device estimate"></label>
         <div class="demo-note">Pricing-time priority: SKU minute override → linked Repair Reference guide → median bench time for the work order’s device type → 60-minute fallback.</div>
         <p class="auth-message" role="status"></p><button class="primary-button" type="submit">Save part pricing profile</button>
-      </form>
+      </form></div>
       <div class="demo-note" style="margin-top:18px"><strong>Tax note:</strong> customer-facing line structure and taxability are intentionally separate settings. Do not change tax treatment solely to change the receipt presentation; configure taxability according to the applicable tax rules for the business.</div>
     </section>`);
   }
@@ -120,6 +132,7 @@
   }
 
   async function savePartMap(form){
+    if(!canManageInventory){window.GotCrackedDiagnostics?.error?.('Inventory Manage permission is required to change part pricing profiles.',{context:'Part pricing permission denied'});return;}
     const partId=form.elements.part_id.value; const guideId=form.elements.guide_id.value||null; const raw=form.elements.minutes.value; const minutes=raw?Number(raw):null; const status=form.querySelector('.auth-message');
     const part=inventory.find(x=>x.id===partId); if(!part){status.textContent='Choose an inventory part.';return;}
     if(minutes!==null&&(!(minutes>=1)||minutes>1440)){status.textContent='Bench time must be 1–1440 minutes.';return;}

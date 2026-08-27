@@ -13,8 +13,9 @@
   const DEFAULT_HOURS = {mon:['09:00','18:00'],tue:['09:00','18:00'],wed:['09:00','18:00'],thu:['09:00','18:00'],fri:['09:00','18:00'],sat:['10:00','16:00'],sun:null};
   let profile = null;
   let settings = null;
+  let canManageSettings = false;
 
-  const isManager = () => ['owner','manager'].includes(profile?.role);
+  const isManager = () => canManageSettings;
   const clean = value => String(value ?? '').trim();
   const safeUrl = value => {
     const text = clean(value);
@@ -28,11 +29,15 @@
 
   async function identity() {
     profile = window.GotCrackedRuntimeProfile || window.GotCrackedOperationsV1?.state?.profile || profile;
-    if (profile?.id) return profile;
-    const { data:{ user } } = await client.auth.getUser();
-    if (!user) return null;
-    const result = await client.from('profiles').select('id,location_id,display_name,role,active').eq('id',user.id).maybeSingle();
-    if (!result.error) profile = result.data;
+    if (!profile?.id) {
+      const { data:{ user } } = await client.auth.getUser();
+      if (!user) return null;
+      const result = await client.from('profiles').select('id,location_id,display_name,role,active').eq('id',user.id).maybeSingle();
+      if (!result.error) profile = result.data;
+    }
+    if (!profile?.id) return null;
+    const permission = await client.rpc('has_permission',{permission_key:'settings.manage'});
+    canManageSettings = permission.error ? ['owner','manager'].includes(profile.role) : Boolean(permission.data);
     return profile;
   }
 
