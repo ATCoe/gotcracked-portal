@@ -70,7 +70,7 @@ Deno.serve(async request => {
     let secretId=settings.shipping_provider_secret_id||null;
     const apiKey=clean(body.api_key,300);
     if(apiKey){
-      const stored=await admin.rpc('server_store_vendor_secret',{p_source_name:`shipping:easypost:${profile.location_id}`,p_secret:JSON.stringify({api_key:apiKey})});
+      const stored=await admin.rpc('server_store_shipping_secret',{p_location_id:profile.location_id,p_secret:JSON.stringify({api_key:apiKey})});
       if(stored.error) return response({ok:false,error:stored.error.message},500);
       secretId=stored.data;
     }
