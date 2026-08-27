@@ -3,7 +3,7 @@
 
   if (window.GotCrackedRuntimeStability) return;
 
-  const VERSION = '20260827-stability2';
+  const VERSION = '20260827-stability3';
   const client = window.supabaseClient;
   const operationsRealtimeTopic = topic => String(topic || '').startsWith('portal-v1-operations-');
   const callbackStates = new WeakMap();
@@ -26,6 +26,45 @@
     if (document.getElementById('v1-lead-drawer')?.classList.contains('open')) return true;
     if (matchMedia('(max-width: 1100px)').matches && document.body.classList.contains('v1-workflow-open')) return true;
     return false;
+  }
+
+  function snapshotOwnedHosts() {
+    const snapshots = [];
+    const capture = (id, owner) => {
+      const host = document.getElementById(id);
+      if (!host || !owner) return;
+      snapshots.push({
+        host,
+        html:host.innerHTML,
+        className:host.className,
+        style:host.getAttribute('style'),
+        ariaBusy:host.getAttribute('aria-busy')
+      });
+    };
+    capture('appointments', window.GotCrackedAppointments);
+    capture('customers', window.GotCrackedCustomers);
+    return snapshots;
+  }
+
+  function restoreOwnedHosts(snapshots) {
+    for (const snapshot of snapshots) {
+      if (!snapshot.host?.isConnected) continue;
+      if (snapshot.host.innerHTML !== snapshot.html) snapshot.host.innerHTML = snapshot.html;
+      if (snapshot.host.className !== snapshot.className) snapshot.host.className = snapshot.className;
+      if (snapshot.style === null) snapshot.host.removeAttribute('style');
+      else snapshot.host.setAttribute('style', snapshot.style);
+      if (snapshot.ariaBusy === null) snapshot.host.removeAttribute('aria-busy');
+      else snapshot.host.setAttribute('aria-busy', snapshot.ariaBusy);
+    }
+  }
+
+  async function protectOwnedHosts(callback, payload) {
+    const snapshots = snapshotOwnedHosts();
+    try {
+      return await callback(payload);
+    } finally {
+      restoreOwnedHosts(snapshots);
+    }
   }
 
   function runWhenSafe(callback, payload) {
@@ -85,8 +124,12 @@
         if (isOperations) return channel;
 
         // portal-live still owns several legacy-only surfaces. Coalesce its
-        // broad reload callback and never let it redraw while a workflow is open.
-        const guarded = payload => runWhenSafe(callback, payload);
+        // broad reload callback, defer it while workflows are open, and restore
+        // command-center DOM owned by newer specialized modules afterward.
+        const guarded = payload => runWhenSafe(
+          current => protectOwnedHosts(callback, current),
+          payload
+        );
         return nativeOn(type, filter, guarded);
       };
       return channel;
