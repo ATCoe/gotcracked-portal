@@ -9,7 +9,9 @@
     busy:false,
     lastLoadedAt:0,
     timer:null,
-    poller:null
+    poller:null,
+    loadSequence:0,
+    mutationRevision:0
   };
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[c]);
@@ -127,21 +129,31 @@
     return Boolean(data);
   }
 
-  async function load({quiet=false}={}){
+  async function load({quiet=false,force=false}={}){
     const p=profile();
     if(!p?.id || !p?.location_id) return;
+    if(state.busy && !force) return;
+
+    const requestId=++state.loadSequence;
+    const mutationRevision=state.mutationRevision;
+    const stale=()=>requestId!==state.loadSequence || mutationRevision!==state.mutationRevision;
+
     try{
-      if(!(await canUse())){
+      const allowed=await canUse();
+      if(stale()) return;
+      if(!allowed){
         miniHost()?.remove();
         dashboardHost()?.remove();
         return;
       }
       const {data,error}=await client.rpc('get_time_clock_state');
       if(error) throw error;
+      if(stale()) return;
       state.data=data || {state:'off_clock'};
       state.lastLoadedAt=Date.now();
       render();
     }catch(error){
+      if(stale()) return;
       console.error('Time clock state failed:',error);
       if(!quiet) window.GotCrackedDiagnostics?.error?.(error,{context:'Time clock unavailable'});
     }
@@ -150,6 +162,8 @@
   async function act(action,button){
     if(state.busy) return;
     state.busy=true;
+    state.mutationRevision+=1;
+    state.loadSequence+=1;
     render();
     try{
       const {data,error}=await client.rpc('time_clock_action',{action});
@@ -162,7 +176,8 @@
     }catch(error){
       console.error('Time clock action failed:',error);
       window.GotCrackedDiagnostics?.error?.(error,{context:'Time clock update failed'});
-      await load({quiet:true});
+      state.busy=false;
+      await load({quiet:true,force:true});
     }finally{
       state.busy=false;
       render();
