@@ -7,16 +7,54 @@ const headers = (origin: string | null) => ({
   'Content-Type': 'application/json', 'Vary': 'Origin'
 });
 const clean = (value: unknown, max = 500) => String(value || '').trim().slice(0, max);
-const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] || c));
+const esc = (value: unknown) => String(value ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c] || c));
 const json = (origin: string | null, body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: headers(origin) });
 const hex = (buffer: ArrayBuffer) => [...new Uint8Array(buffer)].map(value => value.toString(16).padStart(2,'0')).join('');
 const hash = async (value: string) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
 const clientKey = (request: Request) => request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || `ua:${request.headers.get('user-agent') || 'unknown'}`;
 
+const WINDOWS: Record<string,[string,string]> = {
+  'Morning (9 AM–12 PM)': ['09:00','12:00'],
+  'Afternoon (12–4 PM)': ['12:00','16:00'],
+  'Late afternoon (4–6 PM)': ['16:00','18:00']
+};
+const DAY_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
+const DEFAULT_HOURS: Record<string,[string,string] | null> = {
+  mon:['09:00','18:00'],tue:['09:00','18:00'],wed:['09:00','18:00'],thu:['09:00','18:00'],fri:['09:00','18:00'],sat:['10:00','16:00'],sun:null
+};
+
+class ServiceUnavailableError extends Error {}
+
+const minutes = (value: unknown) => {
+  const [hour, minute] = String(value || '').split(':').map(Number);
+  return Number.isFinite(hour) ? hour * 60 + (Number.isFinite(minute) ? minute : 0) : NaN;
+};
+const overlaps = (storeRange: unknown, windowRange: [string,string]) => {
+  if (!Array.isArray(storeRange) || storeRange.length < 2) return false;
+  const storeStart = minutes(storeRange[0]), storeEnd = minutes(storeRange[1]);
+  const windowStart = minutes(windowRange[0]), windowEnd = minutes(windowRange[1]);
+  return [storeStart,storeEnd,windowStart,windowEnd].every(Number.isFinite) && Math.max(storeStart,windowStart) < Math.min(storeEnd,windowEnd);
+};
+const validDateOnly = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T12:00:00Z`).getTime());
+const weekdayKey = (value: string) => DAY_KEYS[new Date(`${value}T12:00:00Z`).getUTCDay()];
+const localDateISO = (timezone: string) => {
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat('en-US', { timeZone:timezone, year:'numeric', month:'2-digit', day:'2-digit' });
+  } catch {
+    formatter = new Intl.DateTimeFormat('en-US', { timeZone:'America/New_York', year:'numeric', month:'2-digit', day:'2-digit' });
+  }
+  const parts = Object.fromEntries(formatter.formatToParts(new Date()).filter(part => part.type !== 'literal').map(part => [part.type,part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
+
 async function consumeRateLimit(admin: ReturnType<typeof createClient>, request: Request) {
   const keyHash = await hash(clientKey(request));
   const result = await admin.rpc('consume_public_rate_limit', { p_kind:'public-intake', p_key_hash:keyHash, p_limit:20, p_window_seconds:900 });
-  if (result.error) { console.error('Public intake rate limiter unavailable:', result.error.message); return true; }
+  if (result.error) {
+    console.error('Public intake rate limiter unavailable:', result.error.message);
+    throw new ServiceUnavailableError('Request protection is temporarily unavailable.');
+  }
   return result.data === true;
 }
 
@@ -107,6 +145,8 @@ Deno.serve(async request => {
     const preferredContact = ['Call','Text','Email'].includes(clean(body.preferredContact, 20)) ? clean(body.preferredContact, 20) : 'No preference';
     const timingNote = clean(body.timing, 240);
     const intakeMethod = body.serviceMode === 'mail_in' ? 'mail_in' : 'walk_in';
+    const preferredDate = intakeMethod === 'walk_in' ? clean(body.date, 10) : '';
+    const preferredTime = intakeMethod === 'walk_in' ? clean(body.time, 80) : '';
     const shippingAddress = intakeMethod === 'mail_in' ? { line1: clean(body.address1, 160), line2: clean(body.address2, 160) || null, city: clean(body.city, 100), state: clean(body.state, 40).toUpperCase(), postal_code: clean(body.postalCode, 20) } : null;
     if (!firstName || !lastName || !phone || !email || !model || !issue || body.consent !== 'on') return json(origin, { error: 'Complete all required fields and consent to contact.' }, 400);
     if (intakeMethod === 'mail_in' && (!shippingAddress?.line1 || !shippingAddress.city || !shippingAddress.state || !shippingAddress.postal_code)) return json(origin, { error: 'Complete the return shipping address.' }, 400);
@@ -114,6 +154,25 @@ Deno.serve(async request => {
 
     const locationId = Deno.env.get('DEFAULT_LOCATION_ID')!;
     if (!locationId) throw new Error('DEFAULT_LOCATION_ID is not configured.');
+    const settingsResult = await admin.from('business_settings').select('store_hours,store_timezone,accepts_mail_in_repairs').eq('location_id',locationId).maybeSingle();
+    if (settingsResult.error) throw settingsResult.error;
+    const settings = settingsResult.data || {};
+
+    if (intakeMethod === 'mail_in' && settings.accepts_mail_in_repairs === false) {
+      return json(origin, { error:'Mail-in repair requests are temporarily unavailable. Please choose a walk-in repair or contact GotCracked.' }, 409);
+    }
+    if (intakeMethod === 'walk_in') {
+      if (!validDateOnly(preferredDate) || !WINDOWS[preferredTime]) return json(origin, { error:'Choose a valid appointment date and time window.' }, 400);
+      const timezone = clean(settings.store_timezone, 80) || 'America/New_York';
+      const today = localDateISO(timezone);
+      if (preferredDate < today) return json(origin, { error:'Choose today or a future appointment date.' }, 400);
+      const hours = settings.store_hours && typeof settings.store_hours === 'object' ? settings.store_hours : DEFAULT_HOURS;
+      const storeRange = (hours as Record<string, unknown>)[weekdayKey(preferredDate)];
+      if (!overlaps(storeRange, WINDOWS[preferredTime])) {
+        return json(origin, { error:'That appointment window is outside current store hours. Choose another date or time.' }, 409);
+      }
+    }
+
     const reference = `GCR-${crypto.randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
     const externalId = `web-${crypto.randomUUID()}`;
     const notes = [issue, `Preferred contact: ${preferredContact}`, timingNote ? `Timing/deadline: ${timingNote}` : null].filter(Boolean).join('\n\n');
@@ -121,8 +180,8 @@ Deno.serve(async request => {
       external_id: externalId, public_reference: reference, location_id: locationId,
       name: `${firstName} ${lastName}`, phone, email, service: issue.slice(0, 180), source: 'gotcracked.co', notes,
       device_type: deviceType, device_model: model, intake_method: intakeMethod, shipping_address: shippingAddress,
-      preferred_date: intakeMethod === 'walk_in' ? clean(body.date, 10) || null : null,
-      preferred_time: intakeMethod === 'walk_in' ? clean(body.time, 80) || null : null,
+      preferred_date: intakeMethod === 'walk_in' ? preferredDate : null,
+      preferred_time: intakeMethod === 'walk_in' ? preferredTime : null,
       consent_at: new Date().toISOString(), status: 'new'
     };
     const leadResult = await admin.from('leads').insert(leadRecord).select().single();
@@ -154,5 +213,9 @@ Deno.serve(async request => {
       body: JSON.stringify({ id: externalId, leadId:leadResult.data.id, appointmentId, portalUrl:`https://portal.gotcracked.co/#leads/${leadResult.data.id}`, appointmentUrl:appointmentId?`https://portal.gotcracked.co/#appointments/${appointmentId}`:null, locationId, name: leadRecord.name, phone, email, service: leadRecord.service, source: leadRecord.source, notes: `${intakeMethod === 'mail_in' ? '[MAIL-IN] ' : ''}${deviceType} ${model}: ${notes}` })
     }).catch(console.error);
     return json(origin, { ok: true, reference, appointmentId, discordDelivered, emailDelivered }, 201);
-  } catch (error) { console.error(error); return json(origin, { error: 'Unable to submit the repair request. Please contact the shop.' }, 500); }
+  } catch (error) {
+    console.error(error);
+    if (error instanceof ServiceUnavailableError) return json(origin, { error:'Repair requests are temporarily unavailable. Please try again in a few minutes.' }, 503);
+    return json(origin, { error: 'Unable to submit the repair request. Please contact the shop.' }, 500);
+  }
 });
