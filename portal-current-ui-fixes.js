@@ -21,6 +21,7 @@
   let diagnosticCreationPending = false;
   let diagnosticLineBusy = false;
   let observer = null;
+  let decorateFrame = 0;
 
   const ops = () => window.GotCrackedOperationsV1;
   const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[char]);
@@ -65,7 +66,8 @@
   function syncTapButtons(select, wrap){
     wrap.querySelectorAll('button[data-value]').forEach(button=>{
       const active=button.dataset.value===select.value;
-      button.setAttribute('aria-pressed',active?'true':'false');
+      const next=active?'true':'false';
+      if(button.getAttribute('aria-pressed')!==next)button.setAttribute('aria-pressed',next);
     });
   }
 
@@ -92,8 +94,10 @@
         button.addEventListener('click',event=>{
           event.preventDefault();
           event.stopPropagation();
-          select.value=value;
-          select.dispatchEvent(new Event('change',{bubbles:true}));
+          if(select.value!==value){
+            select.value=value;
+            select.dispatchEvent(new Event('change',{bubbles:true}));
+          }
           syncTapButtons(select,wrap);
         });
         wrap.appendChild(button);
@@ -115,7 +119,10 @@
 
   function setIntakePath(value){
     intakePath=value==='diagnostic'?'diagnostic':'repair';
-    document.querySelectorAll('[data-gc-intake-path]').forEach(button=>button.setAttribute('aria-pressed',button.dataset.gcIntakePath===intakePath?'true':'false'));
+    document.querySelectorAll('[data-gc-intake-path]').forEach(button=>{
+      const next=button.dataset.gcIntakePath===intakePath?'true':'false';
+      if(button.getAttribute('aria-pressed')!==next)button.setAttribute('aria-pressed',next);
+    });
   }
 
   function patchRepairTicketWrites(){
@@ -151,6 +158,10 @@
     select.appendChild(option);
   }
 
+  function setText(node,value){
+    if(node&&node.textContent!==value)node.textContent=value;
+  }
+
   function decorateWorkflow(){
     const current=ops()?.state?.currentWorkOrder;
     if(!current) return;
@@ -164,10 +175,10 @@
     const filter=document.getElementById('v1-repair-status');
     ensureOption(filter,'awaiting_diagnostic',LABELS.awaiting_diagnostic);
     ensureOption(filter,'testing_in_progress',LABELS.testing_in_progress);
-    document.querySelectorAll('.v1-status.awaiting_diagnostic').forEach(node=>node.textContent=LABELS.awaiting_diagnostic);
-    document.querySelectorAll('.v1-status.testing_in_progress').forEach(node=>node.textContent=LABELS.testing_in_progress);
+    document.querySelectorAll('.v1-status.awaiting_diagnostic').forEach(node=>setText(node,LABELS.awaiting_diagnostic));
+    document.querySelectorAll('.v1-status.testing_in_progress').forEach(node=>setText(node,LABELS.testing_in_progress));
     const workflowTitle=document.querySelector('#work-order .v1-workflow-panel .v1-drawer-head h2');
-    if(workflowTitle&&LABELS[current.status])workflowTitle.textContent=LABELS[current.status];
+    if(workflowTitle&&LABELS[current.status])setText(workflowTitle,LABELS[current.status]);
   }
 
   function safeSuggestions(){
@@ -191,6 +202,9 @@
       const categoryBonus=category&&String(guide.device_category||'').toLowerCase()===category?25:0;
       return {guide,score:Math.min(100,categoryBonus+hits*18)};
     }).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,3);
+    const signature=`${ticket.id}|${source}|${matches.map(match=>`${match.guide.id||match.guide.title}:${match.score}`).join(',')}`;
+    if(host.dataset.gcSafeSuggestionKey===signature)return;
+    host.dataset.gcSafeSuggestionKey=signature;
     const card=host.closest('.card');
     if(!matches.length){ if(card)card.hidden=true; return; }
     if(card)card.hidden=false;
@@ -219,7 +233,15 @@
     if(!diagnosticCreationPending||diagnosticLineBusy) return;
     const state=ops()?.state;
     const ticket=state?.currentWorkOrder;
-    if(!ticket||ticket.status!=='awaiting_diagnostic') return;
+    if(!ticket) return;
+
+    if(training()&&ticket.status==='awaiting_repair'){
+      ticket.status='awaiting_diagnostic';
+      ticket.updated_at=new Date().toISOString();
+      persistTrainingTicket(ticket);
+    }
+    if(ticket.status!=='awaiting_diagnostic') return;
+
     ensureTrainingDiagnosticService();
     const service=(state.services||[]).find(item=>item.sku==='SVC-THOROUGH-DIAG');
     if(!service){diagnosticCreationPending=false;return;}
@@ -258,9 +280,17 @@
     attachDiagnosticService();
   }
 
+  function scheduleDecorate(){
+    if(decorateFrame)return;
+    decorateFrame=requestAnimationFrame(()=>{
+      decorateFrame=0;
+      decorate();
+    });
+  }
+
   function observe(){
     if(observer)return;
-    observer=new MutationObserver(()=>queueMicrotask(decorate));
+    observer=new MutationObserver(scheduleDecorate);
     observer.observe(document.body,{childList:true,subtree:true});
   }
 
@@ -271,19 +301,20 @@
     if(create&&intakePath==='diagnostic')diagnosticCreationPending=true;
   });
 
-  document.getElementById('v1-intake-dialog')?.addEventListener('close',()=>setTimeout(()=>{if(!diagnosticCreationPending)setIntakePath('repair');},0));
-  document.addEventListener('gc-view-changed',()=>setTimeout(decorate,0));
-  document.addEventListener('gc-cross-user-sync',()=>setTimeout(decorate,0));
-  document.addEventListener('gc-portal-runtime-ready',()=>setTimeout(decorate,0));
+  const intakeDialog=document.getElementById('v1-intake-dialog');
+  intakeDialog?.addEventListener('close',()=>setTimeout(()=>{if(!diagnosticCreationPending)setIntakePath('repair');},0));
+  document.addEventListener('gc-view-changed',()=>setTimeout(scheduleDecorate,0));
+  document.addEventListener('gc-cross-user-sync',()=>setTimeout(scheduleDecorate,0));
+  document.addEventListener('gc-portal-runtime-ready',()=>setTimeout(scheduleDecorate,0));
 
   injectStyle();
   patchRepairTicketWrites();
   observe();
-  setTimeout(decorate,0);
+  scheduleDecorate();
 
   window.GotCrackedCurrentUIFixes={
-    version:'20260827-diagnostic2',
-    decorate,
+    version:'20260827-diagnostic3',
+    decorate:scheduleDecorate,
     get intakePath(){return intakePath;}
   };
 })();
