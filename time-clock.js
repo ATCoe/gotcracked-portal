@@ -68,8 +68,10 @@
   const overtimeThreshold = data => Number(data?.overtime_warning_hours)||40;
   const overtimeRisk = data => weeklyPaidHours(data)>=overtimeThreshold(data);
 
-  function miniHost(){ return document.getElementById('sidebar-time-clock'); }
   function dashboardHost(){ return document.getElementById('dashboard-time-clock'); }
+  function removeDeprecatedSidebarClock(){
+    document.querySelectorAll('#sidebar-time-clock,.sidebar .gc-timeclock-mini,[data-sidebar-time-clock]').forEach(node=>node.remove());
+  }
 
   function injectStyle(){
     if(document.getElementById('gc-timeclock-premium-style')) return;
@@ -95,15 +97,6 @@
     return `<button type="button" class="gc-clock-secondary" data-timeclock-action="break_start">Start break</button><button type="button" class="gc-clock-danger" data-timeclock-action="clock_out">Clock out</button>`;
   }
 
-  function renderMini(){
-    const host=miniHost();
-    if(!host) return;
-    const data=state.data || {state:'off_clock'};
-    host.className=`gc-timeclock-mini ${state.busy?'gc-timeclock-busy':''}`;
-    host.dataset.state=data.state || 'off_clock';
-    host.innerHTML=`<div class="gc-timeclock-mini-head"><span class="gc-timeclock-state">${esc(statusLabel(data.state))}</span><strong data-timeclock-elapsed>${esc(elapsed(data))}</strong></div><div class="gc-timeclock-mini-actions">${actionButtons(data,true)}</div><span class="gc-timeclock-mini-note">${esc(statusDetail(data))}</span>`;
-  }
-
   function renderDashboard(){
     const host=dashboardHost();
     if(!host) return;
@@ -117,7 +110,10 @@
     host.innerHTML=`<div class="gc-dashboard-clock-main"><span class="gc-dashboard-clock-icon" aria-hidden="true">◷</span><div class="gc-dashboard-clock-copy"><small>Time clock</small><strong>${esc(statusLabel(data.state))}</strong><span>${esc(statusDetail(data))}</span>${attendance?`<span class="gc-timeclock-attendance ${esc(data.clock_in_status||'')}">${esc(attendance)}</span>`:''}${hasPremiumContext?`<div class="gc-timeclock-week-context"><span class="${overtimeRisk(data)?'is-warning':''}">${paid.toFixed(1)}h paid this week</span><span>${scheduled.toFixed(1)}h scheduled</span><span>${overtimeThreshold(data).toFixed(0)}h overtime warning</span></div>`:''}</div></div><div class="gc-dashboard-clock-time"><strong data-timeclock-elapsed>${esc(elapsed(data))}</strong><div class="gc-dashboard-clock-actions">${actionButtons(data,false)}</div></div>`;
   }
 
-  function render(){ renderMini(); renderDashboard(); }
+  function render(){
+    removeDeprecatedSidebarClock();
+    renderDashboard();
+  }
 
   function tick(){
     document.querySelectorAll('[data-timeclock-elapsed]').forEach(node=>{ node.textContent=elapsed(state.data); });
@@ -130,6 +126,7 @@
   }
 
   async function load({quiet=false,force=false}={}){
+    removeDeprecatedSidebarClock();
     const p=profile();
     if(!p?.id || !p?.location_id) return;
     if(state.busy && !force) return;
@@ -142,7 +139,7 @@
       const allowed=await canUse();
       if(stale()) return;
       if(!allowed){
-        miniHost()?.remove();
+        removeDeprecatedSidebarClock();
         dashboardHost()?.remove();
         return;
       }
@@ -198,6 +195,7 @@
   window.addEventListener('focus',()=>load({quiet:true}));
   window.addEventListener('online',()=>load({quiet:true}));
 
+  removeDeprecatedSidebarClock();
   injectStyle();
   state.timer=setInterval(tick,1000);
   state.poller=setInterval(()=>{ if(document.visibilityState==='visible') load({quiet:true}); },30000);
