@@ -3,16 +3,17 @@
   if (window.GotCrackedDirectory?.version) return;
   const client = window.supabaseClient;
   if (!client) { console.warn('GotCracked directory: Supabase client unavailable.'); return; }
-  const VERSION = '20260825-directory2';
+  const VERSION = '20260827-directory4';
   const REPAIR_TERMINAL = new Set(['sale_complete','abandoned','unrepairable','customer_declined','completed','cancelled']);
   const LEAD_TERMINAL = new Set(['converted','lost']);
-  const REPAIR_LABELS = { checked_in:'Checked In', in_diagnosis:'In Diagnosis', awaiting_approval:'Awaiting Approval', waiting_on_parts:'Waiting on Parts', in_repair:'In Repair', ready_for_pickup:'Ready for Pickup', completed:'Completed', awaiting_customer:'Awaiting Customer', awaiting_repair:'Awaiting Repair', need_to_order_parts:'Need to Order Parts', awaiting_parts:'Awaiting Parts', diagnostic_in_progress:'Diagnostic in Progress', repair_in_progress:'Repair in Progress', quality_inspection:'Quality Inspection', awaiting_callback:'Awaiting Callback', repaired:'Ready for Pickup', sale_complete:'Sale Complete', abandoned:'Abandoned', unrepairable:'Unrepairable', customer_declined:'Customer Declined', cancelled:'Cancelled' };
+  const REPAIR_LABELS = { checked_in:'Checked In', in_diagnosis:'In Diagnosis', awaiting_approval:'Awaiting Approval', waiting_on_parts:'Waiting on Parts', in_repair:'In Repair', ready_for_pickup:'Ready for Pickup', completed:'Completed', awaiting_customer:'Awaiting Customer', awaiting_repair:'Awaiting Repair', awaiting_diagnostic:'Awaiting Diagnostic', testing_in_progress:'Testing in Progress', need_to_order_parts:'Need to Order Parts', awaiting_parts:'Awaiting Parts', diagnostic_in_progress:'Diagnostic in Progress', repair_in_progress:'Repair in Progress', quality_inspection:'Quality Inspection', awaiting_callback:'Awaiting Callback', repaired:'Ready for Pickup', sale_complete:'Sale Complete', abandoned:'Abandoned', unrepairable:'Unrepairable', customer_declined:'Customer Declined', cancelled:'Cancelled' };
   const LEAD_LABELS = { need_to_contact:'Need to Contact', awaiting_customer:'Awaiting Customer', awaiting_device:'Awaiting Device', need_to_order_part:'Need to Order Part', awaiting_parts:'Awaiting Parts', converted:'Converted', lost:'Lost' };
   const DEFAULT_SORT = 'checkin_desc';
   const baseState = () => ({ query:'', types:new Set(), statuses:new Set(), device:'all', assigned:'all', intake:'all', from:'', to:'', includeClosed:false, sort:DEFAULT_SORT, filtersOpen:false, preset:'active' });
   const state = { dashboard:baseState(), leads:baseState(), data:{repairs:[],leads:[]}, loading:false, loaded:false, refreshTimer:null };
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[char]);
   const friendly = value => String(value || '').replaceAll('_',' ').replace(/\b\w/g, letter => letter.toUpperCase());
+  const notifyRendered = scope => document.dispatchEvent(new CustomEvent('gc-directory-rendered',{detail:{scope}}));
   const leadStage = lead => lead.pipeline_status || (lead.status === 'won' ? 'converted' : lead.status === 'lost' ? 'lost' : ['claimed','qualified'].includes(lead.status) ? 'awaiting_customer' : 'need_to_contact');
   const labelFor = (type,status) => type === 'work_order' ? (REPAIR_LABELS[status] || friendly(status)) : (LEAD_LABELS[status] || friendly(status));
   const isClosed = record => record.type === 'work_order' ? REPAIR_TERMINAL.has(record.status) : LEAD_TERMINAL.has(record.status);
@@ -60,7 +61,7 @@
   function activeFilterCount(scope) { const s=state[scope]; return Number(Boolean(s.query))+Number(Boolean(s.types.size))+Number(Boolean(s.statuses.size))+Number(s.device!=='all')+Number(s.assigned!=='all')+Number(s.intake!=='all')+Number(Boolean(s.from||s.to))+Number(s.includeClosed)+Number(s.sort!==DEFAULT_SORT); }
   function formatDate(value) { if (!value) return '—'; const date=new Date(value); if (Number.isNaN(date.getTime())) return '—'; return new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(date); }
   const typeLabel = type => type === 'work_order' ? 'Work order' : 'Lead';
-  function statusClass(record) { const v=record.status; if (['need_to_contact','new','need_to_order_part','need_to_order_parts','awaiting_repair','checked_in'].includes(v)) return 'status-red'; if (['awaiting_customer','awaiting_device','claimed','awaiting_approval','awaiting_callback','awaiting_parts','waiting_on_parts'].includes(v)||String(v).startsWith('awaiting_')) return 'status-yellow'; if (['repaired','ready_for_pickup','converted','won','customer_declined','unrepairable'].includes(v)) return 'status-green'; if (v==='sale_complete') return 'status-blue'; return ''; }
+  function statusClass(record) { const v=record.status; if (['need_to_contact','new','need_to_order_part','need_to_order_parts','awaiting_repair','awaiting_diagnostic','checked_in'].includes(v)) return 'status-red'; if (['awaiting_customer','awaiting_device','claimed','awaiting_approval','awaiting_callback','awaiting_parts','waiting_on_parts'].includes(v)||String(v).startsWith('awaiting_')) return 'status-yellow'; if (['repaired','ready_for_pickup','testing_in_progress','repair_in_progress','converted','won','customer_declined','unrepairable'].includes(v)) return 'status-green'; if (v==='sale_complete') return 'status-blue'; return ''; }
   function renderStatusChecklist(scope) { const s=state[scope], options=statusOptions(scope); return options.length ? options.map(record => { const value=`${record.type}:${record.status}`; return `<label class="gc-dir-check"><input type="checkbox" data-gc-status="${esc(value)}" ${s.statuses.has(value)?'checked':''}><span><i class="gc-dir-type-dot ${record.type}"></i>${esc(record.statusLabel)}</span></label>`; }).join('') : '<p class="gc-dir-filter-empty">No statuses loaded yet.</p>'; }
   function selectOptions(values,selected,allLabel) { return `<option value="all">${esc(allLabel)}</option>${values.map(value=>`<option value="${esc(value)}" ${selected===value?'selected':''}>${esc(friendly(value))}</option>`).join('')}`; }
   function renderPresets(scope) { const active=state[scope].preset, presets=scope==='dashboard' ? [['active','All active'],['attention','Needs attention'],['new_leads','Need to contact'],['awaiting_parts','Awaiting parts'],['ready','Ready for pickup'],['unassigned','Unassigned']] : [['active','Active leads'],['need_to_contact','Need to Contact'],['awaiting_customer','Awaiting Customer'],['awaiting_device','Awaiting Device'],['need_to_order_part','Need to Order Part'],['awaiting_parts','Awaiting Parts'],['converted','Converted'],['lost','Lost'],['unassigned','Unassigned']]; return presets.map(([value,label])=>`<button type="button" class="gc-dir-chip ${active===value?'active':''}" data-gc-preset="${value}">${label}</button>`).join(''); }
@@ -78,13 +79,14 @@
 
   function drawResults(scope) {
     const host=ensureHost(scope), results=host?.querySelector('[data-gc-results]'), summary=host?.querySelector('[data-gc-summary]'); if (!results||!summary) return;
-    if (state.loading&&!state.loaded) { summary.textContent='Loading live records…'; results.innerHTML='<div class="gc-dir-loading"><span></span><p>Loading GotCracked operations…</p></div>'; return; }
+    if (state.loading&&!state.loaded) { summary.textContent='Loading live records…'; results.innerHTML='<div class="gc-dir-loading"><span></span><p>Loading GotCracked operations…</p></div>'; notifyRendered(scope); return; }
     const filtered=filteredRecords(scope), base=allRecords(scope).filter(record=>state[scope].includeClosed||!isClosed(record)), activeCount=base.filter(record=>!isClosed(record)).length, workOrderCount=filtered.filter(r=>r.type==='work_order').length, leadCount=filtered.filter(r=>r.type==='lead').length;
     summary.innerHTML=`<strong>${filtered.length}</strong> of ${base.length} records shown${scope==='dashboard'?` · ${workOrderCount} work order${workOrderCount===1?'':'s'} · ${leadCount} lead${leadCount===1?'':'s'}`:` · ${activeCount} active`}`;
-    if (!filtered.length) { results.innerHTML='<div class="gc-dir-empty"><span>⌕</span><h3>No matching records</h3><p>Adjust the search or filters to broaden this view.</p><button class="secondary-button" type="button" data-gc-action="clear">Clear filters</button></div>'; return; }
-    results.innerHTML=`<div class="gc-dir-columns" aria-hidden="true"><span>Record</span><span>Customer</span><span>Device / service</span><span>Status</span><span>Check-in</span><span>Assigned</span><span></span></div>${filtered.map(renderRow).join('')}`;
+    if (!filtered.length) { results.innerHTML='<div class="gc-dir-empty"><span>⌕</span><h3>No matching records</h3><p>Adjust the search or filters to broaden this view.</p><button class="secondary-button" type="button" data-gc-action="clear">Clear filters</button></div>'; notifyRendered(scope); return; }
+    results.innerHTML=`<div class="gc-dir-columns" aria-hidden="true"><span>Record</span><span>Customer</span><span>Device / service</span><span>Status</span><span>Check-in</span><span>Assigned</span></div>${filtered.map(renderRow).join('')}`;
+    notifyRendered(scope);
   }
-  function renderRow(record) { const clickAttr=record.type==='work_order'?`data-v1-work-order="${esc(record.sourceId)}"`:`data-v1-lead="${esc(record.sourceId)}"`; return `<button class="gc-dir-row" type="button" ${clickAttr} data-gc-record="${esc(record.key)}"><span class="gc-dir-record"><b class="gc-dir-type ${record.type}">${typeLabel(record.type)}</b><strong>${esc(record.displayId)}</strong></span><span class="gc-dir-customer"><strong>${esc(record.customer)}</strong><small>${esc(record.phone||record.email||'No contact listed')}</small></span><span class="gc-dir-device"><strong>${esc(record.device)}</strong><small>${esc(record.service)}</small></span><span><b class="status ${statusClass(record)}">${esc(record.statusLabel)}</b></span><span class="gc-dir-time"><strong>${esc(formatDate(record.createdAt))}</strong><small>Updated ${esc(formatDate(record.updatedAt))}</small></span><span class="gc-dir-assigned"><strong>${esc(record.assigned)}</strong><small>${esc(friendly(record.intake))}</small></span><span class="gc-dir-arrow">›</span></button>`; }
+  function renderRow(record) { const clickAttr=record.type==='work_order'?`data-v1-work-order="${esc(record.sourceId)}"`:`data-v1-lead="${esc(record.sourceId)}"`; return `<button class="gc-dir-row" type="button" ${clickAttr} data-gc-record="${esc(record.key)}"><span class="gc-dir-record"><b class="gc-dir-type ${record.type}">${typeLabel(record.type)}</b><strong>${esc(record.displayId)}</strong></span><span class="gc-dir-customer"><strong>${esc(record.customer)}</strong><small>${esc(record.phone||record.email||'No contact listed')}</small></span><span class="gc-dir-device"><strong>${esc(record.device)}</strong><small>${esc(record.service)}</small></span><span><b class="status ${statusClass(record)}">${esc(record.statusLabel)}</b></span><span class="gc-dir-time"><strong>${esc(formatDate(record.createdAt))}</strong><small>Updated ${esc(formatDate(record.updatedAt))}</small></span><span class="gc-dir-assigned"><strong>${esc(record.assigned)}</strong><small>${esc(friendly(record.intake))}</small></span></button>`; }
 
   function ensureHost(scope) {
     if (scope==='dashboard') {
@@ -113,7 +115,7 @@
   document.addEventListener('click',event=>{ const target=event.target instanceof Element?event.target:null; if (!target) return; const metric=target.closest('[data-gc-directory-filter]'); if (metric) { event.preventDefault(); event.stopPropagation(); if (metric.dataset.gcDirectoryFilter==='ready') setPreset('dashboard','ready'); else { setPreset('dashboard','active'); state.dashboard.types.add('work_order'); state.dashboard.preset='open_repairs'; persist('dashboard'); renderShell('dashboard'); } document.querySelector('#gc-master-directory')?.scrollIntoView({behavior:'smooth',block:'start'}); return; } const preset=target.closest('[data-gc-preset]'); if (preset) { const scope=scopeFor(preset); if (scope) setPreset(scope,preset.dataset.gcPreset); return; } const action=target.closest('[data-gc-action]'); if (!action) return; const scope=scopeFor(action); if (!scope) return; if (action.dataset.gcAction==='filters') { state[scope].filtersOpen=!state[scope].filtersOpen; persist(scope); renderShell(scope); } if (action.dataset.gcAction==='clear') clearFilters(scope); if (action.dataset.gcAction==='refresh') requestRefresh(); },true);
 
   async function load() {
-    if (state.loading) return; state.loading=true; renderVisible();
+    if (state.loading) return; state.loading=true; if (!state.loaded) renderVisible();
     try {
       const {data:{session}}=await client.auth.getSession(); if (!session) return;
       const [repairs,leads]=await Promise.all([
@@ -124,9 +126,21 @@
       const leadBadge=document.querySelector('#lead-count'); if (leadBadge) { const count=state.data.leads.filter(lead=>!LEAD_TERMINAL.has(leadStage(lead))).length; leadBadge.textContent=String(count); leadBadge.hidden=count===0; }
       state.loaded=true;
     } catch (error) { console.error('GotCracked directory failed to load',error); window.GotCrackedDiagnostics?.error(error,{context:'Failure to refresh Portal directory'}); document.querySelectorAll('.gc-dir-summary').forEach(node=>{node.textContent=`Directory refresh failed: ${error.message||'Unknown error'}`;}); }
-    finally { state.loading=false; renderVisible(); }
+    finally { state.loading=false; state.loaded ? drawVisibleResults() : renderVisible(); }
   }
-  function renderVisible() { if (document.querySelector('#dashboard')) renderShell('dashboard'); if (document.querySelector('#leads #portal-leads')) renderShell('leads'); }
+  function ensureVisibleShell(scope) {
+    const host=ensureHost(scope);
+    if (!host) return;
+    if (!host.querySelector('.gc-dir-head') || !host.querySelector('[data-gc-results]')) renderShell(scope);
+  }
+  function renderVisible() {
+    if (document.querySelector('#dashboard')) ensureVisibleShell('dashboard');
+    if (document.querySelector('#leads #portal-leads')) ensureVisibleShell('leads');
+  }
+  function drawVisibleResults() {
+    if (document.querySelector('#dashboard')) { const host=ensureHost('dashboard'); if (host) host.querySelector('[data-gc-results]') ? drawResults('dashboard') : renderShell('dashboard'); }
+    if (document.querySelector('#leads #portal-leads')) { const host=ensureHost('leads'); if (host) host.querySelector('[data-gc-results]') ? drawResults('leads') : renderShell('leads'); }
+  }
   function requestRefresh() { clearTimeout(state.refreshTimer); state.refreshTimer=setTimeout(load,120); }
   restore('dashboard'); restore('leads');
   window.GotCrackedDirectory={version:VERSION,ownsLeadDirectory:true,requestRefresh,render:renderVisible};
@@ -138,6 +152,5 @@
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')requestRefresh();});
   window.addEventListener('gc-view-changed',()=>requestAnimationFrame(renderVisible));
   window.addEventListener('beforeunload',()=>{try{client.removeChannel(channel);}catch{}},{once:true});
-  setTimeout(load,250); setTimeout(renderVisible,900);
+  setTimeout(load,250); setTimeout(()=>{renderVisible();drawVisibleResults();},900);
 })();
-
