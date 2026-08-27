@@ -37,6 +37,12 @@
     return `<section class="gc-marlon-approval" data-state="${esc(state)}" data-approval-ticket="${esc(t.id)}"><strong>${esc(stateLabel)}</strong><p>${esc(message)}</p><p><b>Exact scope:</b> ${esc(t.title)}</p><small>Surface: ${esc(t.surface)} · Requested ${esc(fmt(t.approval_requested_at))}${t.approval_decided_at?` · Decided ${esc(fmt(t.approval_decided_at))}`:''}</small>${pending&&owner?`<div class="gc-marlon-approval-actions"><button type="button" class="gc-marlon-approve" data-marlon-approval="approve">Approve</button><button type="button" class="gc-marlon-deny" data-marlon-approval="deny">Deny</button></div>`:pending?'<small>Waiting for a verified Owner decision.</small>':''}</section>`;
   }
 
+  async function refreshPanels(id){
+    const t=await ticket(id);if(!t?.requires_approval)return;
+    document.querySelectorAll(`[data-approval-ticket="${id}"]`).forEach(panel=>{panel.outerHTML=panelMarkup(t)});
+    return t;
+  }
+
   async function decorate(id){
     if(!id)return;
     try{
@@ -58,8 +64,9 @@
     panel.querySelectorAll('button').forEach(b=>b.disabled=true);
     try{
       const {error}=await client.rpc('decide_marlon_change_approval',{p_ticket_id:id,p_approved:approved});if(error)throw error;
+      await refreshPanels(id);
       await window.GotCrackedSupportTickets?.load?.();
-      await decorate(id);
+      if(document.getElementById('gc-support-detail-dialog')?.open)await decorate(id);
     }catch(error){
       panel.querySelectorAll('button').forEach(b=>b.disabled=false);
       window.GotCrackedDiagnostics?.error?.(error,{context:'Unable to record Marlon approval decision'});
@@ -73,5 +80,5 @@
   },true);
 
   ensureStyle();
-  window.GotCrackedMarlonApprovalGate={version:'1.0.0',decorate};
+  window.GotCrackedMarlonApprovalGate={version:'1.1.0',decorate,refreshPanels,panelMarkup};
 })();
