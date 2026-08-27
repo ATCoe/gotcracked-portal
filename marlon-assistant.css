@@ -3,3 +3,13 @@
 /* Marlon launcher v2: identity stays inside the open chat, launcher stays simple. */
 .gc-marlon-launcher{width:auto;min-width:104px;height:46px;padding:0 16px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:linear-gradient(145deg,#158ed8,#0873ba);box-shadow:0 12px 30px rgba(4,63,104,.28),0 0 0 1px rgba(255,255,255,.05) inset;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:850;letter-spacing:.01em}.gc-marlon-launcher img,.gc-marlon-launcher .gc-marlon-live{display:none!important}.gc-marlon-launcher::before{content:attr(data-label);white-space:nowrap}.gc-marlon-launcher:not([data-label])::before,.gc-marlon-launcher[data-label='']::before{content:'Need Help?'}.gc-marlon-launcher:hover{transform:translateY(-1px);background:linear-gradient(145deg,#1a99e5,#0879c4);box-shadow:0 16px 36px rgba(4,63,104,.34)}.gc-marlon-avatar{object-fit:cover}.gc-marlon.open .gc-marlon-launcher{opacity:.86}
 @media(max-width:640px){.gc-marlon-launcher{width:52px;min-width:52px;height:52px;padding:0;border-radius:50%;font-size:0}.gc-marlon-launcher::before,.gc-marlon-launcher:not([data-label])::before,.gc-marlon-launcher[data-label='']::before{content:'?';font-size:23px;font-weight:900;line-height:1}}
+
+/* Mobile Marlon is an app-like full-screen support surface. Desktop remains a floating panel. */
+@media(max-width:640px){
+  .gc-marlon.open{inset:0;right:0;bottom:0;width:100vw;height:100dvh;z-index:3200}
+  .gc-marlon.open .gc-marlon-launcher{display:none!important}
+  .gc-marlon.open .gc-marlon-panel{position:fixed;inset:0;right:0;bottom:0;width:100vw;max-width:none;height:100dvh;max-height:none;border:0;border-radius:0;box-shadow:none;overscroll-behavior:contain}
+  .gc-marlon.open .gc-marlon-head{padding-top:max(15px,env(safe-area-inset-top))}
+  .gc-marlon.open .gc-marlon-body{min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .gc-marlon.open .gc-marlon-form{padding-bottom:max(12px,env(safe-area-inset-bottom))}
+}
