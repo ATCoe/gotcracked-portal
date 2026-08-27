@@ -91,22 +91,15 @@ async function maintenancePolicy() {
   return { ...data, timeZone: tz, clock, todayHours: window, isOpen };
 }
 
-async function dmActiveStaff(message: string) {
+async function logTechSupport(message: string) {
   const db = admin();
-  const { data, error } = await db.from('profiles').select('discord_user_id').eq('active', true).not('discord_user_id', 'is', null);
-  if (error) throw error;
-  let sent = 0;
-  let failedCount = 0;
-  for (const row of data || []) {
-    const userId = clean(row.discord_user_id, 40);
-    if (!userId) continue;
-    try {
-      const dm = await discord('POST', '/users/@me/channels', { recipient_id: userId });
-      await discord('POST', `/channels/${dm.id}/messages`, { content: message, allowed_mentions: { parse: [] } });
-      sent++;
-    } catch { failedCount++; }
-  }
-  return { sent, failedCount };
+  const { data: settings, error: settingsError } = await db.from('business_settings').select('location_id').limit(1).maybeSingle();
+  if (settingsError || !settings?.location_id) throw settingsError || new Error('Location settings unavailable.');
+  const { data: config } = await db.from('marlon_discord_config').select('tech_support_channel_id,bug_log_channel_id').eq('location_id', settings.location_id).maybeSingle();
+  const channelId = clean(config?.tech_support_channel_id || config?.bug_log_channel_id || Deno.env.get('DISCORD_TECH_SUPPORT_CHANNEL_ID') || Deno.env.get('DISCORD_BUG_LOG_CHANNEL_ID'), 40);
+  if (!channelId) return { logged: false, reason: 'Tech Support channel is not configured.' };
+  await discord('POST', `/channels/${channelId}/messages`, { content: message, flags: 4096, allowed_mentions: { parse: [] } });
+  return { logged: true, channelId };
 }
 
 function surfaceName(surface: string) {
@@ -135,11 +128,11 @@ async function maintenanceStart(body: any) {
   }
   const { data: event, error } = await db.from('marlon_maintenance_events').insert({ location_id: settings.location_id, surface, change_class: changeClass, status: 'started', requires_downtime: requiresDowntime, reason, started_at: new Date().toISOString(), details: gate }).select('id').single();
   if (error) throw error;
-  let notification = { sent: 0, failedCount: 0 };
+  let notification = { logged: false };
   if (requiresDowntime) {
-    notification = await dmActiveStaff(`🛠️ **Marlon maintenance notice**\n${surfaceName(surface)} is temporarily down for scheduled maintenance.\n**Reason:** ${reason}\nI’ll send another DM when service is restored.`);
-    await db.from('marlon_maintenance_events').update({ dm_recipients: notification.sent }).eq('id', event.id);
+    notification = await logTechSupport(`🛠️ **Marlon maintenance notice**\n${surfaceName(surface)} is temporarily down for scheduled maintenance.\n**Reason:** ${reason}`);
   }
+  await db.from('marlon_maintenance_events').update({ dm_recipients: 0, details: { ...gate, notification } }).eq('id', event.id);
   return { ...gate, eventId: event.id, notification };
 }
 async function maintenanceFinish(body: any, failed = false) {
@@ -150,9 +143,9 @@ async function maintenanceFinish(body: any, failed = false) {
   if (error || !event) throw error || new Error('Maintenance event not found.');
   const surface = event.surface || 'both';
   const note = clean(body.note || (failed ? 'Maintenance needs attention.' : 'Maintenance completed and service verification passed.'), 1000);
-  let notification = { sent: 0, failedCount: 0 };
-  if (event.requires_downtime) notification = await dmActiveStaff(failed ? `❌ **Marlon maintenance alert**\n${surfaceName(surface)} is not back online yet.\n**Status:** ${note}` : `✅ **Marlon maintenance complete**\n${surfaceName(surface)} is back online and available.\n**Status:** ${note}`);
-  await db.from('marlon_maintenance_events').update({ status: failed ? 'failed' : 'completed', completed_at: new Date().toISOString(), dm_recipients: Math.max(Number(event.dm_recipients || 0), notification.sent), details: { ...(event.details || {}), completion_note: note, notification } }).eq('id', eventId);
+  let notification = { logged: false };
+  if (event.requires_downtime) notification = await logTechSupport(failed ? `❌ **Marlon maintenance alert**\n${surfaceName(surface)} is not back online yet.\n**Status:** ${note}` : `✅ **Marlon maintenance complete**\n${surfaceName(surface)} is back online and available.\n**Status:** ${note}`);
+  await db.from('marlon_maintenance_events').update({ status: failed ? 'failed' : 'completed', completed_at: new Date().toISOString(), dm_recipients: 0, details: { ...(event.details || {}), completion_note: note, notification } }).eq('id', eventId);
   return { ok: !failed, eventId, notification };
 }
 
