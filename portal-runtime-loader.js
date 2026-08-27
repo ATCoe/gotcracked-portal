@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260827-production15';
+  const VERSION = '20260827-production16';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260826-sales-ops2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -41,9 +41,10 @@
     'checkout-receipts.js'
   ];
 
-  // Legacy portal-live.js and payment-center.js are intentionally retired.
-  // operations-v1-core owns the current operational UI, while checkout remains
-  // the only payment gate between Ready for Pickup and Sale Complete.
+  // Legacy portal-live.js, payment-center.js, and leads.js are intentionally
+  // retired from production. operations-v1-core owns the current operational UI,
+  // while checkout remains the only payment gate between Ready for Pickup and
+  // Sale Complete.
   const deferredScripts = [
     'schedule-board.js',
     'schedule-print.js',
