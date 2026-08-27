@@ -57,14 +57,48 @@ async function resolveGuild() {
 
 async function syncTechSupport() {
   const guild = await resolveGuild();
-  const channels: any[] = await discord('GET', `/guilds/${guild.id}/channels`);
+  const db = admin();
+  let channels: any[] = await discord('GET', `/guilds/${guild.id}/channels`);
+
   let category = channels.find(c => c.type === 4 && /^tech[ -]?support$/i.test(String(c.name || '')));
-  if (!category) category = await discord('POST', `/guilds/${guild.id}/channels`, { name: 'TECH SUPPORT', type: 4 });
-  let channel = channels.find(c => c.type === 0 && /^tech-support$/i.test(String(c.name || '')));
-  const topic = 'GotCracked Tech Support with Marlon — hardware, software, accounts, connectivity, internal tools, website issues, and Portal issues when relevant. This Discord support space is independent from Portal chat.';
-  if (channel) channel = await discord('PATCH', `/channels/${channel.id}`, { parent_id: category.id, topic });
-  else channel = await discord('POST', `/guilds/${guild.id}/channels`, { name: 'tech-support', type: 0, parent_id: category.id, topic });
-  return { guild: { id: guild.id, name: guild.name }, category: { id: category.id, name: category.name }, channel: { id: channel.id, name: channel.name, parent_id: channel.parent_id }, standalone: true };
+  if (!category) {
+    category = await discord('POST', `/guilds/${guild.id}/channels`, { name: 'TECH SUPPORT', type: 4 });
+    channels = [...channels, category];
+  }
+
+  const supportTopic = 'GotCracked Tech Support with Marlon — hardware, software, accounts, connectivity, internal tools, website issues, and Portal issues when relevant.';
+  let support = channels.find(c => c.type === 0 && /^tech-support$/i.test(String(c.name || '')));
+  if (support) support = await discord('PATCH', `/channels/${support.id}`, { parent_id: category.id, topic: supportTopic });
+  else support = await discord('POST', `/guilds/${guild.id}/channels`, { name: 'tech-support', type: 0, parent_id: category.id, topic: supportTopic });
+
+  const updatesTopic = 'Verified GotCracked Portal releases, updates, fixes, and patch notes posted by Marlon. Silent channel — no staff pings.';
+  let updates = channels.find(c => c.type === 0 && /^(updates-and-patch-notes|updates-patch-notes|patch-notes)$/i.test(String(c.name || '')));
+  if (updates) updates = await discord('PATCH', `/channels/${updates.id}`, { parent_id: category.id, topic: updatesTopic });
+  else updates = await discord('POST', `/guilds/${guild.id}/channels`, { name: 'updates-and-patch-notes', type: 0, parent_id: category.id, topic: updatesTopic });
+
+  const { data: settings, error: settingsError } = await db.from('business_settings').select('location_id').order('updated_at',{ascending:false}).limit(1).maybeSingle();
+  if (settingsError || !settings?.location_id) throw settingsError || new Error('Location settings unavailable.');
+  const { data: existing } = await db.from('marlon_discord_config').select('bug_log_channel_id,lead_dm_profile_id,tech_support_voice_channel_id').eq('location_id',settings.location_id).maybeSingle();
+  const { error: saveError } = await db.from('marlon_discord_config').upsert({
+    location_id: settings.location_id,
+    guild_id: guild.id,
+    category_id: category.id,
+    tech_support_channel_id: support.id,
+    future_updates_channel_id: updates.id,
+    bug_log_channel_id: existing?.bug_log_channel_id || support.id,
+    lead_dm_profile_id: existing?.lead_dm_profile_id || null,
+    tech_support_voice_channel_id: existing?.tech_support_voice_channel_id || null,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'location_id' });
+  if (saveError) throw saveError;
+
+  return {
+    guild: { id: guild.id, name: guild.name },
+    category: { id: category.id, name: category.name },
+    channel: { id: support.id, name: support.name, parent_id: support.parent_id },
+    updates: { id: updates.id, name: updates.name, parent_id: updates.parent_id },
+    standalone: true
+  };
 }
 
 function localClock(timeZone: string) {

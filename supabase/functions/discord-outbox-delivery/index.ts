@@ -37,6 +37,44 @@ function supportPayload(row:any){
   return {flags:4096,allowed_mentions:{parse:[]},embeds:[{title:`${created?'New Marlon support request':'Marlon support update'} · ${code}`,description:`**${text(p.title,'Portal support request')}**\n${text(p.description,'Support activity logged by Marlon').slice(0,3200)}`,color:p.status==='resolved'||p.status==='closed'?0x2fbf71:p.priority==='critical'?0xe5484d:p.priority==='high'?0xf59e0b:0x159bd3,fields,footer:{text:'GotCracked Tech Support · silent log'},timestamp:new Date(row.created_at).toISOString()}],components:[{type:1,components:[{type:2,style:5,label:'Open Support Desk',url:`${portalUrl}/#support-tickets`}]}]};
 }
 
+function releasePayload(row:any){
+  const p=row.payload||{};
+  const raw=Array.isArray(p.feature_highlights)?p.feature_highlights:[];
+  const highlights=raw.slice(0,10).map((item:any)=>{
+    if(typeof item==='string') return item;
+    const itemTitle=text(item?.title,'Update');
+    const detail=String(item?.description||'').trim();
+    return detail ? `**${itemTitle}** — ${detail}` : `**${itemTitle}**`;
+  });
+  const changeList=highlights.length
+    ? `\n\n**What changed**\n${highlights.map((v:string)=>`• ${v}`).join('\n')}`
+    : '';
+  const description=`${text(p.summary,'A new GotCracked Portal update is live.')}${changeList}`;
+  const fields:any[]=[
+    {name:'Version',value:`v${text(p.version,'—')}`,inline:true},
+    {name:'Release',value:titleCase(p.release_kind||'update'),inline:true}
+  ];
+  if(p.deployment_ref){
+    fields.push({name:'Deployment',value:text(p.deployment_ref).slice(0,900),inline:false});
+  }
+  return {
+    flags:4096,
+    allowed_mentions:{parse:[]},
+    embeds:[{
+      title:`GotCracked Portal Update · v${text(p.version,'—')}`,
+      description:description.slice(0,3900),
+      color:0x159bd3,
+      fields,
+      footer:{text:'GotCracked · Updates & Patch Notes · silent'},
+      timestamp:new Date(p.deployed_at||row.created_at).toISOString()
+    }],
+    components:[{
+      type:1,
+      components:[{type:2,style:5,label:'Open Portal',url:p.portal_url||portalUrl}]
+    }]
+  };
+}
+
 function leadPayload(row:any){
   const p=row.payload||{};
   const created=row.event_type==='lead_created';
@@ -78,6 +116,10 @@ async function deliveryChannel(db:any,row:any){
   if(row.entity_type==='support_ticket'){
     const cfg=await db.from('marlon_discord_config').select('tech_support_channel_id,bug_log_channel_id').eq('location_id',row.location_id).maybeSingle();
     return cfg.data?.tech_support_channel_id || cfg.data?.bug_log_channel_id || Deno.env.get('DISCORD_TECH_SUPPORT_CHANNEL_ID') || Deno.env.get('DISCORD_BUG_LOG_CHANNEL_ID') || Deno.env.get('DISCORD_WORK_ORDER_CHANNEL_ID') || Deno.env.get('DISCORD_LEAD_CHANNEL_ID');
+  }
+  if(row.entity_type==='portal_release'){
+    const cfg=await db.from('marlon_discord_config').select('future_updates_channel_id,tech_support_channel_id').eq('location_id',row.location_id).maybeSingle();
+    return cfg.data?.future_updates_channel_id || cfg.data?.tech_support_channel_id || Deno.env.get('DISCORD_TECH_SUPPORT_CHANNEL_ID');
   }
   if(row.entity_type==='lead'||row.entity_type==='pc_build_request') return Deno.env.get('DISCORD_LEAD_CHANNEL_ID') || Deno.env.get('DISCORD_WORK_ORDER_CHANNEL_ID');
   return Deno.env.get('DISCORD_WORK_ORDER_CHANNEL_ID') || Deno.env.get('DISCORD_LEAD_CHANNEL_ID');
@@ -135,12 +177,12 @@ Deno.serve(async request=>{
     const rowResult=await db.from('discord_notification_outbox').select('*').eq('id',id).maybeSingle();
     if(rowResult.error) throw rowResult.error;
     const row=rowResult.data;
-    if(!row||row.delivered_at||!['work_order','support_ticket','lead','pc_build_request'].includes(row.entity_type)) return new Response(JSON.stringify({ok:true,skipped:true}),{headers:{'Content-Type':'application/json'}});
+    if(!row||row.delivered_at||!['work_order','support_ticket','lead','pc_build_request','portal_release'].includes(row.entity_type)) return new Response(JSON.stringify({ok:true,skipped:true}),{headers:{'Content-Type':'application/json'}});
     const token=Deno.env.get('DISCORD_BOT_TOKEN');
     const channelId=await deliveryChannel(db,row);
     if(!token||!channelId) throw new Error(`Discord ${row.entity_type} delivery is not configured.`);
 
-    const channelPayload=row.entity_type==='support_ticket'?supportPayload(row):row.entity_type==='lead'?leadPayload(row):row.entity_type==='pc_build_request'?pcBuildPayload(row):workOrderPayload(row);
+    const channelPayload=row.entity_type==='support_ticket'?supportPayload(row):row.entity_type==='portal_release'?releasePayload(row):row.entity_type==='lead'?leadPayload(row):row.entity_type==='pc_build_request'?pcBuildPayload(row):workOrderPayload(row);
     await sendMessage(token,String(channelId),channelPayload);
     if(shouldDm(row)) await sendDm(db,token,row);
 
