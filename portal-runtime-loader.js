@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260827-production12';
+  const VERSION = '20260827-production13';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260826-sales-ops2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -11,6 +11,7 @@
   const criticalScripts = [
     'theme-controller.js',
     'training-shared-sync.js',
+    'runtime-stability.js',
     'mobile-runtime-regression-fixes.js',
     'operations-v1-core.js',
     'payment-center.js',
@@ -31,6 +32,7 @@
     'intake-profile-validation-fix.js',
     'portal-mobile-audit.js',
     'portal-v1-final.js',
+    'ui-title-case.js',
     'intake-modal-release.js',
     'directory-advanced.js',
     'master-directory.js',
@@ -74,6 +76,7 @@
   const profileIndependentScripts = new Set([
     'theme-controller.js',
     'training-shared-sync.js',
+    'runtime-stability.js',
     'mobile-runtime-regression-fixes.js',
     'operations-v1-core.js'
   ]);
@@ -190,15 +193,6 @@
     }
   }
 
-  async function ensureStoreModeRuntime(){
-    if(isTraining()) return;
-    try { await loadScript('portal-live.js'); }
-    catch(error){
-      console.error('Portal live-data runtime load failed:',error);
-      window.GotCrackedDiagnostics?.error?.(error,{context:'Live Portal data could not be loaded'});
-    }
-  }
-
   async function startCriticalRuntime(){
     if(started)return;
     started=true;
@@ -264,16 +258,9 @@
     observer.observe(login,{attributes:true,attributeFilter:['class']});
   }
 
-  document.addEventListener('click',event=>{
-    const target=event.target instanceof Element?event.target.closest('[data-view]'):null;
-    const view=target?.dataset.view;
-    if(view)ensureViewRuntime(view);
-  },true);
-
   document.addEventListener('gc-view-changed',event=>{
     const view=typeof event.detail==='string'?event.detail:(location.hash.slice(1).split('/')[0]||'dashboard');
     if(view)ensureViewRuntime(view);
-    if(!isTraining()) ensureStoreModeRuntime();
   });
 
   window.addEventListener('hashchange',()=>{
