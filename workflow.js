@@ -37,32 +37,71 @@
     if(initialsElement)initialsElement.textContent=(staff.name||'Staff').split(' ').filter(Boolean).map(part=>part[0]).join('').slice(0,2).toUpperCase();
   }
 
-  async function rejectUntrustedWorkstation(){
+  async function localSignOut(message=''){
     sessionStorage.removeItem('gotcracked-staff');
     sessionStorage.removeItem('gc-workstation-operator-token');
     sessionStorage.removeItem('gc-workstation-operator');
     sessionStorage.removeItem('gc-workstation-operator-expiry');
     try{await window.supabaseClient.auth.signOut({scope:'local'});}catch{}
     loginScreen?.classList.remove('hidden');
-    showLoginError('This shared workstation is not enrolled or has been revoked. Choose “Set up Front Desk Workstation” and authorize it with an owner or manager Discord account.');
+    if(message)showLoginError(message);
   }
 
-  async function loadProfile(userId){
+  async function rejectUntrustedWorkstation(){
+    await localSignOut('This shared workstation is not enrolled or has been revoked. Choose “Set up Front Desk Workstation” and authorize it with an owner or manager Discord account.');
+  }
+
+  async function prepareHumanSession(session){
+    if(!session)return false;
+    const hasDiscord=session.user?.identities?.some(identity=>identity.provider==='discord');
+    if(hasDiscord){
+      const verified=await window.GotCrackedVerifyDiscord?.({force:true});
+      if(!verified?.authorized){
+        if(!verified?.transient)await localSignOut(verified?.reason||'Discord access could not be verified.');
+        else showLoginError('Discord verification is temporarily unavailable. Please retry in a moment.');
+        return false;
+      }
+    }
+    return true;
+  }
+
+  async function loadProfile(userId,session=null){
     const {data:profile,error}=await window.supabaseClient.from('profiles').select('*').eq('id',userId).single();
     if(error){report(error,'Staff profile could not be loaded');showLoginError('Your account signed in, but your staff profile could not be loaded.');return false;}
     if(!profile){showLoginError('Your account signed in, but no staff profile was found.');return false;}
-    if(!profile.active){sessionStorage.removeItem('gotcracked-staff');sessionStorage.setItem('gc-auth-error','Your GotCracked staff access is inactive. Contact an owner or manager.');await window.supabaseClient.auth.signOut();loginScreen?.classList.remove('hidden');showLoginError('Your GotCracked staff access is inactive. Contact an owner or manager.');return false;}
+    if(!profile.active){await localSignOut('Your GotCracked staff access is inactive. Contact an owner or manager.');return false;}
 
     if(profile.account_type==='shared_workstation'){
       const trusted=await window.supabaseClient.rpc('get_my_trusted_workstation_status');
       if(trusted.error||!trusted.data?.trusted){await rejectUntrustedWorkstation();return false;}
+    }else{
+      const activeSession=session||(await window.supabaseClient.auth.getSession()).data?.session||null;
+      const viaDiscord=activeSession?.user?.identities?.some(identity=>identity.provider==='discord');
+      if(!viaDiscord){
+        if(profile.role!=='owner'){
+          await localSignOut('Human staff access requires Discord authentication. Use “Continue with Discord” to sign in.');
+          return false;
+        }
+        const registered=await window.supabaseClient.rpc('register_owner_recovery_session');
+        if(registered.error||registered.data!==true){
+          await localSignOut('Owner password access is only available as a verified recovery session. Use Discord for normal Portal access.');
+          return false;
+        }
+      }else{
+        await window.supabaseClient.rpc('touch_portal_human_session').catch?.(()=>{});
+      }
     }
 
     const staff={id:userId,name:profile.display_name||'Staff',role:profile.role||'Staff',account_type:profile.account_type||'staff'};
     sessionStorage.setItem('gotcracked-staff',JSON.stringify(staff));setStaff(staff);
-    window.GotCrackedNeedsDiscordLink=profile.account_type!=='shared_workstation'&&profile.role!=='owner'&&!profile.discord_user_id;
+    window.GotCrackedNeedsDiscordLink=profile.account_type!=='shared_workstation'&&!profile.discord_user_id;
     loginScreen?.classList.add('hidden');
-    if(window.GotCrackedNeedsDiscordLink){const message='Link your individual Discord account in Staff access before using shared shop data.';sessionStorage.setItem('gc-onboarding-message',message);document.dispatchEvent(new CustomEvent('gc-onboarding-required',{detail:message}));setTimeout(()=>document.querySelector('[data-view="staff"]')?.click(),0);}
+    if(window.GotCrackedNeedsDiscordLink){
+      const message='Link your individual Discord account in Staff access. Discord is the normal human sign-in method; owner password access is recovery-only.';
+      sessionStorage.setItem('gc-onboarding-message',message);
+      document.dispatchEvent(new CustomEvent('gc-onboarding-required',{detail:message}));
+      setTimeout(()=>document.querySelector('[data-view="staff"]')?.click(),0);
+    }
     return true;
   }
 
@@ -77,7 +116,14 @@
     await window.GotCrackedDiscordReady;
     if(!window.supabaseClient){showLoginError('The portal could not connect to authentication.');return;}
     if(recoveryMode){showRecoveryPanel();return;}
-    try{const {data,error}=await window.supabaseClient.auth.getSession();if(error){report(error,'Portal session could not be restored');return;}const session=data?.session;if(!session)return;if(await loadProfile(session.user.id))await loadRepairs();}catch(error){report(error,'Portal session could not be restored');}
+    try{
+      const {data,error}=await window.supabaseClient.auth.getSession();
+      if(error){report(error,'Portal session could not be restored');return;}
+      const session=data?.session;if(!session)return;
+      const isWorkstationSession=!session.user?.identities?.some(identity=>identity.provider==='discord');
+      if(!isWorkstationSession&&!(await prepareHumanSession(session)))return;
+      if(await loadProfile(session.user.id,session))await loadRepairs();
+    }catch(error){report(error,'Portal session could not be restored');showLoginError(error?.message||'Portal sign-in could not be completed.');}
   }
 
   document.querySelector('#forgot-password')?.addEventListener('click',()=>{clearLoginError();setMessage(document.querySelector('#forgot-password-message'),'');showAuthPanel(forgotPasswordPanel);document.querySelector('#reset-email')?.focus();});
@@ -94,7 +140,7 @@
     event.preventDefault();const message=document.querySelector('#new-password-message'),password=document.querySelector('#new-password')?.value||'',confirmation=document.querySelector('#confirm-password')?.value||'';
     if(password.length<8){setMessage(message,'Use a password with at least 8 characters.',true);return;}if(password!==confirmation){setMessage(message,'The passwords do not match.',true);return;}
     const button=newPasswordForm.querySelector('button[type="submit"]');if(button){button.disabled=true;button.textContent='Saving…';}setMessage(message,'');
-    try{const {error}=await window.supabaseClient.auth.updateUser({password});if(error)throw error;await window.supabaseClient.auth.signOut();clearRecoveryUrl();recoveryMode=false;newPasswordForm.reset();showAuthPanel(signInPanel);showLoginError('Owner recovery password updated. Sign in with your new password.');loginEmail?.focus();}catch(error){setMessage(message,error?.message||'Unable to save the new password. Request another reset link and try again.',true);}finally{if(button){button.disabled=false;button.textContent='Save new password';}}
+    try{const {error}=await window.supabaseClient.auth.updateUser({password});if(error)throw error;await window.supabaseClient.auth.signOut({scope:'local'});clearRecoveryUrl();recoveryMode=false;newPasswordForm.reset();showAuthPanel(signInPanel);showLoginError('Owner recovery password updated. Sign in with your new password.');loginEmail?.focus();}catch(error){setMessage(message,error?.message||'Unable to save the new password. Request another reset link and try again.',true);}finally{if(button){button.disabled=false;button.textContent='Save new password';}}
   });
 
   window.supabaseClient?.auth.onAuthStateChange(event=>{if(event==='PASSWORD_RECOVERY')showRecoveryPanel();});
@@ -110,7 +156,7 @@
       const {data,error}=await window.supabaseClient.auth.signInWithPassword({email,password});if(error){showLoginError(error.message||'Unable to sign in.');return;}if(!data?.user){showLoginError('Sign-in completed without a user account.');return;}
       const profileCheck=await window.supabaseClient.from('profiles').select('role,account_type').eq('id',data.user.id).maybeSingle();
       if(profileCheck.error||profileCheck.data?.role!=='owner'||profileCheck.data?.account_type==='shared_workstation'){try{await window.supabaseClient.auth.signOut({scope:'local'});}catch{}showLoginError('Password sign-in is reserved for owner account recovery. Staff use Discord; shared computers use secure workstation enrollment.');return;}
-      if(!(await loadProfile(data.user.id)))return;await loadRepairs();
+      if(!(await loadProfile(data.user.id,data.session)))return;await loadRepairs();
     }catch(error){showLoginError(error?.message||'An unexpected error occurred while signing in.');}finally{if(submitButton){submitButton.disabled=false;submitButton.textContent='Sign in to portal';}loginInProgress=false;}
   }
 
