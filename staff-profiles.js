@@ -34,7 +34,7 @@
     if (document.querySelector('link[data-gc-staff-profiles]')) return;
     const l = document.createElement('link');
     l.rel = 'stylesheet';
-    l.href = 'staff-profiles.css?v=20260828-comp1';
+    l.href = 'staff-profiles.css?v=20260828-comp2';
     l.dataset.gcStaffProfiles = 'true';
     document.head.appendChild(l);
   }
