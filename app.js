@@ -61,16 +61,51 @@
       card.dataset.copyText = `${displayCode} | Ref ${id} | ${time} | ${context} | ${description} | Technical: ${message}`;
       const host = ensureHost();
       host.prepend(card);
-      while (host.children.length > 4) host.lastElementChild.remove();
+      const transient=[...host.querySelectorAll('.gc-diagnostic:not(.gc-maintenance-approval)')];
+      while(transient.length>4) transient.pop()?.remove();
       if(!known) queueUnknown({id,code:displayCode,context,message,path:location.pathname,view:location.hash||'#dashboard',at:new Date().toISOString()});
       setTimeout(() => card.classList.add('is-visible'), 20);
       setTimeout(() => dismiss(card), Number(options.duration || 12000));
       return displayCode;
     };
+    const maintenanceApproval = (options = {}) => {
+      const ticketId = String(options.ticketId || '').trim();
+      if (!ticketId) return null;
+      const host = ensureHost();
+      const selector = `[data-gc-maintenance-ticket="${CSS.escape(ticketId)}"]`;
+      let card = host.querySelector(selector);
+      if (!card) {
+        card = document.createElement('article');
+        card.className = 'gc-diagnostic gc-maintenance-approval';
+        card.dataset.gcMaintenanceTicket = ticketId;
+        card.innerHTML = `<div class="gc-diagnostic-icon" aria-hidden="true">⚙</div><div class="gc-diagnostic-copy"><strong></strong><p></p><small></small><div class="gc-diagnostic-actions"><button type="button" class="gc-maintenance-approve" data-gc-maintenance-approve>Approve</button><button type="button" class="gc-maintenance-deny" data-gc-maintenance-deny>Deny</button></div></div>`;
+        host.prepend(card);
+      }
+      const code = options.ticketNumber ? `SUP-${String(options.ticketNumber).padStart(4,'0')}` : 'Marlon';
+      card.querySelector('strong').textContent = `Maintenance approval required · ${code}`;
+      card.querySelector('p').textContent = String(options.title || 'Marlon needs Owner approval before continuing this protected task.');
+      card.querySelector('small').textContent = `Surface: ${String(options.surface || 'Portal')} · Priority: ${String(options.priority || 'High')} · This alert stays until approved or denied.`;
+      card.querySelectorAll('button').forEach(button => button.disabled = false);
+      requestAnimationFrame(() => card.classList.add('is-visible'));
+      return ticketId;
+    };
+    const clearMaintenanceApproval = ticketId => {
+      const id = String(ticketId || '').trim();
+      if (!id) return;
+      const card = ensureHost().querySelector(`[data-gc-maintenance-ticket="${CSS.escape(id)}"]`);
+      if (card) dismiss(card);
+    };
     const dismiss = card => { if (!card?.isConnected) return; card.classList.remove('is-visible'); setTimeout(() => card.remove(), 180); };
     document.addEventListener('click', async event => {
       const card = event.target.closest?.('.gc-diagnostic');
       if (!card) return;
+      const approve = event.target.closest('[data-gc-maintenance-approve]');
+      const deny = event.target.closest('[data-gc-maintenance-deny]');
+      if (approve || deny) {
+        card.querySelectorAll('button').forEach(button => button.disabled = true);
+        document.dispatchEvent(new CustomEvent('gc-maintenance-approval-decision',{detail:{ticketId:card.dataset.gcMaintenanceTicket,approved:Boolean(approve)}}));
+        return;
+      }
       if (event.target.closest('[data-gc-dismiss-diagnostic]')) dismiss(card);
       if (event.target.closest('[data-gc-copy-diagnostic]')) {
         try { await navigator.clipboard.writeText(card.dataset.copyText || ''); event.target.textContent = 'Copied'; }
@@ -79,7 +114,7 @@
     });
     window.addEventListener('unhandledrejection', event => report(event.reason, {context:'Unexpected Portal failure'}));
     window.addEventListener('error', event => report(event.error || event.message, {context:'Portal script failure'}));
-    return { error:report, classify, catalog:Object.freeze(catalog.map(({code,title,description})=>({code,title,description}))) };
+    return { error:report, maintenanceApproval, clearMaintenanceApproval, classify, catalog:Object.freeze(catalog.map(({code,title,description})=>({code,title,description}))) };
   })();
   window.GotCrackedDiagnostics = diagnostics;
 

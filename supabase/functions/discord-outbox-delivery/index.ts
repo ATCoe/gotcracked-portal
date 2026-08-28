@@ -34,7 +34,10 @@ function supportPayload(row:any){
   if(p.diagnosis) fields.push({name:'Diagnosis',value:text(p.diagnosis).slice(0,900),inline:false});
   if(p.action_taken) fields.push({name:'Action',value:text(p.action_taken).slice(0,900),inline:false});
   if(p.resolution) fields.push({name:'Resolution',value:text(p.resolution).slice(0,900),inline:false});
-  return {flags:4096,allowed_mentions:{parse:[]},embeds:[{title:`${created?'New Marlon support request':'Marlon support update'} · ${code}`,description:`**${text(p.title,'Portal support request')}**\n${text(p.description,'Support activity logged by Marlon').slice(0,3200)}`,color:p.status==='resolved'||p.status==='closed'?0x2fbf71:p.priority==='critical'?0xe5484d:p.priority==='high'?0xf59e0b:0x159bd3,fields,footer:{text:'GotCracked Tech Support · silent log'},timestamp:new Date(row.created_at).toISOString()}],components:[{type:1,components:[{type:2,style:5,label:'Open Support Desk',url:`${portalUrl}/#support-tickets`}]}]};
+  const approvalPending=Boolean(p.requires_approval)&&String(p.approval_status||'pending')==='pending';
+  const supportUrl=approvalPending?`${portalUrl}/?marlon-approval=${encodeURIComponent(String(row.entity_id||''))}#support-tickets`:`${portalUrl}/#support-tickets`;
+  const buttonLabel=approvalPending?'Review Approval':'Open Support Desk';
+  return {flags:4096,allowed_mentions:{parse:[]},embeds:[{title:`${created?'New Marlon support request':'Marlon support update'} · ${code}`,description:`**${text(p.title,'Portal support request')}**\n${text(p.description,'Support activity logged by Marlon').slice(0,3200)}`,color:p.status==='resolved'||p.status==='closed'?0x2fbf71:p.priority==='critical'?0xe5484d:p.priority==='high'?0xf59e0b:0x159bd3,fields,footer:{text:'GotCracked Tech Support · silent log'},timestamp:new Date(row.created_at).toISOString()}],components:[{type:1,components:[{type:2,style:5,label:buttonLabel,url:supportUrl}]}]};
 }
 
 function releasePayload(row:any){

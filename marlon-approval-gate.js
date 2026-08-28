@@ -6,7 +6,10 @@
   const isOwner=()=>String(current()?.role||'')==='owner';
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
   const fmt=v=>v?new Date(v).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'—';
+  const titleCase=v=>String(v||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
   const approvalCache=new Map();
+  const maintenanceShown=new Set();
+  let pendingRefresh=null;
 
   function ensureStyle(){
     if(document.getElementById('gc-marlon-approval-style'))return;
@@ -16,6 +19,15 @@
       .gc-marlon-approval-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.gc-marlon-approval-actions button{min-width:110px;min-height:40px;border-radius:9px;font-weight:800;cursor:pointer}
       .gc-marlon-approve{border:1px solid #19b8ef;background:#0c9fd5;color:white}.gc-marlon-deny{border:1px solid #8c99a7;background:transparent;color:inherit}
       .gc-marlon-approval[data-state="denied"]{border-color:rgba(236,91,91,.45)}.gc-marlon-approval[data-state="approved"]{border-color:rgba(64,196,130,.45)}
+      .gc-maintenance-approval{border-color:#f59e0b!important;border-left-color:#d97706!important;background:#fff7ed!important;color:#7c2d12!important;box-shadow:0 14px 38px rgba(124,45,18,.22)!important}
+      .gc-maintenance-approval .gc-diagnostic-icon{background:#d97706!important;color:#fff!important}.gc-maintenance-approval .gc-diagnostic-copy p{color:#9a3412!important}.gc-maintenance-approval .gc-diagnostic-copy small{color:#b45309!important}
+      .gc-maintenance-approval .gc-diagnostic-actions{gap:8px;flex-wrap:wrap}.gc-maintenance-approval .gc-diagnostic-actions button{min-height:34px;padding:0 12px;border-radius:8px;text-decoration:none!important;font-weight:850}.gc-maintenance-approve{background:#d97706!important;color:#fff!important;border:1px solid #b45309!important}.gc-maintenance-deny{background:transparent!important;color:#9a3412!important;border:1px solid #fdba74!important}
+      .gc-marlon-approval-screen{position:fixed;inset:0;z-index:22000;display:grid;place-items:center;padding:24px;background:rgba(17,24,39,.72);backdrop-filter:blur(8px)}
+      .gc-marlon-approval-screen-card{width:min(680px,100%);max-height:min(760px,calc(100vh - 40px));overflow:auto;border:1px solid #f59e0b;border-top:7px solid #d97706;border-radius:18px;background:#fffaf2;color:#431407;box-shadow:0 26px 80px rgba(0,0,0,.38);padding:24px}
+      .gc-marlon-approval-screen-card .eyebrow{margin:0 0 7px;color:#b45309;font-size:.74rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.gc-marlon-approval-screen-card h1{margin:0 0 10px;font-size:clamp(1.35rem,4vw,2rem)}
+      .gc-marlon-approval-screen-card .gc-approval-scope{margin:18px 0;padding:14px;border:1px solid #fed7aa;border-radius:12px;background:#fff7ed;line-height:1.5}.gc-marlon-approval-screen-meta{display:flex;gap:10px;flex-wrap:wrap;color:#9a3412;font-size:.78rem;font-weight:750}
+      .gc-marlon-approval-screen-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}.gc-marlon-approval-screen-actions button,.gc-marlon-approval-screen-actions a{min-height:44px;padding:0 18px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;text-decoration:none;cursor:pointer}.gc-marlon-screen-approve{border:1px solid #b45309;background:#d97706;color:#fff}.gc-marlon-screen-deny{border:1px solid #fdba74;background:transparent;color:#9a3412}.gc-marlon-screen-continue{border:1px solid #cbd5e1;background:#fff;color:#334155}
+      @media(max-width:650px){.gc-marlon-approval-screen{padding:12px}.gc-marlon-approval-screen-card{padding:18px;border-radius:14px}.gc-marlon-approval-screen-actions>*{flex:1 1 140px}}
     `;document.head.appendChild(s);
   }
 
@@ -30,7 +42,9 @@
     const value=String(text||'').toLowerCase();
     if(/\bcloudflare\b/.test(value))return 'cloudflare';
     if(/\brepository|github|repo\b/.test(value))return 'repository';
-    if(/\bwebsite|site\b/.test(value))return 'website';
+    const portal=/\bportal\b/.test(value),website=/\bwebsite|customer site|customer-facing site\b/.test(value);
+    if(portal&&website)return 'both';
+    if(website)return 'website';
     return String(context?.surface||'').toLowerCase()==='website'?'website':'portal';
   }
 
@@ -40,7 +54,7 @@
     if(approvalCache.has(key))return approvalCache.get(key);
     const title=`Marlon high-level change: ${scope}`.slice(0,180);
     const {data,error}=await client.rpc('create_ui_update_request',{
-      p_title:title,p_description:scope,p_surface:surfaceFor(scope,context),p_priority:'normal',
+      p_title:title,p_description:scope,p_surface:surfaceFor(scope,context),p_priority:/\b(outage|down|unavailable|urgent|blocking|production broken)\b/i.test(scope)?'high':'normal',
       p_context:{source:'marlon_chat_failsafe',view:String(context?.view||location.hash||'#dashboard').slice(0,160),path:String(context?.path||location.pathname).slice(0,300),requested_scope:scope}
     });
     if(error)throw error;
@@ -76,7 +90,7 @@
   }
 
   async function ticket(id){
-    const {data,error}=await client.from('support_tickets').select('id,title,description,surface,status,requires_approval,approval_status,approval_requested_at,approval_decided_at,approval_fingerprint').eq('id',id).maybeSingle();
+    const {data,error}=await client.from('support_tickets').select('id,ticket_number,title,description,surface,priority,status,managed_by,change_level,requires_approval,approval_state,approval_status,approval_requested_at,approval_decided_at,approval_fingerprint').eq('id',id).maybeSingle();
     if(error)throw error;return data;
   }
 
@@ -114,30 +128,153 @@
     }catch(error){console.warn('Marlon approval panel failed:',error)}
   }
 
-  async function decide(button){
-    const panel=button.closest('[data-approval-ticket]');const id=panel?.dataset.approvalTicket;if(!id)return;
-    if(!isOwner()){window.GotCrackedDiagnostics?.error?.('Only a verified Owner can approve Marlon high-level changes.',{context:'Marlon approval blocked'});return}
-    const approved=button.dataset.marlonApproval==='approve';
-    panel.querySelectorAll('button').forEach(b=>b.disabled=true);
+  function deepLinkTicketId(){
     try{
-      const {error}=await client.rpc('decide_marlon_change_approval',{p_ticket_id:id,p_approved:approved});if(error)throw error;
-      await refreshPanels(id);
-      await window.GotCrackedSupportTickets?.load?.();
-      if(document.getElementById('gc-support-detail-dialog')?.open)await decorate(id);
+      const query=new URL(location.href).searchParams.get('marlon-approval');
+      if(query)return query;
+    }catch{}
+    const match=/^#marlon-approval\/([^/?#]+)/.exec(location.hash||'');
+    return match?decodeURIComponent(match[1]):null;
+  }
+
+  function closeApprovalScreen(){document.getElementById('gc-marlon-approval-screen')?.remove()}
+
+  async function renderApprovalScreen(id=deepLinkTicketId()){
+    if(!id)return;
+    let root=document.getElementById('gc-marlon-approval-screen');
+    if(!root){root=document.createElement('section');root.id='gc-marlon-approval-screen';root.className='gc-marlon-approval-screen';root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');document.body.appendChild(root)}
+    root.innerHTML='<article class="gc-marlon-approval-screen-card"><p class="eyebrow">Marlon Maintenance</p><h1>Loading approval request…</h1></article>';
+    try{
+      const t=await ticket(id);if(!t)throw new Error('This approval request could not be found.');
+      const state=t.approval_status||'pending',pending=state==='pending',owner=isOwner();
+      const code=t.ticket_number?`SUP-${String(t.ticket_number).padStart(4,'0')}`:'Support request';
+      const heading=pending?'Owner approval required':state==='approved'?'Approval recorded':'Request denied';
+      const explanation=pending?'Marlon stopped before changing a protected system. Review the exact scope below, then approve or deny it.':state==='approved'?'Marlon is authorized to continue only with this exact fingerprinted scope.':'Marlon will not execute this protected change.';
+      const actions=pending&&owner?`<button type="button" class="gc-marlon-screen-approve" data-marlon-screen-decision="approve">Approve</button><button type="button" class="gc-marlon-screen-deny" data-marlon-screen-decision="deny">Deny</button>`:pending?'<span>Waiting for a verified Owner account.</span>':`<a class="gc-marlon-screen-continue" href="${location.origin}/#support-tickets">Continue to Support Desk</a>`;
+      root.innerHTML=`<article class="gc-marlon-approval-screen-card" data-screen-approval-ticket="${esc(t.id)}"><p class="eyebrow">Marlon Maintenance · ${esc(code)}</p><h1>${esc(heading)}</h1><p>${esc(explanation)}</p><div class="gc-approval-scope"><strong>Exact scope</strong><p>${esc(t.description||t.title)}</p></div><div class="gc-marlon-approval-screen-meta"><span>Surface: ${esc(t.surface)}</span><span>Priority: ${esc(t.priority||'normal')}</span><span>Status: ${esc(state)}</span><span>Requested: ${esc(fmt(t.approval_requested_at))}</span></div><div class="gc-marlon-approval-screen-actions">${actions}</div></article>`;
     }catch(error){
-      panel.querySelectorAll('button').forEach(b=>b.disabled=false);
-      window.GotCrackedDiagnostics?.error?.(error,{context:'Unable to record Marlon approval decision'});
+      root.innerHTML=`<article class="gc-marlon-approval-screen-card"><p class="eyebrow">Marlon Maintenance</p><h1>Approval request unavailable</h1><p>${esc(error?.message||error)}</p><div class="gc-marlon-approval-screen-actions"><a class="gc-marlon-screen-continue" href="${location.origin}/#support-tickets">Open Support Desk</a></div></article>`;
     }
   }
 
+  async function pendingApprovals(){
+    const profile=current();
+    if(!profile?.id)return [];
+    if(!isOwner())return [];
+    const {data,error}=await client.from('support_tickets')
+      .select('id,ticket_number,title,description,surface,priority,status,managed_by,change_level,requires_approval,approval_state,approval_status,approval_requested_at,approval_fingerprint,created_at')
+      .eq('managed_by','Marlon')
+      .eq('requires_approval',true)
+      .eq('approval_status','pending')
+      .order('created_at',{ascending:true})
+      .limit(6);
+    if(error)throw error;
+    return Array.isArray(data)?data:[];
+  }
+
+  function syncMaintenanceAlerts(rows){
+    const diagnostics=window.GotCrackedDiagnostics;
+    if(!diagnostics?.maintenanceApproval)return;
+    const next=new Set(rows.map(row=>String(row.id)));
+    for(const id of maintenanceShown){
+      if(!next.has(id))diagnostics.clearMaintenanceApproval?.(id);
+    }
+    maintenanceShown.clear();
+    for(const row of rows){
+      maintenanceShown.add(String(row.id));
+      diagnostics.maintenanceApproval({
+        ticketId:row.id,
+        ticketNumber:row.ticket_number,
+        title:row.title || 'Marlon needs Owner approval before continuing this protected task.',
+        surface:titleCase(row.surface),
+        priority:titleCase(row.priority||'high')
+      });
+    }
+  }
+
+  async function refreshPendingApprovals(){
+    try{
+      const rows=await pendingApprovals();
+      syncMaintenanceAlerts(rows);
+      return rows;
+    }catch(error){
+      console.warn('Marlon pending approval refresh failed:',error);
+      return [];
+    }
+  }
+
+  function schedulePendingRefresh(delay=100){
+    if(pendingRefresh)clearTimeout(pendingRefresh);
+    pendingRefresh=setTimeout(()=>{pendingRefresh=null;void refreshPendingApprovals()},delay);
+  }
+
+  async function decideTicket(id,approved,controls=[]){
+    if(!id)return;
+    if(!isOwner()){
+      window.GotCrackedDiagnostics?.error?.('Only a verified Owner can approve Marlon high-level changes.',{context:'Marlon approval blocked'});
+      controls.forEach(button=>button.disabled=false);
+      return;
+    }
+    controls.forEach(button=>button.disabled=true);
+    try{
+      const {error}=await client.rpc('decide_marlon_high_level_change',{p_ticket:id,p_approve:Boolean(approved)});
+      if(error)throw error;
+      window.GotCrackedDiagnostics?.clearMaintenanceApproval?.(id);
+      maintenanceShown.delete(String(id));
+      await refreshPanels(id).catch(()=>null);
+      await window.GotCrackedSupportTickets?.load?.();
+      if(document.getElementById('gc-support-detail-dialog')?.open)await decorate(id);
+      await refreshPendingApprovals();
+      if(deepLinkTicketId()===id)await renderApprovalScreen(id);
+      document.dispatchEvent(new CustomEvent('gc-marlon-approval-decided',{detail:{ticket:id,approved:Boolean(approved)}}));
+    }catch(error){
+      controls.forEach(button=>button.disabled=false);
+      window.GotCrackedDiagnostics?.error?.(error,{context:'Unable to record Marlon approval decision'});
+      if(deepLinkTicketId()===id)await renderApprovalScreen(id);
+    }
+  }
+
+  async function decide(button){
+    const panel=button.closest('[data-approval-ticket]');const id=panel?.dataset.approvalTicket;if(!id)return;
+    const approved=button.dataset.marlonApproval==='approve';
+    await decideTicket(id,approved,[...panel.querySelectorAll('button')]);
+  }
+
+  document.addEventListener('gc-maintenance-approval-decision',event=>{
+    const id=String(event.detail?.ticketId||'');
+    const card=document.querySelector(`[data-gc-maintenance-ticket="${CSS.escape(id)}"]`);
+    void decideTicket(id,event.detail?.approved===true,[...(card?.querySelectorAll('button')||[])]);
+  });
+
   document.addEventListener('click',event=>{
     const target=event.target instanceof Element?event.target:null;if(!target)return;
+    const screenDecision=target.closest('[data-marlon-screen-decision]');
+    if(screenDecision){
+      const host=screenDecision.closest('[data-screen-approval-ticket]');
+      const id=host?.dataset.screenApprovalTicket;
+      if(id){event.preventDefault();void decideTicket(id,screenDecision.dataset.marlonScreenDecision==='approve',[...host.querySelectorAll('button')]);}
+      return;
+    }
     const decision=target.closest('[data-marlon-approval]');
     if(decision&&decision.closest('[data-approval-ticket]')){event.preventDefault();event.stopPropagation();void decide(decision);return}
     const row=target.closest('[data-ticket-id]');if(row)setTimeout(()=>void decorate(row.dataset.ticketId),0);
   },true);
 
+  document.addEventListener('gc-cross-user-sync',()=>schedulePendingRefresh(250));
+  document.addEventListener('gc-marlon-approval-decided',()=>schedulePendingRefresh(100));
+  window.addEventListener('gotcracked:staff-ready',()=>{schedulePendingRefresh(50);if(deepLinkTicketId())void renderApprovalScreen()});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedulePendingRefresh(100)});
+  setInterval(()=>{if(!document.hidden)schedulePendingRefresh(0)},30000);
+
+  try{
+    client.channel('gc-marlon-approval-alerts')
+      .on('postgres_changes',{event:'*',schema:'public',table:'support_tickets'},()=>schedulePendingRefresh(150))
+      .subscribe();
+  }catch(error){console.warn('Marlon approval realtime subscription unavailable:',error)}
+
   ensureStyle();
   installChatFailsafe();
-  window.GotCrackedMarlonApprovalGate={version:'1.2.0',decorate,refreshPanels,panelMarkup,createApproval,highLevelIntent};
+  setTimeout(()=>{schedulePendingRefresh(0);if(deepLinkTicketId())void renderApprovalScreen()},700);
+  window.GotCrackedMarlonApprovalGate={version:'1.3.0',decorate,refreshPanels,panelMarkup,createApproval,highLevelIntent,refreshPendingApprovals,renderApprovalScreen};
+
 })();
