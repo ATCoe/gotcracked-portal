@@ -39,15 +39,15 @@ Deno.serve(async request => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json(request, { error: 'Sign in required.' }, 401);
 
-    const { data: actor } = await admin.from('profiles').select('id,location_id,role,active').eq('id', user.id).single();
-    if (!actor?.active || !['owner', 'manager'].includes(actor.role)) {
+    const { data: actor } = await admin.from('profiles').select('id,location_id,role,active,account_type').eq('id', user.id).single();
+    if (!actor?.active || actor.account_type === 'shared_workstation' || !['owner', 'manager'].includes(actor.role)) {
       return json(request, { error: 'Only active owners and managers can manage staff.' }, 403);
     }
 
     const body = await request.json();
     if (body.action === 'list') {
       const result = await admin.from('profiles')
-        .select('id,display_name,role,active,discord_user_id')
+        .select('id,display_name,role,active,discord_user_id,account_type,job_title')
         .eq('location_id', actor.location_id)
         .order('display_name');
       if (result.error) throw result.error;
@@ -60,7 +60,7 @@ Deno.serve(async request => {
     }
 
     const { data: target } = await admin.from('profiles')
-      .select('id,location_id,display_name,role,active,discord_user_id')
+      .select('id,location_id,display_name,role,active,discord_user_id,account_type,job_title')
       .eq('id', targetUserId)
       .single();
     if (!target || target.location_id !== actor.location_id) {
@@ -68,6 +68,9 @@ Deno.serve(async request => {
     }
     if (target.role === 'owner' && (actor.role !== 'owner' || target.id === user.id || body.role !== undefined)) {
       return json(request, { error: 'Owner roles are protected; another owner may only activate or deactivate the account.' }, 403);
+    }
+    if (target.account_type === 'shared_workstation' && body.role !== undefined) {
+      return json(request, { error: 'Shared workstation access uses a fixed workflow permission profile and does not accept employee role changes.' }, 403);
     }
     if (actor.role === 'manager' && target.role === 'manager') {
       return json(request, { error: 'Managers cannot manage other managers.' }, 403);
@@ -85,7 +88,8 @@ Deno.serve(async request => {
 
     let updated = target;
     if (Object.keys(updates).length) {
-      const result = await admin.from('profiles').update(updates).eq('id', target.id).select('id,display_name,role,active,discord_user_id').single();
+      const result = await admin.from('profiles').update(updates).eq('id', target.id)
+        .select('id,display_name,role,active,discord_user_id,account_type,job_title').single();
       if (result.error) throw result.error;
       updated = result.data;
     }
