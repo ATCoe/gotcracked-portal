@@ -1,0 +1,70 @@
+name: Launch Security Guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  launch-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check launch browser runtimes
+        run: |
+          node --check discord-integration.js
+          node --check workflow.js
+          node --check operator-request-context.js
+          node --check workstation-mode.js
+          node --check workstation-admin.js
+          node --check premium-onboarding-v2.js
+          node --check portal-runtime-loader.js
+      - name: Guard human and workstation authentication separation
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "Set up Front Desk Workstation" discord-integration.js
+          grep -q "workstation-enroll" discord-integration.js
+          grep -q "verifyOtp" discord-integration.js
+          grep -q "complete_workstation_enrollment" discord-integration.js
+          grep -q "get_my_trusted_workstation_status" workflow.js
+          grep -q "Password sign-in is reserved for owner account recovery" workflow.js
+          grep -q "x-gc-operator-token" operator-request-context.js
+          grep -q "operator-request-context.js.*workstation-mode.js" portal-runtime-loader.js
+      - name: Guard Discord-first staff onboarding
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "staff_invitations" supabase/functions/staff-invite/index.ts
+          grep -q "portalInviteUrl" supabase/functions/staff-invite/index.ts
+          grep -q "welcomeEmailBody" supabase/functions/staff-invite/index.ts
+          grep -q "staff_onboarding_progress" supabase/functions/discord-verify/index.ts
+          grep -q "discord_username" supabase/functions/discord-verify/index.ts
+          grep -q "cancelled_at" supabase/functions/discord-verify/index.ts
+          if grep -q "auth.admin.createUser" supabase/functions/staff-invite/index.ts; then echo 'Temporary-password user creation returned to staff onboarding.'; exit 1; fi
+          if grep -q "temporaryPassword" supabase/functions/staff-invite/index.ts; then echo 'Temporary password returned to staff onboarding.'; exit 1; fi
+          if grep -q "Access-Control-Allow-Origin.*\*" supabase/functions/discord-verify/index.ts; then echo 'Wildcard CORS returned to Discord verification.'; exit 1; fi
+      - name: Guard trusted device and human operator database boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "create table if not exists public.trusted_workstations" supabase/migrations/0079_trusted_workstations_and_premium_onboarding.sql
+          grep -q "auth_session_id" supabase/migrations/0079_trusted_workstations_and_premium_onboarding.sql
+          grep -q "device_id_hash" supabase/migrations/0079_trusted_workstations_and_premium_onboarding.sql
+          grep -q "portal_session_authorized" supabase/migrations/0079_trusted_workstations_and_premium_onboarding.sql
+          grep -q "current_actor_profile_id" supabase/migrations/0080_workstation_operator_and_internal_rls_hardening.sql
+          grep -q "apply_workstation_actor_attribution" supabase/migrations/0080_workstation_operator_and_internal_rls_hardening.sql
+          grep -q "Recognition requires a human staff session" supabase/migrations/0081_shared_workstation_rpc_boundary_hardening.sql
+          grep -q "account_type.*staff" supabase/migrations/0082_exclude_workstations_from_employee_directory.sql
+      - name: Guard workstation management separation
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "eq('account_type', 'staff')" supabase/functions/manage-staff/index.ts
+          grep -q "Trusted shop workstations" supabase/functions/manage-staff/index.ts
+          grep -q "list_trusted_workstations" workstation-admin.js
+          grep -q "revoke_trusted_workstation" workstation-admin.js
+          grep -q "premium-onboarding-v2.js" portal-runtime-loader.js
