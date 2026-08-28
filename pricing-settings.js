@@ -79,7 +79,7 @@
       <div class="card-title"><div><p class="eyebrow">Pricing engine</p><h2>Repair pricing targets</h2></div></div>
       <form id="gc-pricing-target-form" class="settings-list">
         <label>Target gross margin (%)<input name="target_gm" type="number" min="0" max="94" step="0.5" value="${Number(settings?.target_gross_margin_percent ?? 50)}" required></label>
-        <div class="demo-note"><strong>Current labor-cost basis:</strong> ${money(hourlyLaborCents)}/bench hour · ${esc(laborSource)}. Portal blends active bench-capable employee compensation into one consistent bench-hour cost; hourly wages are used directly and salaries are converted to a 40-hour weekly equivalent. The repair target is calculated from part acquisition cost + estimated labor cost, then grossed up to the target GM.</div>
+        <div class="demo-note"><strong>Current labor-cost basis:</strong> ${money(hourlyLaborCents)}/bench hour · ${esc(laborSource)}. Portal blends active bench-capable base wage/salary compensation into one consistent bench-hour cost; hourly wages are used directly and salaries are converted to a 40-hour weekly equivalent. Sales commissions stay separate from bench labor cost. The repair target is calculated from part acquisition cost + estimated labor cost, then grossed up to the target GM.</div>
         <div class="demo-note"><strong>Current part mode:</strong> ${settings?.charge_parts_to_customer?'Parts shown separately + labor/service companion':'Part consumed internally at $0 + bundled Repair Service charge'}. Existing quotes are never repriced when this setting changes.</div>
         <p class="auth-message" role="status"></p><button class="primary-button" type="submit">Save target margin</button>
       </form>

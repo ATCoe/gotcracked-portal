@@ -5,7 +5,7 @@
   const client = window.supabaseClient;
   if (!client) return;
 
-  const VERSION = '20260828-compensation1';
+  const VERSION = '20260828-compensation2';
   const state = {profiles:[], compensation:[], selected:null, canManage:false, canManagePay:false, busy:false, previewUrl:null};
 
   const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({
@@ -24,9 +24,10 @@
     const pay=payFor(p.id), type=pay?.employment_type || (p.role==='owner'?'owner':'hourly');
     let amount='Not set';
     if(type==='hourly') amount=pay?.hourly_rate_cents>0?`${dollars(pay.hourly_rate_cents)}/hr`:'Not set';
-    if(type==='salary') amount=pay?.weekly_salary_cents>0?`${dollars(pay.weekly_salary_cents*52)}/yr`:'Not set';
-    if(type==='owner') amount='Owner / no payroll wage';
-    return `<article class="gc-profile-bio"><h2>Compensation</h2><p><strong>${esc(roleLabel(type))}</strong> · ${esc(amount)}${pay?.effective_at?` · effective ${esc(pay.effective_at)}`:''}</p></article>`;
+    if(type==='salary') amount=pay?.weekly_salary_cents>0?`${dollars(pay.weekly_salary_cents)}/week (${dollars(pay.weekly_salary_cents*52)}/yr)`:'Not set';
+    if(type==='owner') amount='Owner / no base payroll wage';
+    const commission=Number(pay?.commission_percent||0)>0&&pay?.commission_scope==='store_sales'?` · ${Number(pay.commission_percent).toFixed(2).replace(/\.00$/,'')}% store sales/repair commission`:'';
+    return `<article class="gc-profile-bio"><h2>Compensation</h2><p><strong>${esc(roleLabel(type))}</strong> · ${esc(amount)}${esc(commission)}${pay?.effective_at?` · effective ${esc(pay.effective_at)}`:''}</p></article>`;
   }
 
   function style() {
@@ -196,24 +197,29 @@
     if (!state.canManagePay) return;
     const pay=payFor(p.id), type=pay?.employment_type || (p.role==='owner'?'owner':'hourly');
     const hourly=((pay?.hourly_rate_cents||0)/100).toFixed(2);
-    const annual=((pay?.weekly_salary_cents||0)*52/100).toFixed(2);
+    const weekly=((pay?.weekly_salary_cents||0)/100).toFixed(2);
+    const commission=Number(pay?.commission_percent||0);
+    const commissionScope=pay?.commission_scope||'none';
     const effective=pay?.effective_at || new Date().toISOString().slice(0,10);
     const section=document.createElement('section'); section.className='gc-profile-compensation full'; section.dataset.compensationFields='true';
     const typeOptions=p.role==='owner'?'<option value="owner">Owner</option><option value="hourly">Hourly</option><option value="salary">Salary</option>':'<option value="hourly">Hourly</option><option value="salary">Salary</option>';
-    section.innerHTML=`<div class="gc-profile-comp-head"><div><strong>Compensation</strong><small>Owner only. Used for labor reporting and repair-pricing cost basis.</small></div></div><div class="gc-profile-comp-grid"><label>Pay type<select name="pay_type">${typeOptions}</select></label><label data-pay-hourly>Hourly wage ($/hr)<input name="hourly_wage" type="number" min="0" max="1000" step="0.01" value="${hourly}"></label><label data-pay-salary>Annual salary ($/year)<input name="annual_salary" type="number" min="0" max="10000000" step="100" value="${annual}"></label><label>Effective date<input name="pay_effective_at" type="date" value="${effective}" required></label></div><p>Salary labor cost is converted to an hourly equivalent using a 40-hour work week for pricing and labor planning.</p>`;
+    section.innerHTML=`<div class="gc-profile-comp-head"><div><strong>Compensation</strong><small>Owner only. Base pay and optional commission are tracked separately.</small></div></div><div class="gc-profile-comp-grid"><label>Pay type<select name="pay_type">${typeOptions}</select></label><label data-pay-hourly>Hourly wage ($/hr)<input name="hourly_wage" type="number" min="0" max="1000" step="0.01" value="${hourly}"></label><label data-pay-salary>Weekly salary ($/week)<input name="weekly_salary" type="number" min="0" max="1000000" step="0.01" value="${weekly}"></label><label>Commission scope<select name="commission_scope"><option value="none">No commission</option><option value="store_sales">Store sales & repairs</option></select></label><label data-pay-commission>Commission rate (%)<input name="commission_percent" type="number" min="0" max="100" step="0.25" value="${commission}"></label><label>Effective date<input name="pay_effective_at" type="date" value="${effective}" required></label></div><p>Salary is entered weekly and annualized automatically. Store commission is calculated from finalized receipt subtotal before tax, with discounts/refunds reflected in the receipt subtotal. Commission stays separate from bench labor cost.</p>`;
     form.querySelector('.gc-profile-message')?.insertAdjacentElement('beforebegin',section);
     const select=section.querySelector('[name="pay_type"]'); select.value=type;
-    const sync=()=>{section.querySelector('[data-pay-hourly]').hidden=select.value!=='hourly';section.querySelector('[data-pay-salary]').hidden=select.value!=='salary'};
-    select.addEventListener('change',sync); sync();
+    const commissionSelect=section.querySelector('[name="commission_scope"]'); commissionSelect.value=commissionScope;
+    const sync=()=>{section.querySelector('[data-pay-hourly]').hidden=select.value!=='hourly';section.querySelector('[data-pay-salary]').hidden=select.value!=='salary';section.querySelector('[data-pay-commission]').hidden=commissionSelect.value==='none'};
+    select.addEventListener('change',sync); commissionSelect.addEventListener('change',sync); sync();
   }
 
   async function saveCompensation(form,profileId) {
     if (!state.canManagePay) return;
     const type=form.elements.pay_type?.value || 'hourly';
     const hourly=Math.max(0,Number(form.elements.hourly_wage?.value||0));
-    const annual=Math.max(0,Number(form.elements.annual_salary?.value||0));
+    const weekly=Math.max(0,Number(form.elements.weekly_salary?.value||0));
+    const commissionScope=form.elements.commission_scope?.value||'none';
+    const commissionPercent=commissionScope==='store_sales'?Math.max(0,Math.min(100,Number(form.elements.commission_percent?.value||0))):0;
     const effective=form.elements.pay_effective_at?.value || new Date().toISOString().slice(0,10);
-    const row={profile_id:profileId,location_id:current().location_id,employment_type:type,hourly_rate_cents:type==='hourly'?Math.round(hourly*100):0,weekly_salary_cents:type==='salary'?Math.round(annual*100/52):0,effective_at:effective,updated_at:new Date().toISOString()};
+    const row={profile_id:profileId,location_id:current().location_id,employment_type:type,hourly_rate_cents:type==='hourly'?Math.round(hourly*100):0,weekly_salary_cents:type==='salary'?Math.round(weekly*100):0,commission_scope:commissionScope,commission_percent:commissionPercent,effective_at:effective,updated_at:new Date().toISOString()};
     const result=await client.from('staff_compensation').upsert(row,{onConflict:'profile_id'});
     if(result.error) throw result.error;
   }
