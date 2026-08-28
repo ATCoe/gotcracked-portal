@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260829-launch-security1';
+  const VERSION = '20260829-launch-security2';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -14,7 +14,7 @@
   ];
 
   const deferredScripts = [
-    'workforce-premium.js','timesheets.js','avatar-presets.js','staff-profiles.js','account-page.js','premium-onboarding.js','training-store-guard.js','pc-builds.js','checkout-receipts.js','schedule-board.js','schedule-print.js','analytics.js','shipping.js','inventory-audit.js'
+    'workforce-premium.js','timesheets.js','avatar-presets.js','staff-profiles.js','account-page.js','premium-onboarding-v2.js','training-store-guard.js','pc-builds.js','checkout-receipts.js','schedule-board.js','schedule-print.js','analytics.js','shipping.js','inventory-audit.js'
   ];
 
   const viewDependencies = {
@@ -26,7 +26,7 @@
     reports:['analytics.js','reconciliation-center.js','reporting-bookkeeper.js','reporting-capacity-enhancements.js'],
     shipping:['shipping.js','shipping-integrated.js','shipping-marlon-support.js'],
     inventory:['inventory-command-center.js','inventory-audit.js','parts-registry.js','shipping-marlon-support.js'],
-    staff:['avatar-presets.js','staff-profiles.js','account-page.js','premium-onboarding.js','workforce-premium.js','timesheets.js'],
+    staff:['avatar-presets.js','staff-profiles.js','account-page.js','premium-onboarding-v2.js','workforce-premium.js','timesheets.js'],
     settings:['business-settings.js','google-settings-integration.js','pricing-settings.js','procurement-settings.js','mobilesentrix-integration.js','shipping-integrated.js','shipping-marlon-support.js','reporting-capacity-enhancements.js','workstation-admin.js']
   };
 
