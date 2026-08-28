@@ -4,6 +4,7 @@
   const client=window.supabaseClient;if(!client)return;
   const ACTIVE_TICKET=new Set(['open','in_progress','waiting','waiting_window']);
   const ACTIVE_RUN=new Set(['claimed','diagnosing','patching','testing','deploying','verifying']);
+  const RECENT_COMPLETE_MS=10*60*1000;
   let profile=null,channel=null,pollTimer=null,refreshTimer=null,lastModel=null;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const code=n=>n?`SUP-${String(n).padStart(4,'0')}`:'Marlon task';
@@ -27,18 +28,24 @@
   }
   function chooseTask(tickets){
     const parents=tickets.filter(t=>!t.parent_ticket_id);
-    return parents.find(t=>ACTIVE_TICKET.has(String(t.status))&&t.approval_status!=='denied')
-      ||parents.find(t=>t.approval_status==='pending')||parents[0]||null;
+    const active=parents.find(t=>ACTIVE_TICKET.has(String(t.status))&&t.approval_status!=='denied');if(active)return active;
+    const pending=parents.find(t=>t.approval_status==='pending');if(pending)return pending;
+    const latest=parents[0]||null;if(!latest)return null;
+    if(['resolved','closed'].includes(String(latest.status))){
+      const completedAt=Date.parse(latest.resolved_at||latest.updated_at||latest.created_at||0);
+      if(Number.isFinite(completedAt)&&Date.now()-completedAt>RECENT_COMPLETE_MS)return null;
+    }
+    return latest;
   }
   function modelStatus(task,children,runs){
     if(!task)return {key:'idle',label:'Idle'};
     if(task.approval_status==='pending')return {key:'approval',label:'Needs approval'};
-    const active=runs.filter(r=>ACTIVE_RUN.has(String(r.status)));
-    if(active.length)return {key:'working',label:'Working'};
-    if(runs.some(r=>r.status==='waiting_window'))return {key:'waiting',label:'Waiting'};
-    if(runs.some(r=>r.status==='blocked'||r.status==='failed'))return {key:'attention',label:'Needs attention'};
     const targets=children.length?children:[task];
     if(targets.length&&targets.every(t=>['resolved','closed'].includes(String(t.status))))return {key:'complete',label:'Complete'};
+    const latestRuns=targets.map(t=>latestRun(t,runs)).filter(Boolean);
+    if(latestRuns.some(r=>ACTIVE_RUN.has(String(r.status))))return {key:'working',label:'Working'};
+    if(latestRuns.some(r=>r.status==='waiting_window'))return {key:'waiting',label:'Waiting'};
+    if(latestRuns.some(r=>r.status==='blocked'||r.status==='failed'))return {key:'attention',label:'Needs attention'};
     if(task.approval_status==='approved'&&targets.some(t=>ACTIVE_TICKET.has(String(t.status))))return {key:'queued',label:'Queued'};
     return {key:'idle',label:'Idle'};
   }
@@ -46,9 +53,12 @@
     return runs.filter(r=>r.ticket_id===ticket.id).sort((a,b)=>Date.parse(b.heartbeat_at||b.started_at||0)-Date.parse(a.heartbeat_at||a.started_at||0))[0]||null;
   }
   function targetRow(ticket,runs){
-    const run=latestRun(ticket,runs);const stage=run?.status||(['resolved','closed'].includes(String(ticket.status))?'completed':'queued');
-    const heartbeat=run?.heartbeat_at||run?.started_at||null;
-    return `<div class="gc-marlon-activity-target" data-stage="${esc(stage)}"><span class="gc-marlon-target-dot"></span><div><strong>${esc(ticket.surface==='website'?'Website':ticket.surface==='portal'?'Portal':ticket.surface||'Task')} · ${esc(code(ticket.ticket_number))}</strong><small>${esc(stageLabel(stage))}${heartbeat?` · heartbeat ${esc(age(heartbeat))}`:' · awaiting worker pickup'}</small></div></div>`;
+    const resolved=['resolved','closed'].includes(String(ticket.status));
+    const run=resolved?null:latestRun(ticket,runs);
+    const stage=resolved?'completed':run?.status||'queued';
+    const heartbeat=resolved?(ticket.resolved_at||ticket.updated_at||null):(run?.heartbeat_at||run?.started_at||null);
+    const activityLabel=heartbeat?`${resolved?'updated':'heartbeat'} ${age(heartbeat)}`:'awaiting worker pickup';
+    return `<div class="gc-marlon-activity-target" data-stage="${esc(stage)}"><span class="gc-marlon-target-dot"></span><div><strong>${esc(ticket.surface==='website'?'Website':ticket.surface==='portal'?'Portal':ticket.surface||'Task')} · ${esc(code(ticket.ticket_number))}</strong><small>${esc(stageLabel(stage))} · ${esc(activityLabel)}</small></div></div>`;
   }
   function render(model){
     lastModel=model;const host=ensureUi();if(!host)return;
@@ -58,13 +68,13 @@
     if(!task){panel.innerHTML='<strong>Marlon activity</strong><p>No active Marlon task right now.</p>';return}
     const targets=children.length?children:[task];
     const lastHeartbeat=runs.map(r=>r.heartbeat_at||r.started_at).filter(Boolean).sort().at(-1)||null;
-    panel.innerHTML=`<header><span><b>Marlon activity</b><small>${esc(status.label)}</small></span><b>${esc(code(task.ticket_number))}</b></header><p class="gc-marlon-activity-task">${esc(short(task.context?.requested_scope||task.title))}</p><div class="gc-marlon-activity-targets">${targets.map(t=>targetRow(t,runs)).join('')}</div><footer>${lastHeartbeat?`Last worker heartbeat ${esc(age(lastHeartbeat))}`:status.key==='queued'?'Approved and queued. Waiting for an execution worker to claim it.':'Live status updates automatically.'}</footer>`;
+    panel.innerHTML=`<header><span><b>Marlon activity</b><small>${esc(status.label)}</small></span><b>${esc(code(task.ticket_number))}</b></header><p class="gc-marlon-activity-task">${esc(short(task.context?.requested_scope||task.title))}</p><div class="gc-marlon-activity-targets">${targets.map(t=>targetRow(t,runs)).join('')}</div><footer>${status.key==='complete'?'Task completed successfully.':lastHeartbeat?`Last worker heartbeat ${esc(age(lastHeartbeat))}`:status.key==='queued'?'Approved and queued. Waiting for an execution worker to claim it.':'Live status updates automatically.'}</footer>`;
   }
   async function refresh(force=false){
     if(!profile?.id)return;
     try{
       const {data:tickets,error}=await client.from('support_tickets')
-        .select('id,ticket_number,title,status,priority,surface,approval_status,parent_ticket_id,context,created_at,updated_at')
+        .select('id,ticket_number,title,status,priority,surface,approval_status,parent_ticket_id,context,created_at,updated_at,resolved_at')
         .eq('managed_by','Marlon').order('updated_at',{ascending:false}).limit(30);
       if(error)throw error;
       const rows=Array.isArray(tickets)?tickets:[];const task=chooseTask(rows);
@@ -96,5 +106,5 @@
   window.addEventListener('gotcracked:staff-ready',event=>start(event.detail));
   document.addEventListener('gc-staff-profile-updated',()=>{const p=window.GotCrackedRuntimeProfile||window.GotCrackedOperationsV1?.state?.profile;if(p)start(p)});
   const existing=window.GotCrackedRuntimeProfile||window.GotCrackedOperationsV1?.state?.profile;if(existing)setTimeout(()=>start(existing),250);
-  window.GotCrackedMarlonActivity={version:'1.0.0',refresh:()=>refresh(true),get model(){return lastModel}};
+  window.GotCrackedMarlonActivity={version:'1.0.1',refresh:()=>refresh(true),get model(){return lastModel}};
 })();
