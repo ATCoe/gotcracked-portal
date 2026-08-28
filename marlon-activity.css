@@ -17,6 +17,32 @@
 html[data-theme='light'] .gc-marlon-activity-pill{background:rgba(249,253,255,.98);color:#173242;border-color:rgba(14,112,150,.2);box-shadow:0 10px 26px rgba(37,76,94,.15)}
 html[data-theme='light'] .gc-marlon-activity-panel{background:rgba(250,254,255,.995);color:#173242;border-color:rgba(14,112,150,.18);box-shadow:0 18px 48px rgba(37,76,94,.2)}
 html[data-theme='light'] .gc-marlon-activity-task{color:#315465}html[data-theme='light'] .gc-marlon-activity-target{background:#edf7fb}html[data-theme='light'] .gc-marlon-activity-target small,html[data-theme='light'] .gc-marlon-activity-panel header small,html[data-theme='light'] .gc-marlon-activity-panel footer{color:#617f8d}
+
+/* Dashboard employee-recognition baseline styles. reporting-bookkeeper.js also injects
+   these styles when Reports is opened; keeping the baseline here prevents the dashboard
+   from rendering an unstyled recognition card before that view has been visited. */
+.gc-recognition{margin:16px 0}
+.gc-recognition-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.gc-recognition-card{border:1px solid var(--line,#dbe4eb);border-radius:14px;padding:12px;background:var(--card,#fff);display:grid;gap:8px;min-width:0}
+.gc-recognition-head{display:flex;align-items:center;gap:10px;min-width:0}
+.gc-recognition-head>div{display:grid;gap:2px;min-width:0}
+.gc-recognition-head strong,.gc-recognition-head small{display:block}
+.gc-recognition-head strong{overflow-wrap:anywhere}
+.gc-recognition-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;background:rgba(120,150,170,.15);display:grid;place-items:center;font-weight:900;flex:0 0 42px}
+.gc-recognition-rank{margin-left:auto;font-size:20px;font-weight:900;flex:0 0 auto}
+.gc-recognition-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.gc-recognition-metrics div{padding:7px;border-radius:9px;background:rgba(120,150,170,.07);min-width:0}
+.gc-recognition-metrics small,.gc-recognition-metrics strong{display:block}
+.gc-recognition-label{font-size:11px;font-weight:900;opacity:.8}
+.gc-recognition .gc-books-muted{opacity:.68;font-size:12px}
+
+@media(max-width:1050px){.gc-recognition-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:650px){
+  .gc-recognition-grid{grid-template-columns:1fr}
+  .gc-recognition-card{padding:14px}
+  .gc-recognition .card-title{display:grid;gap:10px}
+  .gc-recognition .card-title a{justify-self:start}
+}
 @media(max-width:640px){
   .gc-marlon-activity{right:62px;bottom:9px}
   .gc-marlon.open .gc-marlon-activity{display:none}
