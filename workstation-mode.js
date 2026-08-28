@@ -3,6 +3,7 @@
   if(window.GotCrackedWorkstationMode)return;
 
   const WORKSTATION='shared_workstation';
+  const OPERATOR_PIN_VERSION='20260828-operator-pin1';
   const ALLOWED_VIEWS=new Set([
     'dashboard','repairs','work-order','ready-pickup','leads',
     'appointments','customers','inventory','repair-reference'
@@ -12,6 +13,16 @@
 
   const profile=()=>window.GotCrackedRuntimeProfile||window.GotCrackedOperationsV1?.state?.profile||null;
   const isWorkstation=p=>p?.account_type===WORKSTATION;
+
+  function loadOperatorPinModule(){
+    if(window.GotCrackedOperatorPin||document.querySelector('script[data-gc-operator-pin]'))return;
+    const script=document.createElement('script');
+    script.src=`operator-pin.js?v=${OPERATOR_PIN_VERSION}`;
+    script.async=false;
+    script.dataset.gcOperatorPin='true';
+    script.addEventListener('error',()=>window.GotCrackedDiagnostics?.error?.('Operator PIN runtime failed to load.',{context:'Shared workstation identity'}),{once:true});
+    document.body.appendChild(script);
+  }
 
   function injectStyle(){
     if(document.getElementById('gc-workstation-mode-style'))return;
@@ -83,6 +94,7 @@
   function apply(nextProfile=profile()){
     active=isWorkstation(nextProfile);
     document.documentElement.dataset.accountType=active?WORKSTATION:'staff';
+    loadOperatorPinModule();
     if(!active)return false;
     injectStyle();
     decorateIdentity(nextProfile);
@@ -101,5 +113,5 @@
   document.addEventListener('gc-staff-profile-updated',()=>setTimeout(()=>apply(),50));
 
   setTimeout(()=>apply(),0);
-  window.GotCrackedWorkstationMode={version:'1.0.0',apply,get active(){return active},allowedViews:[...ALLOWED_VIEWS]};
+  window.GotCrackedWorkstationMode={version:'1.1.0',apply,get active(){return active},allowedViews:[...ALLOWED_VIEWS]};
 })();
