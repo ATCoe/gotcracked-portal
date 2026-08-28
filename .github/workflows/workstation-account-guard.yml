@@ -39,7 +39,6 @@ jobs:
             "p.account_type='shared_workstation'",
             "'repairs.intake'",
             "'ready_pickup.checkout'",
-            "'timeclock.use'",
             "get_employee_recognition",
             "get_schedule_planning_summary",
             "get_staff_schedule_week",
