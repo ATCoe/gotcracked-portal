@@ -5,6 +5,13 @@ const cors=(origin:string|null)=>({'Access-Control-Allow-Origin':allowedOrigins.
 const reply=(origin:string|null,body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors(origin),'Content-Type':'application/json'}});
 const bytesToHex=(bytes:Uint8Array)=>[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');
 async function sha256(value:string){return bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))));}
+function jwtPayload(authorization:string){
+  try{
+    const token=authorization.replace(/^Bearer\s+/i,'').trim(),part=token.split('.')[1]||'';
+    const normalized=part.replaceAll('-','+').replaceAll('_','/')+'='.repeat((4-part.length%4)%4);
+    return JSON.parse(atob(normalized));
+  }catch{return {};}
+}
 
 Deno.serve(async request=>{
   const origin=request.headers.get('Origin');
@@ -16,6 +23,8 @@ Deno.serve(async request=>{
     const userClient=createClient(url,anon,{global:{headers:{Authorization:authorization}}}),admin=createClient(url,service);
     const {data:{user},error:userError}=await userClient.auth.getUser();
     if(userError||!user)return reply(origin,{authorized:false,error:'Sign in required.'},401);
+    const claims:any=jwtPayload(authorization),sessionId=String(claims?.session_id||'');
+    if(!/^[0-9a-f-]{36}$/i.test(sessionId))return reply(origin,{authorized:false,error:'This Portal session cannot be verified. Sign in again.'},401);
     const discordIdentity=user.identities?.find(identity=>identity.provider==='discord');
     const discordId=String(discordIdentity?.identity_data?.provider_id||discordIdentity?.identity_data?.sub||discordIdentity?.id||'');
     if(!discordId)return reply(origin,{authorized:false,error:'No Discord identity was found.'},403);
@@ -46,7 +55,10 @@ Deno.serve(async request=>{
     if(!profile?.active)return reply(origin,{authorized:false,error:'Your GotCracked staff account is not active.'},403);
     if(profile.account_type==='shared_workstation')return reply(origin,{authorized:false,error:'Shared workstations use device enrollment, not Discord authentication.'},403);
     if(profile.discord_user_id&&String(profile.discord_user_id)!==discordId)return reply(origin,{authorized:false,error:'This Portal profile is already linked to a different Discord identity. Contact an owner.'},403);
+
     const updated=await admin.from('profiles').update({discord_user_id:discordId,discord_username:currentUsername||profile.discord_username,discord_avatar_url:identity.avatar_url||null,discord_verified_at:new Date().toISOString(),last_portal_login_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',user.id);if(updated.error)throw updated.error;
-    return reply(origin,{authorized:true,role:profile.role,discordUserId:discordId,onboardingRequired:!profile.onboarding_complete,invitationAccepted:Boolean(consumedInvite)});
+    const registered=await admin.from('portal_human_sessions').upsert({auth_session_id:sessionId,profile_id:user.id,location_id:profile.location_id,verification_method:'discord',verified_at:new Date().toISOString(),last_seen_at:new Date().toISOString()},{onConflict:'auth_session_id'});
+    if(registered.error)throw registered.error;
+    return reply(origin,{authorized:true,role:profile.role,discordUserId:discordId,onboardingRequired:!profile.onboarding_complete,invitationAccepted:Boolean(consumedInvite),sessionVerified:true});
   }catch(error){console.error('discord-verify',error);return reply(origin,{authorized:false,error:'Discord access verification failed.'},500);}
 });
