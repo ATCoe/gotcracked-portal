@@ -1,0 +1,47 @@
+name: Shared Workstation Guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  workstation-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Parse workstation runtime
+        run: |
+          node --check workstation-mode.js
+          node --check portal-runtime-loader.js
+      - name: Verify shared account boundary
+        run: |
+          node <<'NODE'
+          const fs=require('fs');
+          const runtime=fs.readFileSync('portal-runtime-loader.js','utf8');
+          const mode=fs.readFileSync('workstation-mode.js','utf8');
+          const migration=fs.readFileSync('supabase/migrations/0075_shared_front_desk_workstation.sql','utf8');
+          if(!runtime.includes("'workstation-mode.js'")) throw new Error('Workstation mode must load after authentication.');
+          for(const token of ['shared_workstation','Basic workflow only','gc-workstation-hidden','ALLOWED_VIEWS']) {
+            if(!mode.includes(token)) throw new Error(`Workstation runtime missing ${token}`);
+          }
+          for(const token of [
+            "account_type text not null default 'staff'",
+            "p.account_type='shared_workstation'",
+            "'repairs.intake'",
+            "'ready_pickup.checkout'",
+            "'timeclock.use'",
+            "get_employee_recognition",
+            "get_schedule_planning_summary",
+            "get_staff_schedule_week",
+            "get_timesheet_week"
+          ]) {
+            if(!migration.includes(token)) throw new Error(`Workstation data boundary missing ${token}`);
+          }
+          if(migration.includes("'timeclock.use',")) throw new Error('Shared workstation must never receive time-clock access.');
+          console.log('Shared workstation boundary is present.');
+          NODE
