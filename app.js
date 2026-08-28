@@ -15,6 +15,7 @@
       {code:'GC-DATA-001',title:'Duplicate record blocked',match:/\b(23505|duplicate key|unique constraint|already exists)\b/i,description:'Portal prevented a duplicate record from being saved. Review the existing record before trying again.'},
       {code:'GC-DATA-002',title:'Related record is missing',match:/\b(23503|foreign key constraint|violates foreign key)\b/i,description:'This save depends on another record that is missing or no longer available. Refresh the Portal and retry from the current record.'},
       {code:'GC-DATA-003',title:'Required data is missing',match:/\b(23502|not.null constraint|null value in column)\b/i,description:'Portal could not save because a required value was missing. Reopen the form and confirm the required fields before retrying.'},
+      {code:'GC-DATA-004',title:'Portal data rule blocked the save',match:/\b(23514|violates check constraint|check constraint)\b/i,description:'Portal rejected this save because it violated a database integrity rule. The action was not applied; Marlon should inspect the rule and attempted value.'},
       {code:'GC-RUNTIME-001',title:'Portal feature is still loading',match:/guided intake is still loading|staff profile is not ready|has not finished loading yet/i,description:'The requested Portal feature has not finished loading. Wait a moment and try again; refresh if it does not become available.'},
       {code:'GC-RUNTIME-002',title:'Portal module failed to load',match:/\b(failed to load .*module|failed to load .*script|runtime failed to load|failed to load [\w./-]+\.js)\b/i,description:'A Portal code module did not load correctly. Refresh once; if it repeats, Marlon should inspect the failed module and deployment.'}
     ];
@@ -84,7 +85,8 @@
       const code = options.ticketNumber ? `SUP-${String(options.ticketNumber).padStart(4,'0')}` : 'Marlon';
       card.querySelector('strong').textContent = `Maintenance approval required · ${code}`;
       card.querySelector('p').textContent = String(options.title || 'Marlon needs Owner approval before continuing this protected task.');
-      card.querySelector('small').textContent = `Surface: ${String(options.surface || 'Portal')} · Priority: ${String(options.priority || 'High')} · This alert stays until approved or denied.`;
+      const count=Math.max(1,Number(options.pendingCount||1));
+      card.querySelector('small').textContent = count>1 ? `${count} approvals pending · Showing oldest · Surface: ${String(options.surface || 'Portal')} · Priority: ${String(options.priority || 'High')}` : `Surface: ${String(options.surface || 'Portal')} · Priority: ${String(options.priority || 'High')} · Stays until decided.`;
       card.querySelectorAll('button').forEach(button => button.disabled = false);
       requestAnimationFrame(() => card.classList.add('is-visible'));
       return ticketId;

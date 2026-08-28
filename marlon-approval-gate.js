@@ -9,6 +9,7 @@
   const titleCase=v=>String(v||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
   const approvalCache=new Map();
   const maintenanceShown=new Set();
+  const decidingTickets=new Set();
   let pendingRefresh=null;
 
   function ensureStyle(){
@@ -20,13 +21,14 @@
       .gc-marlon-approve{border:1px solid #19b8ef;background:#0c9fd5;color:white}.gc-marlon-deny{border:1px solid #8c99a7;background:transparent;color:inherit}
       .gc-marlon-approval[data-state="denied"]{border-color:rgba(236,91,91,.45)}.gc-marlon-approval[data-state="approved"]{border-color:rgba(64,196,130,.45)}
       .gc-maintenance-approval{border-color:#f59e0b!important;border-left-color:#d97706!important;background:#fff7ed!important;color:#7c2d12!important;box-shadow:0 14px 38px rgba(124,45,18,.22)!important}
-      .gc-maintenance-approval .gc-diagnostic-icon{background:#d97706!important;color:#fff!important}.gc-maintenance-approval .gc-diagnostic-copy p{color:#9a3412!important}.gc-maintenance-approval .gc-diagnostic-copy small{color:#b45309!important}
+      .gc-maintenance-approval .gc-diagnostic-icon{background:#d97706!important;color:#fff!important}.gc-maintenance-approval .gc-diagnostic-copy strong{color:#7c2d12!important;font-weight:900!important}.gc-maintenance-approval .gc-diagnostic-copy p{color:#9a3412!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.gc-maintenance-approval .gc-diagnostic-copy small{color:#b45309!important}
       .gc-maintenance-approval .gc-diagnostic-actions{gap:8px;flex-wrap:wrap}.gc-maintenance-approval .gc-diagnostic-actions button{min-height:34px;padding:0 12px;border-radius:8px;text-decoration:none!important;font-weight:850}.gc-maintenance-approve{background:#d97706!important;color:#fff!important;border:1px solid #b45309!important}.gc-maintenance-deny{background:transparent!important;color:#9a3412!important;border:1px solid #fdba74!important}
       .gc-marlon-approval-screen{position:fixed;inset:0;z-index:22000;display:grid;place-items:center;padding:24px;background:rgba(17,24,39,.72);backdrop-filter:blur(8px)}
       .gc-marlon-approval-screen-card{width:min(680px,100%);max-height:min(760px,calc(100vh - 40px));overflow:auto;border:1px solid #f59e0b;border-top:7px solid #d97706;border-radius:18px;background:#fffaf2;color:#431407;box-shadow:0 26px 80px rgba(0,0,0,.38);padding:24px}
-      .gc-marlon-approval-screen-card .eyebrow{margin:0 0 7px;color:#b45309;font-size:.74rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.gc-marlon-approval-screen-card h1{margin:0 0 10px;font-size:clamp(1.35rem,4vw,2rem)}
+      .gc-marlon-approval-screen-card,.gc-marlon-approval-screen-card h1,.gc-marlon-approval-screen-card strong{color:#431407!important}.gc-marlon-approval-screen-card>p,.gc-marlon-approval-screen-card .gc-approval-scope p{color:#7c2d12!important}.gc-marlon-approval-screen-card .eyebrow{margin:0 0 7px;color:#b45309!important;font-size:.74rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.gc-marlon-approval-screen-card h1{margin:0 0 10px;font-size:clamp(1.35rem,4vw,2rem)}
       .gc-marlon-approval-screen-card .gc-approval-scope{margin:18px 0;padding:14px;border:1px solid #fed7aa;border-radius:12px;background:#fff7ed;line-height:1.5}.gc-marlon-approval-screen-meta{display:flex;gap:10px;flex-wrap:wrap;color:#9a3412;font-size:.78rem;font-weight:750}
       .gc-marlon-approval-screen-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}.gc-marlon-approval-screen-actions button,.gc-marlon-approval-screen-actions a{min-height:44px;padding:0 18px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;text-decoration:none;cursor:pointer}.gc-marlon-screen-approve{border:1px solid #b45309;background:#d97706;color:#fff}.gc-marlon-screen-deny{border:1px solid #fdba74;background:transparent;color:#9a3412}.gc-marlon-screen-continue{border:1px solid #cbd5e1;background:#fff;color:#334155}
+      html[data-theme="dark"] .gc-marlon-approval-screen-card{background:#18130d!important;color:#fff7ed!important;border-color:#f59e0b!important}html[data-theme="dark"] .gc-marlon-approval-screen-card h1,html[data-theme="dark"] .gc-marlon-approval-screen-card strong{color:#fff7ed!important}html[data-theme="dark"] .gc-marlon-approval-screen-card>p,html[data-theme="dark"] .gc-marlon-approval-screen-card .gc-approval-scope p{color:#fed7aa!important}html[data-theme="dark"] .gc-marlon-approval-screen-card .eyebrow{color:#fbbf24!important}html[data-theme="dark"] .gc-marlon-approval-screen-card .gc-approval-scope{background:#21170d!important;border-color:#92400e!important}html[data-theme="dark"] .gc-marlon-approval-screen-meta{color:#fdba74!important}html[data-theme="dark"] .gc-marlon-screen-deny{color:#fed7aa!important;border-color:#92400e!important}
       @media(max-width:650px){.gc-marlon-approval-screen{padding:12px}.gc-marlon-approval-screen-card{padding:18px;border-radius:14px}.gc-marlon-approval-screen-actions>*{flex:1 1 140px}}
     `;document.head.appendChild(s);
   }
@@ -175,21 +177,14 @@
   function syncMaintenanceAlerts(rows){
     const diagnostics=window.GotCrackedDiagnostics;
     if(!diagnostics?.maintenanceApproval)return;
-    const next=new Set(rows.map(row=>String(row.id)));
-    for(const id of maintenanceShown){
-      if(!next.has(id))diagnostics.clearMaintenanceApproval?.(id);
-    }
+    const active=rows[0]||null;
+    const activeId=active?String(active.id):'';
+    for(const id of maintenanceShown){if(id!==activeId)diagnostics.clearMaintenanceApproval?.(id)}
     maintenanceShown.clear();
-    for(const row of rows){
-      maintenanceShown.add(String(row.id));
-      diagnostics.maintenanceApproval({
-        ticketId:row.id,
-        ticketNumber:row.ticket_number,
-        title:row.title || 'Marlon needs Owner approval before continuing this protected task.',
-        surface:titleCase(row.surface),
-        priority:titleCase(row.priority||'high')
-      });
-    }
+    if(!active)return;
+    maintenanceShown.add(activeId);
+    const concise=String(active.title||'').replace(/^Marlon high-level change:\s*/i,'').trim() || 'Marlon needs Owner approval before continuing this protected task.';
+    diagnostics.maintenanceApproval({ticketId:active.id,ticketNumber:active.ticket_number,title:concise,surface:titleCase(active.surface),priority:titleCase(active.priority||'high'),pendingCount:rows.length});
   }
 
   async function refreshPendingApprovals(){
@@ -209,13 +204,14 @@
   }
 
   async function decideTicket(id,approved,controls=[]){
-    if(!id)return;
+    if(!id||decidingTickets.has(String(id)))return;
     if(!isOwner()){
       window.GotCrackedDiagnostics?.error?.('Only a verified Owner can approve Marlon high-level changes.',{context:'Marlon approval blocked'});
       controls.forEach(button=>button.disabled=false);
       return;
     }
-    controls.forEach(button=>button.disabled=true);
+    decidingTickets.add(String(id));
+    controls.forEach(button=>{button.disabled=true;button.dataset.gcOriginalText||=button.textContent||'';button.textContent='Working…'});
     try{
       const {error}=await client.rpc('decide_marlon_high_level_change',{p_ticket:id,p_approve:Boolean(approved)});
       if(error)throw error;
@@ -228,10 +224,12 @@
       if(deepLinkTicketId()===id)await renderApprovalScreen(id);
       document.dispatchEvent(new CustomEvent('gc-marlon-approval-decided',{detail:{ticket:id,approved:Boolean(approved)}}));
     }catch(error){
-      controls.forEach(button=>button.disabled=false);
+      controls.forEach(button=>{button.disabled=false;if(button.dataset.gcOriginalText)button.textContent=button.dataset.gcOriginalText});
+      const message=String(error?.message||error||'');
+      if(/already been decided/i.test(message)){await refreshPendingApprovals();if(deepLinkTicketId()===id)await renderApprovalScreen(id);return}
       window.GotCrackedDiagnostics?.error?.(error,{context:'Unable to record Marlon approval decision'});
       if(deepLinkTicketId()===id)await renderApprovalScreen(id);
-    }
+    }finally{decidingTickets.delete(String(id))}
   }
 
   async function decide(button){
@@ -275,6 +273,6 @@
   ensureStyle();
   installChatFailsafe();
   setTimeout(()=>{schedulePendingRefresh(0);if(deepLinkTicketId())void renderApprovalScreen()},700);
-  window.GotCrackedMarlonApprovalGate={version:'1.3.0',decorate,refreshPanels,panelMarkup,createApproval,highLevelIntent,refreshPendingApprovals,renderApprovalScreen};
+  window.GotCrackedMarlonApprovalGate={version:'1.4.0',decorate,refreshPanels,panelMarkup,createApproval,highLevelIntent,refreshPendingApprovals,renderApprovalScreen};
 
 })();
