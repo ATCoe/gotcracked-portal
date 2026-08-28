@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260829-launch-security3';
+  const VERSION = '20260829-launch-security4';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -22,7 +22,7 @@
     'work-order':['part-availability-workflow.js'],
     appointments:['appointments-board.js','appointments-owner-guard.js'],
     schedule: ['schedule-board.js','schedule-print.js'],
-    customers:['customers-board.js'],
+    customers: ['customers-board.js'],
     reports:['analytics.js','reconciliation-center.js','reporting-bookkeeper.js','reporting-capacity-enhancements.js'],
     shipping:['shipping.js','shipping-integrated.js','shipping-marlon-support.js'],
     inventory:['inventory-command-center.js','inventory-audit.js','parts-registry.js','shipping-marlon-support.js'],
