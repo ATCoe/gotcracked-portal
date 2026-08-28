@@ -88,6 +88,38 @@ Deno.serve(async (request: Request) => {
       return json({ ok: true, executor, ...data, history });
     }
 
+    if (action === 'proposal_context') {
+      const { data, error } = await admin.from('portal_suggestions')
+        .select('id,surface,title,description,status,owner_review_state,created_at')
+        .eq('source','marlon')
+        .order('created_at',{ascending:false})
+        .limit(100);
+      if (error) throw error;
+      return json({ ok: true, proposals: data || [] });
+    }
+
+    if (action === 'create_proposal') {
+      const proposal = body.proposal && typeof body.proposal === 'object' ? body.proposal : null;
+      if (!proposal) return json({ error: 'proposal is required.' }, 400);
+      const { data, error } = await admin.rpc('create_marlon_improvement_proposal', {
+        p_surface: proposal.surface ?? 'portal',
+        p_title: proposal.title ?? '',
+        p_description: proposal.description ?? '',
+        p_business_value: proposal.businessValue ?? null,
+        p_user_impact: proposal.userImpact ?? null,
+        p_complexity: proposal.complexity ?? 'medium',
+        p_suggestion_type: proposal.suggestionType ?? 'workflow_improvement',
+        p_evidence: {
+          evidence_summary: proposal.evidenceSummary ?? null,
+          github_run_id: claims.run_id || null,
+          github_sha: claims.sha || null,
+          scout_source: 'portal-and-website'
+        }
+      });
+      if (error) throw error;
+      return json({ ok: true, proposal: data });
+    }
+
     if (action === 'deployment_gate') {
       const ticketId = String(body.ticketId || '').trim();
       const commitSha = String(body.commitSha || '').trim();

@@ -1,0 +1,38 @@
+name: Marlon Improvement Scout
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 13 * * *"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: marlon-improvement-scout
+  cancel-in-progress: false
+
+jobs:
+  inspect-portal-and-website:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Portal
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Checkout customer website
+        uses: actions/checkout@v4
+        with:
+          repository: ATCoe/gotcracked-site
+          path: site
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Inspect both live sites and propose worthwhile upgrades
+        run: node scripts/marlon-improvement-scout.mjs
