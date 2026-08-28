@@ -92,7 +92,7 @@
   }
 
   async function ticket(id){
-    const {data,error}=await client.from('support_tickets').select('id,ticket_number,title,description,surface,priority,status,managed_by,change_level,requires_approval,approval_state,approval_status,approval_requested_at,approval_decided_at,approval_fingerprint').eq('id',id).maybeSingle();
+    const {data,error}=await client.from('support_tickets').select('id,ticket_number,title,description,surface,priority,status,managed_by,change_level,requires_approval,approval_state,approval_status,approval_requested_at,approval_decided_at,approval_fingerprint,parent_ticket_id,context').eq('id',id).maybeSingle();
     if(error)throw error;return data;
   }
 
@@ -149,11 +149,13 @@
     try{
       const t=await ticket(id);if(!t)throw new Error('This approval request could not be found.');
       const state=t.approval_status||'pending',pending=state==='pending',owner=isOwner();
+      const inherited=Boolean(t.parent_ticket_id&&t.context?.approval_inherited_from_parent);
       const code=t.ticket_number?`SUP-${String(t.ticket_number).padStart(4,'0')}`:'Support request';
-      const heading=pending?'Owner approval required':state==='approved'?'Approval recorded':'Request denied';
-      const explanation=pending?'Marlon stopped before changing a protected system. Review the exact scope below, then approve or deny it.':state==='approved'?'Marlon is authorized to continue only with this exact fingerprinted scope.':'Marlon will not execute this protected change.';
+      const heading=inherited&&state==='approved'?'Approval inherited':pending?'Owner approval required':state==='approved'?'Approval recorded':'Request denied';
+      const parentCode=t.context?.parent_ticket_number?`SUP-${String(t.context.parent_ticket_number).padStart(4,'0')}`:'';
+      const explanation=inherited&&state==='approved'?`This is an internal execution item for ${parentCode||'the approved parent request'}. Your Owner approval was already recorded there; no second approval is required.`:pending?'Marlon stopped before changing a protected system. Review the exact scope below, then approve or deny it.':state==='approved'?'Marlon is authorized to continue only with this exact fingerprinted scope.':'Marlon will not execute this protected change.';
       const actions=pending&&owner?`<button type="button" class="gc-marlon-screen-approve" data-marlon-screen-decision="approve">Approve</button><button type="button" class="gc-marlon-screen-deny" data-marlon-screen-decision="deny">Deny</button>`:pending?'<span>Waiting for a verified Owner account.</span>':`<a class="gc-marlon-screen-continue" href="${location.origin}/#support-tickets">Continue to Support Desk</a>`;
-      root.innerHTML=`<article class="gc-marlon-approval-screen-card" data-screen-approval-ticket="${esc(t.id)}"><p class="eyebrow">Marlon Maintenance · ${esc(code)}</p><h1>${esc(heading)}</h1><p>${esc(explanation)}</p><div class="gc-approval-scope"><strong>Exact scope</strong><p>${esc(t.description||t.title)}</p></div><div class="gc-marlon-approval-screen-meta"><span>Surface: ${esc(t.surface)}</span><span>Priority: ${esc(t.priority||'normal')}</span><span>Status: ${esc(state)}</span><span>Requested: ${esc(fmt(t.approval_requested_at))}</span></div><div class="gc-marlon-approval-screen-actions">${actions}</div></article>`;
+      root.innerHTML=`<article class="gc-marlon-approval-screen-card" data-screen-approval-ticket="${esc(t.id)}"><p class="eyebrow">Marlon Maintenance · ${esc(code)}</p><h1>${esc(heading)}</h1><p>${esc(explanation)}</p><div class="gc-approval-scope"><strong>Exact scope</strong><p>${esc(t.description||t.title)}</p></div><div class="gc-marlon-approval-screen-meta"><span>Surface: ${esc(t.surface)}</span><span>Priority: ${esc(t.priority||'normal')}</span><span>Status: ${esc(state)}</span>${parentCode?`<span>Parent: ${esc(parentCode)}</span>`:''}<span>Requested: ${esc(fmt(t.approval_requested_at))}</span></div><div class="gc-marlon-approval-screen-actions">${actions}</div></article>`;
     }catch(error){
       root.innerHTML=`<article class="gc-marlon-approval-screen-card"><p class="eyebrow">Marlon Maintenance</p><h1>Approval request unavailable</h1><p>${esc(error?.message||error)}</p><div class="gc-marlon-approval-screen-actions"><a class="gc-marlon-screen-continue" href="${location.origin}/#support-tickets">Open Support Desk</a></div></article>`;
     }

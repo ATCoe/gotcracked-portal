@@ -48,6 +48,15 @@ async function report(token,runId,status,extra={}){
   return post(BRIDGE,token,{action:'report',runId,status,...extra});
 }
 
+let heartbeatTimer=null;
+let heartbeatStage='claimed';
+function startHeartbeat(token,runId,stage='claimed'){
+  heartbeatStage=stage;
+  if(heartbeatTimer||!runId)return;
+  heartbeatTimer=setInterval(()=>report(token,runId,heartbeatStage,{metadata:{activity_heartbeat:true}}).catch(()=>{}),15000);
+  heartbeatTimer.unref?.();
+}
+
 function ticketWords(ticket){
   const raw=[ticket.title,ticket.description,JSON.stringify(ticket.context||{})].join(' ').toLowerCase();
   return [...new Set((raw.match(/[a-z0-9_-]{4,}/g)||[]).filter(w=>!STOP.has(w)))];
@@ -123,6 +132,7 @@ async function prepare(){
   const ticket=claim.ticket;
   if(!ticket){ output('has_work','false'); return; }
   const runId=claim.run?.id;
+  startHeartbeat(token,runId,'claimed');
   output('ticket_number',ticket.ticket_number);
   if(claim.resume===true){
     const meta=claim.run?.metadata||{};
@@ -142,6 +152,7 @@ async function prepare(){
     return;
   }
   try{
+    heartbeatStage='diagnosing';
     await report(token,runId,'diagnosing',{metadata:{prior_history_count:(claim.history||[]).length}});
     const candidates=candidateFiles(ticket);
     const ticketWithHistory={...ticket,prior_history:claim.history||[]};
@@ -164,6 +175,7 @@ async function prepare(){
     }
     const changed=applyPlan(ticket,candidates,plan);
     const patchSummary=plan.edits.map(e=>`${e.path}: ${e.reason||'bounded repair'}`).join('; ').slice(0,3500);
+    heartbeatStage='patching';
     await report(token,runId,'patching',{diagnosis:plan.diagnosis||null,patchSummary,metadata:{changed_paths:changed,prior_history_count:(claim.history||[]).length}});
     fs.writeFileSync(STATE,JSON.stringify({runId,ticketId:ticket.id,ticketNumber:ticket.ticket_number,baseSha:git('rev-parse','HEAD'),diagnosis:plan.diagnosis||'',patchSummary,changedPaths:changed,verificationPlan:plan.verification||[],changeSize:['small','medium','large'].includes(plan.changeSize)?plan.changeSize:'small',featureUpdate:plan.featureUpdate===true,architectureImpact:String(plan.architectureImpact||'neutral'),preservedCapabilities:Array.isArray(plan.preservedCapabilities)?plan.preservedCapabilities:[]},null,2));
     output('has_work','true'); output('audit_only','false');
@@ -201,6 +213,7 @@ async function waitWorkflow(file,sha,startedAt,token){
 async function checks(branch){
   const state=JSON.parse(fs.readFileSync(STATE,'utf8'));
   const idToken=await oidc();
+  startHeartbeat(idToken,state.runId,'testing');
   const apiToken=process.env.GITHUB_TOKEN;
   if(!apiToken) throw new Error('GitHub workflow token missing.');
   const sha=git('rev-parse','HEAD');
@@ -222,6 +235,7 @@ async function checks(branch){
   state.deploymentGate=gateResult.gate||{};
   fs.writeFileSync(STATE,JSON.stringify(state,null,2));
   if(state.deploymentGate.allowed!==true){
+    heartbeatStage='waiting_window';
     await report(idToken,state.runId,'waiting_window',{commitSha:sha,patchSummary:state.patchSummary,verification:{checks:results},metadata:{branch,base_sha:state.baseSha,changed_paths:state.changedPaths||[],verification_plan:state.verificationPlan||[],checks:results,change_size:state.changeSize||'small',feature_update:state.featureUpdate===true,architecture_impact:state.architectureImpact||'neutral',preserved_capabilities:state.preservedCapabilities||[],deployment_gate:state.deploymentGate}});
     output('deploy_allowed','false');
     return;
@@ -250,6 +264,7 @@ async function verifyLive(state){
 async function complete(){
   const state=JSON.parse(fs.readFileSync(STATE,'utf8'));
   const token=await oidc();
+  startHeartbeat(token,state.runId,state.auditOnly===true?'verifying':'deploying');
   const sha=git('rev-parse','HEAD');
   state.commitSha=sha;
   if(state.auditOnly===true){
@@ -259,6 +274,7 @@ async function complete(){
       const body=await res.text();
       if(body.length<100) throw new Error('Live surface audit verification returned an unexpectedly small response.');
       const live={url:LIVE,status:res.status,content_type:res.headers.get('content-type'),verified_at:new Date().toISOString()};
+      heartbeatStage='verifying';
       await report(token,state.runId,'verifying',{commitSha:sha,deploymentUrl:LIVE,verification:{checks:state.checks||[],audit_only:true,live}});
       await report(token,state.runId,'completed',{diagnosis:state.diagnosis,patchSummary:state.patchSummary,resolution:'Production audit completed: repository guards passed and the live surface responded successfully. No deterministic code change was required by the audited evidence.',commitSha:sha,deploymentUrl:LIVE,verification:{checks:state.checks||[],audit_only:true,live}});
       return;
@@ -267,9 +283,11 @@ async function complete(){
       throw error;
     }
   }
+  heartbeatStage='deploying';
   await report(token,state.runId,'deploying',{commitSha:sha,metadata:{branch:state.branch,checks:state.checks||[]}});
   try{
     const live=await verifyLive(state);
+    heartbeatStage='verifying';
     await report(token,state.runId,'verifying',{commitSha:sha,deploymentUrl:LIVE,verification:{checks:state.checks||[],...live}});
     await report(token,state.runId,'completed',{diagnosis:state.diagnosis,patchSummary:state.patchSummary,resolution:'Implemented, passed Portal CI, Production Guard, and Full Source Audit, then verified on the live Cloudflare deployment.',commitSha:sha,deploymentUrl:LIVE,verification:{checks:state.checks||[],...live}});
   }catch(error){

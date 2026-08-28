@@ -43,9 +43,10 @@
   }
 
   async function loadMarlon() {
-    const version = '20260828-marlon27';
+    const version = '20260828-marlon28';
     loadStyle(`marlon-assistant.css?v=${version}`, 'gcMarlonStyle');
     loadStyle(`marlon-extensions.css?v=${version}`, 'gcMarlonExtensions');
+    loadStyle(`marlon-activity.css?v=${version}`, 'gcMarlonActivityStyle');
     await loadScript(`marlon-config.js?v=${version}`, 'gcMarlonConfig');
     await loadScript(`marlon-assistant.js?v=${version}`, 'gcMarlonRuntime');
     await loadScript(`marlon-support.js?v=${version}`, 'gcMarlonSupport');
@@ -54,6 +55,7 @@
     await loadScript(`staff-badges-v2.js?v=${version}`, 'gcStaffBadges');
     await loadScript(`marlon-releases.js?v=${version}`, 'gcMarlonReleases');
     await loadScript(`marlon-monitor.js?v=${version}`, 'gcMarlonMonitor');
+    await loadScript(`marlon-activity.js?v=${version}`, 'gcMarlonActivity');
     await loadScript(`parts-registry.js?v=${version}`, 'gcPartsRegistry');
     await loadScript(`mobilesentrix-integration.js?v=${version}`, 'gcMobileSentrixIntegration');
     await loadScript(`pc-build-policy-settings.js?v=${version}`, 'gcPcBuildPolicy');

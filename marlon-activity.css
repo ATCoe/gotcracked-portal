@@ -1,0 +1,27 @@
+.gc-marlon-activity{position:absolute;right:0;bottom:58px;z-index:4;color:#eaf7ff}
+.gc-marlon-activity-pill{min-height:34px;padding:0 11px;border:1px solid rgba(91,190,231,.28);border-radius:999px;background:rgba(7,23,35,.96);box-shadow:0 10px 28px rgba(0,0,0,.28);color:#dff6ff;display:flex;align-items:center;gap:8px;font:inherit;font-size:11px;font-weight:850;white-space:nowrap;cursor:pointer}
+.gc-marlon-activity-dot,.gc-marlon-target-dot{width:8px;height:8px;border-radius:50%;background:#7f93a0;flex:0 0 auto}
+.gc-marlon-activity[data-state='queued'] .gc-marlon-activity-dot{background:#f6b94c}
+.gc-marlon-activity[data-state='working'] .gc-marlon-activity-dot{background:#31bdf4;box-shadow:0 0 0 0 rgba(49,189,244,.55);animation:gc-marlon-heartbeat 1.25s infinite}
+.gc-marlon-activity[data-state='waiting'] .gc-marlon-activity-dot,.gc-marlon-activity[data-state='approval'] .gc-marlon-activity-dot{background:#f59e0b}
+.gc-marlon-activity[data-state='complete'] .gc-marlon-activity-dot{background:#39cc84}
+.gc-marlon-activity[data-state='attention'] .gc-marlon-activity-dot,.gc-marlon-activity[data-state='unknown'] .gc-marlon-activity-dot{background:#ef6464}
+@keyframes gc-marlon-heartbeat{0%{box-shadow:0 0 0 0 rgba(49,189,244,.52)}70%{box-shadow:0 0 0 8px rgba(49,189,244,0)}100%{box-shadow:0 0 0 0 rgba(49,189,244,0)}}
+.gc-marlon-activity-panel{position:absolute;right:0;bottom:42px;width:min(360px,calc(100vw - 28px));padding:14px;border:1px solid rgba(90,190,228,.24);border-radius:16px;background:rgba(7,19,29,.985);box-shadow:0 20px 55px rgba(0,0,0,.42);color:#eaf7ff}
+.gc-marlon-activity-panel[hidden]{display:none!important}.gc-marlon-activity-panel header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(115,190,216,.13);padding-bottom:10px}.gc-marlon-activity-panel header span{display:grid;gap:2px}.gc-marlon-activity-panel header small{color:#7fa5b4;font-size:10px}
+.gc-marlon-activity-task{margin:11px 0;color:#cfe8f1;font-size:11px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.gc-marlon-activity-targets{display:grid;gap:7px}.gc-marlon-activity-target{display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:11px;background:rgba(31,67,86,.3)}
+.gc-marlon-activity-target strong{display:block;font-size:11px}.gc-marlon-activity-target small{display:block;margin-top:2px;color:#8db0bf;font-size:10px}.gc-marlon-activity-target[data-stage='claimed'] .gc-marlon-target-dot,.gc-marlon-activity-target[data-stage='diagnosing'] .gc-marlon-target-dot,.gc-marlon-activity-target[data-stage='patching'] .gc-marlon-target-dot,.gc-marlon-activity-target[data-stage='testing'] .gc-marlon-target-dot,.gc-marlon-activity-target[data-stage='deploying'] .gc-marlon-target-dot,.gc-marlon-activity-target[data-stage='verifying'] .gc-marlon-target-dot{background:#31bdf4}
+.gc-marlon-activity-target[data-stage='queued'] .gc-marlon-target-dot,.gc-marlon-activity-target[data-stage='waiting_window'] .gc-marlon-target-dot{background:#f6b94c}.gc-marlon-activity-target[data-stage='completed'] .gc-marlon-target-dot{background:#39cc84}.gc-marlon-activity-target[data-stage='blocked'] .gc-marlon-target-dot,.gc-marlon-activity-target[data-stage='failed'] .gc-marlon-target-dot{background:#ef6464}
+.gc-marlon-activity-panel footer{margin-top:10px;padding-top:9px;border-top:1px solid rgba(115,190,216,.1);color:#7599a8;font-size:9px;line-height:1.4}
+html[data-theme='light'] .gc-marlon-activity-pill{background:rgba(249,253,255,.98);color:#173242;border-color:rgba(14,112,150,.2);box-shadow:0 10px 26px rgba(37,76,94,.15)}
+html[data-theme='light'] .gc-marlon-activity-panel{background:rgba(250,254,255,.995);color:#173242;border-color:rgba(14,112,150,.18);box-shadow:0 18px 48px rgba(37,76,94,.2)}
+html[data-theme='light'] .gc-marlon-activity-task{color:#315465}html[data-theme='light'] .gc-marlon-activity-target{background:#edf7fb}html[data-theme='light'] .gc-marlon-activity-target small,html[data-theme='light'] .gc-marlon-activity-panel header small,html[data-theme='light'] .gc-marlon-activity-panel footer{color:#617f8d}
+@media(max-width:640px){
+  .gc-marlon-activity{right:62px;bottom:9px}
+  .gc-marlon.open .gc-marlon-activity{display:none}
+  .gc-marlon-activity-pill{min-height:34px;max-width:180px;padding:0 10px}
+  .gc-marlon-activity-label{overflow:hidden;text-overflow:ellipsis}
+  .gc-marlon-activity-panel{position:fixed;right:12px;bottom:78px;width:calc(100vw - 24px);max-height:min(65vh,480px);overflow:auto}
+}
+@media(prefers-reduced-motion:reduce){.gc-marlon-activity[data-state='working'] .gc-marlon-activity-dot{animation:none}}
