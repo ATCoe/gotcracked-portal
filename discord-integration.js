@@ -9,9 +9,13 @@
   async function signInWithDiscord() {
     sessionStorage.setItem('gc-discord-auth-started', '1');
     const invite = sessionStorage.getItem('gc-staff-invite');
+    const approval = new URL(window.location.href).searchParams.get('marlon-approval');
     const redirect = new URL(window.location.href);
-    redirect.search = invite ? `?invite=${encodeURIComponent(invite)}` : '';
-    redirect.hash = '';
+    const redirectParams = new URLSearchParams();
+    if (invite) redirectParams.set('invite', invite);
+    if (approval) redirectParams.set('marlon-approval', approval);
+    redirect.search = redirectParams.size ? `?${redirectParams.toString()}` : '';
+    redirect.hash = approval ? '#support-tickets' : '';
     const { error } = await client.auth.signInWithOAuth({
       provider: 'discord',
       options: { redirectTo: redirect.toString(), queryParams: { prompt: 'consent' } }
