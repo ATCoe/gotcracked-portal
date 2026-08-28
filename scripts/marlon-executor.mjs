@@ -65,6 +65,11 @@ function protectedTicket(ticket){
   return ['401','403'].includes(status) || /\b(authentication|authorization|permission|permissions|rls|payment|billing|secret|credential|schema|migration|deploy|deployment)\b/.test(raw);
 }
 
+function auditIntent(ticket){
+  const raw=[ticket.title,ticket.description,JSON.stringify(ticket.context||{})].join(' ').toLowerCase();
+  return /\b(audit|production review|source review|hard review|full review)\b/.test(raw);
+}
+
 function candidateFiles(ticket){
   const words=ticketWords(ticket);
   const rows=[];
@@ -143,7 +148,12 @@ async function prepare(){
     const planned=await post(PLANNER,token,{ticket:ticketWithHistory,candidates});
     const plan=planned.plan||{};
     if(!Array.isArray(plan.edits)||plan.edits.length===0){
-      await report(token,runId,'blocked',{diagnosis:plan.diagnosis||null,error:plan.blocker||'No deterministic safe patch was produced.',metadata:{prior_history_count:(claim.history||[]).length}});
+      if(String(plan.outcome||'')==='clean'&&auditIntent(ticket)){
+        const patchSummary='Audit completed without a deterministic code change requirement.';
+        fs.writeFileSync(STATE,JSON.stringify({runId,ticketId:ticket.id,ticketNumber:ticket.ticket_number,baseSha:git('rev-parse','HEAD'),diagnosis:plan.diagnosis||'No deterministic repair was required by the supplied audit evidence.',patchSummary,changedPaths:[],verificationPlan:plan.verification||[],changeSize:'small',featureUpdate:false,architectureImpact:'neutral',preservedCapabilities:Array.isArray(plan.preservedCapabilities)?plan.preservedCapabilities:[],auditOnly:true},null,2));
+        output('has_work','true'); output('audit_only','true'); return;
+      }
+      await report(token,runId,'blocked',{diagnosis:plan.diagnosis||null,error:plan.blocker||'No deterministic safe patch was produced.',metadata:{prior_history_count:(claim.history||[]).length,outcome:plan.outcome||'blocked'}});
       output('has_work','false'); return;
     }
     const removed=Array.isArray(plan.removedCapabilities)?plan.removedCapabilities.filter(Boolean):[];
@@ -156,7 +166,7 @@ async function prepare(){
     const patchSummary=plan.edits.map(e=>`${e.path}: ${e.reason||'bounded repair'}`).join('; ').slice(0,3500);
     await report(token,runId,'patching',{diagnosis:plan.diagnosis||null,patchSummary,metadata:{changed_paths:changed,prior_history_count:(claim.history||[]).length}});
     fs.writeFileSync(STATE,JSON.stringify({runId,ticketId:ticket.id,ticketNumber:ticket.ticket_number,baseSha:git('rev-parse','HEAD'),diagnosis:plan.diagnosis||'',patchSummary,changedPaths:changed,verificationPlan:plan.verification||[],changeSize:['small','medium','large'].includes(plan.changeSize)?plan.changeSize:'small',featureUpdate:plan.featureUpdate===true,architectureImpact:String(plan.architectureImpact||'neutral'),preservedCapabilities:Array.isArray(plan.preservedCapabilities)?plan.preservedCapabilities:[]},null,2));
-    output('has_work','true');
+    output('has_work','true'); output('audit_only','false');
   }catch(error){
     await report(token,runId,'failed',{error:String(error?.message||error)}).catch(()=>{});
     throw error;
@@ -203,6 +213,11 @@ async function checks(branch){
   state.branch=branch;
   state.commitSha=sha;
   state.checks=results;
+  if(state.auditOnly===true){
+    fs.writeFileSync(STATE,JSON.stringify(state,null,2));
+    output('audit_verified','true');
+    return;
+  }
   const gateResult=await post(BRIDGE,idToken,{action:'deployment_gate',ticketId:state.ticketId,commitSha:sha,changeSize:state.changeSize||'small',featureUpdate:state.featureUpdate===true});
   state.deploymentGate=gateResult.gate||{};
   fs.writeFileSync(STATE,JSON.stringify(state,null,2));
@@ -237,6 +252,21 @@ async function complete(){
   const token=await oidc();
   const sha=git('rev-parse','HEAD');
   state.commitSha=sha;
+  if(state.auditOnly===true){
+    try{
+      const res=await fetch(`${LIVE}/?marlon-audit=${encodeURIComponent(sha)}`,{headers:{'Cache-Control':'no-cache'}});
+      if(!res.ok) throw new Error(`Live surface audit verification failed (${res.status}).`);
+      const body=await res.text();
+      if(body.length<100) throw new Error('Live surface audit verification returned an unexpectedly small response.');
+      const live={url:LIVE,status:res.status,content_type:res.headers.get('content-type'),verified_at:new Date().toISOString()};
+      await report(token,state.runId,'verifying',{commitSha:sha,deploymentUrl:LIVE,verification:{checks:state.checks||[],audit_only:true,live}});
+      await report(token,state.runId,'completed',{diagnosis:state.diagnosis,patchSummary:state.patchSummary,resolution:'Production audit completed: repository guards passed and the live surface responded successfully. No deterministic code change was required by the audited evidence.',commitSha:sha,deploymentUrl:LIVE,verification:{checks:state.checks||[],audit_only:true,live}});
+      return;
+    }catch(error){
+      await report(token,state.runId,'failed',{commitSha:sha,error:String(error?.message||error),verification:{checks:state.checks||[],audit_only:true}}).catch(()=>{});
+      throw error;
+    }
+  }
   await report(token,state.runId,'deploying',{commitSha:sha,metadata:{branch:state.branch,checks:state.checks||[]}});
   try{
     const live=await verifyLive(state);

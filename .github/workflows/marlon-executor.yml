@@ -55,7 +55,7 @@ jobs:
 
       - name: Commit patch to isolated branch
         id: commit
-        if: steps.prepare.outputs.has_work == 'true' && steps.prepare.outputs.resume != 'true'
+        if: steps.prepare.outputs.has_work == 'true' && steps.prepare.outputs.resume != 'true' && steps.prepare.outputs.audit_only != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -74,10 +74,14 @@ jobs:
         if: steps.prepare.outputs.has_work == 'true' && steps.prepare.outputs.resume != 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/marlon-executor.mjs checks "${{ steps.commit.outputs.branch }}"
+        shell: bash
+        run: |
+          branch="${{ steps.commit.outputs.branch }}"
+          if [ "${{ steps.prepare.outputs.audit_only }}" = "true" ]; then branch="main"; fi
+          node scripts/marlon-executor.mjs checks "$branch"
 
       - name: Fast-forward production only if main is unchanged
-        if: steps.prepare.outputs.has_work == 'true' && (steps.prepare.outputs.resume == 'true' || steps.checks.outputs.deploy_allowed == 'true')
+        if: steps.prepare.outputs.has_work == 'true' && steps.prepare.outputs.audit_only != 'true' && (steps.prepare.outputs.resume == 'true' || steps.checks.outputs.deploy_allowed == 'true')
         shell: bash
         run: |
           set -euo pipefail
@@ -91,11 +95,11 @@ jobs:
           git push origin HEAD:main
 
       - name: Verify Cloudflare production and resolve ticket
-        if: steps.prepare.outputs.has_work == 'true' && (steps.prepare.outputs.resume == 'true' || steps.checks.outputs.deploy_allowed == 'true')
+        if: steps.prepare.outputs.has_work == 'true' && (steps.prepare.outputs.audit_only == 'true' || steps.prepare.outputs.resume == 'true' || steps.checks.outputs.deploy_allowed == 'true')
         run: node scripts/marlon-executor.mjs complete
 
       - name: Remove successful patch branch
-        if: success() && steps.prepare.outputs.has_work == 'true' && (steps.prepare.outputs.resume == 'true' || steps.checks.outputs.deploy_allowed == 'true')
+        if: success() && steps.prepare.outputs.has_work == 'true' && steps.prepare.outputs.audit_only != 'true' && (steps.prepare.outputs.resume == 'true' || steps.checks.outputs.deploy_allowed == 'true')
         shell: bash
         run: |
           branch=$(node -e "const fs=require('fs');console.log(JSON.parse(fs.readFileSync('.marlon-executor-state.json','utf8')).branch||'')")
