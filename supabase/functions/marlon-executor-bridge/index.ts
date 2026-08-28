@@ -4,7 +4,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const EXPECTED_ISSUER = 'https://token.actions.githubusercontent.com';
 const EXPECTED_AUDIENCE = 'gotcracked-marlon-executor';
-const EXPECTED_REPOSITORY = 'ATCoe/gotcracked-portal';
+const EXPECTED_REPOSITORIES = new Set(['ATCoe/gotcracked-portal','ATCoe/gotcracked-site']);
 const EXPECTED_REF = 'refs/heads/main';
 const JWKS_URL = 'https://token.actions.githubusercontent.com/.well-known/jwks';
 
@@ -61,7 +61,7 @@ async function verifyGithubOidc(request: Request) {
   if (!audiences.includes(EXPECTED_AUDIENCE)) throw new Error('Unexpected GitHub OIDC audience.');
   if (claims.exp && Number(claims.exp) < now - 30) throw new Error('GitHub OIDC token expired.');
   if (claims.nbf && Number(claims.nbf) > now + 30) throw new Error('GitHub OIDC token not active yet.');
-  if (claims.repository !== EXPECTED_REPOSITORY) throw new Error('Unexpected GitHub repository.');
+  if (!EXPECTED_REPOSITORIES.has(String(claims.repository || ''))) throw new Error('Unexpected GitHub repository.');
   if (claims.ref !== EXPECTED_REF) throw new Error('Executor may run only from main.');
   if (!['schedule', 'workflow_dispatch'].includes(String(claims.event_name || ''))) throw new Error('Unsupported GitHub Actions event.');
   return claims;
@@ -74,10 +74,10 @@ Deno.serve(async (request: Request) => {
     const body: any = await request.json().catch(() => ({}));
     const action = String(body.action || '').trim().toLowerCase();
     const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
-    const executor = `github-actions:${claims.run_id || 'unknown'}:${claims.run_attempt || '1'}`;
+    const executor = `github-actions:${claims.repository || 'unknown'}:${claims.run_id || 'unknown'}:${claims.run_attempt || '1'}`;
 
     if (action === 'claim') {
-      const { data, error } = await admin.rpc('claim_next_marlon_execution', { p_executor: executor });
+      const { data, error } = await admin.rpc('claim_next_marlon_execution', { p_executor: executor, p_repository: claims.repository });
       if (error) throw error;
       let history: any[] = [];
       if (data?.ticket?.id) {
@@ -89,6 +89,7 @@ Deno.serve(async (request: Request) => {
     }
 
     if (action === 'proposal_context') {
+      if (claims.repository !== 'ATCoe/gotcracked-portal') throw new Error('Proposal scouting is restricted to the Portal orchestration workflow.');
       const { data, error } = await admin.from('portal_suggestions')
         .select('id,surface,title,description,status,owner_review_state,created_at')
         .eq('source','marlon')
@@ -99,6 +100,7 @@ Deno.serve(async (request: Request) => {
     }
 
     if (action === 'create_proposal') {
+      if (claims.repository !== 'ATCoe/gotcracked-portal') throw new Error('Proposal creation is restricted to the Portal orchestration workflow.');
       const proposal = body.proposal && typeof body.proposal === 'object' ? body.proposal : null;
       if (!proposal) return json({ error: 'proposal is required.' }, 400);
       const { data, error } = await admin.rpc('create_marlon_improvement_proposal', {
