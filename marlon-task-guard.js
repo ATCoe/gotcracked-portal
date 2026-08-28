@@ -60,8 +60,12 @@
       const latest=[...messages].reverse().find(m=>m?.role==='user');
       const text=clean(latest?.content);
       const source=payload?.context?.source==='call'?'call':'text';
-      const [caps,ticket]=await Promise.all([capabilities(),ensureTicket(text,source)]);
-      payload.context={...(payload.context||{}),executionCapabilities:caps,executionPolicy:executionPolicy(caps),workTicket:ticket};
+      const [capsResult,ticketResult]=await Promise.allSettled([capabilities(),ensureTicket(text,source)]);
+      const caps=capsResult.status==='fulfilled'?capsResult.value:{};
+      const ticket=ticketResult.status==='fulfilled'?ticketResult.value:null;
+      const wiringError=ticketResult.status==='rejected'?'Support Desk tracking is temporarily unavailable. Do not claim this request was queued or is being executed.':null;
+      if(wiringError)console.warn('Marlon ticket tracking unavailable:',ticketResult.reason);
+      payload.context={...(payload.context||{}),executionCapabilities:caps,executionPolicy:executionPolicy(caps),workTicket:ticket,executionWiringError:wiringError};
       const headers=new Headers(init?.headers||(input instanceof Request?input.headers:undefined));headers.set('Content-Type','application/json');
       const response=await nativeFetch(url,{...init,method:'POST',headers,body:JSON.stringify(payload)});
       if(!ticket)return response;
@@ -76,5 +80,5 @@
     }
   };
 
-  window.GotCrackedMarlonTaskGuard={version:'1.0.0',capabilities,ensureTicket,actionableIntent,highLevelIntent,get cachedCapabilities(){return capabilityCache}};
+  window.GotCrackedMarlonTaskGuard={version:'1.1.0',capabilities,ensureTicket,actionableIntent,highLevelIntent,get cachedCapabilities(){return capabilityCache}};
 })();

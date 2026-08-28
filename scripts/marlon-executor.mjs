@@ -9,7 +9,8 @@ const PLANNER='https://crackwave-ai.austncoe.workers.dev/executor/plan';
 const STATE='.marlon-executor-state.json';
 const REPO='ATCoe/gotcracked-portal';
 const LIVE='https://portal.gotcracked.co';
-const TEXT_EXT=new Set(['.js','.css','.html','.json']);
+const TEXT_EXT=new Set(['.js','.mjs','.cjs','.ts','.tsx','.css','.html','.json','.sql','.yml','.yaml','.md']);
+const SKIP_DIRS=new Set(['.git','node_modules','dist','build','.wrangler','.next','coverage']);
 const STOP=new Set(['this','that','with','from','have','need','full','done','portal','website','find','fix','bugs','issues','open','coding','update','thing','noticed','make','into','when','they','them','your','marlon']);
 
 const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
@@ -82,21 +83,29 @@ function auditIntent(ticket){
 function candidateFiles(ticket){
   const words=ticketWords(ticket);
   const rows=[];
-  for(const item of fs.readdirSync('.', {withFileTypes:true})){
-    if(!item.isFile()||!TEXT_EXT.has(path.extname(item.name).toLowerCase())) continue;
-    if(item.name===STATE) continue;
-    const content=fs.readFileSync(item.name,'utf8');
+  const files=[];
+  const walk=(dir='')=>{
+    for(const item of fs.readdirSync(dir||'.',{withFileTypes:true})){
+      const file=dir?`${dir}/${item.name}`:item.name;
+      if(item.isDirectory()){if(!SKIP_DIRS.has(item.name))walk(file);continue}
+      if(item.isFile()&&TEXT_EXT.has(path.extname(item.name).toLowerCase())&&file!==STATE)files.push(file);
+    }
+  };
+  walk();
+  for(const file of files){
+    const content=fs.readFileSync(file,'utf8');
     const lower=content.toLowerCase();
     let score=0;
     for(const word of words){
-      if(item.name.toLowerCase().includes(word)) score+=12;
+      if(file.toLowerCase().includes(word)) score+=12;
       if(lower.includes(word)) score+=Math.min(5,(lower.split(word).length-1));
     }
-    if(/directory|filter/.test(words.join(' ')) && /master-directory|directory-advanced/.test(item.name)) score+=40;
-    if(/mobile/.test(words.join(' ')) && /mobile/.test(item.name)) score+=35;
-    if(/dashboard/.test(words.join(' ')) && /dashboard|index/.test(item.name)) score+=30;
-    if(/support|marlon/.test(words.join(' ')) && /marlon|support/.test(item.name)) score+=30;
-    if(score>0) rows.push({path:item.name,content:content.slice(0,14000),score});
+    if(/directory|filter/.test(words.join(' ')) && /master-directory|directory-advanced/.test(file)) score+=40;
+    if(/mobile/.test(words.join(' ')) && /mobile/.test(file)) score+=35;
+    if(/dashboard/.test(words.join(' ')) && /dashboard|index/.test(file)) score+=30;
+    if(/support|marlon/.test(words.join(' ')) && /marlon|support/.test(file)) score+=30;
+    if(auditIntent(ticket)&&/marlon|support|workflow|supabase|cloudflare|package\.json/.test(file.toLowerCase()))score+=18;
+    if(score>0) rows.push({path:file,content:content.slice(0,12000),score});
   }
   rows.sort((a,b)=>b.score-a.score||a.path.localeCompare(b.path));
   const fallback=['index.html','app.js','portal-runtime-loader.js','portal-v1-release.css'];
@@ -104,7 +113,12 @@ function candidateFiles(ticket){
     if(rows.some(r=>r.path===file)||!fs.existsSync(file)) continue;
     rows.push({path:file,content:fs.readFileSync(file,'utf8').slice(0,14000),score:0});
   }
-  return rows.slice(0,8).map(({path,content})=>({path,content}));
+  let budget=46000;
+  return rows.slice(0,16).flatMap(({path,content})=>{
+    if(budget<1000)return[];
+    const selected=content.slice(0,budget);budget-=selected.length;
+    return[{path,content:selected}];
+  });
 }
 
 function applyPlan(ticket,candidates,plan){
@@ -115,7 +129,7 @@ function applyPlan(ticket,candidates,plan){
     const find=String(edit?.find||'');
     const replace=String(edit?.replace??'');
     if(!allowed.has(file)||!find) throw new Error(`Unsafe or unknown edit target: ${file}`);
-    if(ticket.change_level!=='high_level'&&protectedPath(file)) throw new Error(`Protected file requires high-level approval: ${file}`);
+    if(protectedPath(file)) throw new Error(`Protected file requires its dedicated deployment workflow: ${file}`);
     const source=fs.readFileSync(file,'utf8');
     const first=source.indexOf(find);
     const second=first<0?-1:source.indexOf(find,first+find.length);
@@ -245,7 +259,7 @@ async function checks(branch){
 }
 
 async function verifyLive(state){
-  const wanted=state.changedPaths.filter(p=>TEXT_EXT.has(path.extname(p).toLowerCase()));
+  const wanted=state.changedPaths.filter(p=>!p.includes('/')&&['.js','.css','.html','.json'].includes(path.extname(p).toLowerCase()));
   const pending=new Set(wanted);
   for(let attempt=0;attempt<24 && pending.size;attempt++){
     for(const file of [...pending]){
