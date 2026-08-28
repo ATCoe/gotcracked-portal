@@ -154,8 +154,9 @@ async function prepare(){
   try{
     heartbeatStage='diagnosing';
     await report(token,runId,'diagnosing',{metadata:{prior_history_count:(claim.history||[]).length}});
-    const candidates=candidateFiles(ticket);
-    const ticketWithHistory={...ticket,prior_history:claim.history||[]};
+    const repositoryScope=String(ticket.context?.repository_execution_scope||'').trim();
+    const ticketWithHistory=repositoryScope?{...ticket,description:repositoryScope,context:{...(ticket.context||{}),parent_requested_scope:ticket.context?.requested_scope||ticket.description||'',requested_scope:repositoryScope},prior_history:claim.history||[]}:{...ticket,prior_history:claim.history||[]};
+    const candidates=candidateFiles(ticketWithHistory);
     const planned=await post(PLANNER,token,{ticket:ticketWithHistory,candidates});
     const plan=planned.plan||{};
     if(!Array.isArray(plan.edits)||plan.edits.length===0){
