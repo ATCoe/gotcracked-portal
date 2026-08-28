@@ -5,8 +5,8 @@
   const client = window.supabaseClient;
   if (!client) return;
 
-  const VERSION = '20260827-profile-save2';
-  const state = {profiles:[], selected:null, canManage:false, busy:false, previewUrl:null};
+  const VERSION = '20260828-compensation1';
+  const state = {profiles:[], compensation:[], selected:null, canManage:false, canManagePay:false, busy:false, previewUrl:null};
 
   const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
@@ -17,12 +17,23 @@
   const presetSvg = value => window.GotCrackedAvatarPresets?.render?.(value) || '';
   const initials = name => String(name || 'GC').trim().split(/\s+/).slice(0,2).map(x => x[0] || '').join('').toUpperCase() || 'GC';
   const roleLabel = v => String(v || 'staff').replaceAll('_',' ').replace(/\b\w/g, c => c.toUpperCase());
+  const dollars = cents => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format((Number(cents)||0)/100);
+  const payFor = id => state.compensation.find(x => x.profile_id === id) || null;
+  function paySummaryMarkup(p) {
+    if (!state.canManagePay) return '';
+    const pay=payFor(p.id), type=pay?.employment_type || (p.role==='owner'?'owner':'hourly');
+    let amount='Not set';
+    if(type==='hourly') amount=pay?.hourly_rate_cents>0?`${dollars(pay.hourly_rate_cents)}/hr`:'Not set';
+    if(type==='salary') amount=pay?.weekly_salary_cents>0?`${dollars(pay.weekly_salary_cents*52)}/yr`:'Not set';
+    if(type==='owner') amount='Owner / no payroll wage';
+    return `<article class="gc-profile-bio"><h2>Compensation</h2><p><strong>${esc(roleLabel(type))}</strong> · ${esc(amount)}${pay?.effective_at?` · effective ${esc(pay.effective_at)}`:''}</p></article>`;
+  }
 
   function style() {
     if (document.querySelector('link[data-gc-staff-profiles]')) return;
     const l = document.createElement('link');
     l.rel = 'stylesheet';
-    l.href = 'staff-profiles.css?v=20260826-sp2';
+    l.href = 'staff-profiles.css?v=20260828-comp1';
     l.dataset.gcStaffProfiles = 'true';
     document.head.appendChild(l);
   }
@@ -109,6 +120,7 @@
 
     const perm = await client.rpc('has_permission', {permission_key:'staff.manage'});
     state.canManage = Boolean(perm.data);
+    state.canManagePay = current()?.role === 'owner';
 
     const {data, error} = await client
       .from('profiles')
@@ -122,6 +134,11 @@
     }
 
     state.profiles = data || [];
+    if (state.canManagePay) {
+      const pay = await client.from('staff_compensation').select('*').eq('location_id', p.location_id);
+      if (pay.error) console.warn('Staff compensation unavailable:', pay.error.message);
+      state.compensation = pay.data || [];
+    } else state.compensation = [];
     syncCurrentProfile();
     renderProfileView(state.selected || current()?.id);
     renderStaffCards();
@@ -155,7 +172,7 @@
 
     state.selected = p.id;
     const canEdit = p.id === current()?.id || state.canManage;
-    host.innerHTML = `<div class="gc-profile-page-head"><div><p class="eyebrow">Staff identity</p><h1>${p.id === current()?.id ? 'My profile' : 'Employee profile'}</h1><p>Profile details are used throughout the Portal for staff identity and repair activity.</p></div>${canEdit ? `<button class="primary-button" type="button" data-edit-profile="${p.id}">Edit profile</button>` : ''}</div><section class="gc-profile-hero"><div class="gc-profile-photo">${avatarMarkup(p,'xl')}</div><div class="gc-profile-copy"><h2>${esc(p.display_name)}</h2><p>${esc(p.job_title || roleLabel(p.role))}</p><div class="gc-profile-badges"><span>${esc(roleLabel(p.role))}</span><span>${p.active ? 'Active' : 'Inactive'}</span>${p.discord_user_id ? '<span>Discord linked</span>' : ''}${p.onboarding_status && p.onboarding_status !== 'active' ? `<span>${esc(p.onboarding_status.replaceAll('_',' '))}</span>` : ''}${isPreset(p.avatar_url) ? '<span>GotCracked avatar</span>' : ''}</div></div></section><div class="gc-profile-grid"><article><small>Portal login</small><strong>${esc(p.portal_email || 'Legacy account')}</strong></article><article><small>Portal role</small><strong>${esc(roleLabel(p.role))}</strong></article><article><small>Discord</small><strong>${esc(p.discord_username || (p.discord_user_id ? 'Linked' : 'Not linked'))}</strong></article><article><small>Onboarding</small><strong>${esc((p.onboarding_status || 'active').replaceAll('_',' '))}</strong></article></div><article class="gc-profile-bio"><h2>About</h2><p>${esc(p.bio || 'No profile bio yet.')}</p></article>`;
+    host.innerHTML = `<div class="gc-profile-page-head"><div><p class="eyebrow">Staff identity</p><h1>${p.id === current()?.id ? 'My profile' : 'Employee profile'}</h1><p>Profile details are used throughout the Portal for staff identity and repair activity.</p></div>${canEdit ? `<button class="primary-button" type="button" data-edit-profile="${p.id}">Edit profile</button>` : ''}</div><section class="gc-profile-hero"><div class="gc-profile-photo">${avatarMarkup(p,'xl')}</div><div class="gc-profile-copy"><h2>${esc(p.display_name)}</h2><p>${esc(p.job_title || roleLabel(p.role))}</p><div class="gc-profile-badges"><span>${esc(roleLabel(p.role))}</span><span>${p.active ? 'Active' : 'Inactive'}</span>${p.discord_user_id ? '<span>Discord linked</span>' : ''}${p.onboarding_status && p.onboarding_status !== 'active' ? `<span>${esc(p.onboarding_status.replaceAll('_',' '))}</span>` : ''}${isPreset(p.avatar_url) ? '<span>GotCracked avatar</span>' : ''}</div></div></section><div class="gc-profile-grid"><article><small>Portal login</small><strong>${esc(p.portal_email || 'Legacy account')}</strong></article><article><small>Portal role</small><strong>${esc(roleLabel(p.role))}</strong></article><article><small>Discord</small><strong>${esc(p.discord_username || (p.discord_user_id ? 'Linked' : 'Not linked'))}</strong></article><article><small>Onboarding</small><strong>${esc((p.onboarding_status || 'active').replaceAll('_',' '))}</strong></article></div><article class="gc-profile-bio"><h2>About</h2><p>${esc(p.bio || 'No profile bio yet.')}</p></article>${paySummaryMarkup(p)}`;
   }
 
   function renderStaffCards() {
@@ -172,6 +189,33 @@
     }
 
     host.innerHTML = `<div class="card-title"><div><h2>Employee profiles</h2><p>Names, photos, job titles, and team identity used throughout the Portal.</p></div></div><div class="gc-staff-profile-grid">${state.profiles.map(p => `<button type="button" class="gc-staff-profile-card" data-open-profile="${p.id}">${avatarMarkup(p,'lg')}<span><strong>${esc(p.display_name)}</strong><small>${esc(p.job_title || roleLabel(p.role))}</small></span><em>${p.active ? 'Active' : 'Inactive'}</em></button>`).join('')}</div>`;
+  }
+
+  function ensureCompensationFields(form,p) {
+    form.querySelector('[data-compensation-fields]')?.remove();
+    if (!state.canManagePay) return;
+    const pay=payFor(p.id), type=pay?.employment_type || (p.role==='owner'?'owner':'hourly');
+    const hourly=((pay?.hourly_rate_cents||0)/100).toFixed(2);
+    const annual=((pay?.weekly_salary_cents||0)*52/100).toFixed(2);
+    const effective=pay?.effective_at || new Date().toISOString().slice(0,10);
+    const section=document.createElement('section'); section.className='gc-profile-compensation full'; section.dataset.compensationFields='true';
+    const typeOptions=p.role==='owner'?'<option value="owner">Owner</option><option value="hourly">Hourly</option><option value="salary">Salary</option>':'<option value="hourly">Hourly</option><option value="salary">Salary</option>';
+    section.innerHTML=`<div class="gc-profile-comp-head"><div><strong>Compensation</strong><small>Owner only. Used for labor reporting and repair-pricing cost basis.</small></div></div><div class="gc-profile-comp-grid"><label>Pay type<select name="pay_type">${typeOptions}</select></label><label data-pay-hourly>Hourly wage ($/hr)<input name="hourly_wage" type="number" min="0" max="1000" step="0.01" value="${hourly}"></label><label data-pay-salary>Annual salary ($/year)<input name="annual_salary" type="number" min="0" max="10000000" step="100" value="${annual}"></label><label>Effective date<input name="pay_effective_at" type="date" value="${effective}" required></label></div><p>Salary labor cost is converted to an hourly equivalent using a 40-hour work week for pricing and labor planning.</p>`;
+    form.querySelector('.gc-profile-message')?.insertAdjacentElement('beforebegin',section);
+    const select=section.querySelector('[name="pay_type"]'); select.value=type;
+    const sync=()=>{section.querySelector('[data-pay-hourly]').hidden=select.value!=='hourly';section.querySelector('[data-pay-salary]').hidden=select.value!=='salary'};
+    select.addEventListener('change',sync); sync();
+  }
+
+  async function saveCompensation(form,profileId) {
+    if (!state.canManagePay) return;
+    const type=form.elements.pay_type?.value || 'hourly';
+    const hourly=Math.max(0,Number(form.elements.hourly_wage?.value||0));
+    const annual=Math.max(0,Number(form.elements.annual_salary?.value||0));
+    const effective=form.elements.pay_effective_at?.value || new Date().toISOString().slice(0,10);
+    const row={profile_id:profileId,location_id:current().location_id,employment_type:type,hourly_rate_cents:type==='hourly'?Math.round(hourly*100):0,weekly_salary_cents:type==='salary'?Math.round(annual*100/52):0,effective_at:effective,updated_at:new Date().toISOString()};
+    const result=await client.from('staff_compensation').upsert(row,{onConflict:'profile_id'});
+    if(result.error) throw result.error;
   }
 
   function revokePreview() {
@@ -205,6 +249,7 @@
     f.elements.bio.value = p.bio || '';
     f.elements.avatar.value = '';
     f.elements.avatar_preset.value = isPreset(p.avatar_url) ? p.avatar_url : '';
+    ensureCompensationFields(f,p);
     f.querySelector('[data-avatar-gallery]').innerHTML = presetGalleryMarkup(isPreset(p.avatar_url) ? p.avatar_url : '');
     setDialogPreview(f, p, p.avatar_url || '');
     f.querySelector('.gc-profile-message').textContent = '';
@@ -274,6 +319,7 @@
 
       const saved = Array.isArray(result.data) ? result.data[0] : result.data;
       mergeSavedProfile(saved);
+      await saveCompensation(form, String(data.id));
 
       // Re-read after the write so the user never sees stale profile state.
       await load();

@@ -10,6 +10,7 @@
   let settings = null;
   let inventory = [];
   let guides = [];
+  let laborBasis = null;
   let canManageSettings = false;
   let canManageInventory = false;
 
@@ -46,16 +47,18 @@
 
   async function load(){
     if (training()) {
-      const local = trainingState(); settings=local.settings; inventory=local.inventory; guides=local.guides; return;
+      const local = trainingState(); settings=local.settings; inventory=local.inventory; guides=local.guides; laborBasis=null; return;
     }
-    const [business,parts,refs] = await Promise.all([
+    const [business,parts,refs,basis] = await Promise.all([
       client.from('business_settings').select('location_id,target_gross_margin_percent,target_splh,target_labor_percent,charge_parts_to_customer,auto_service_taxable,custom_pc_build_service_charge_cents,custom_pc_build_estimate_valid_days').eq('location_id',profile.location_id).maybeSingle(),
       client.from('inventory_items').select('id,sku,name,category,cost_cents,sell_price_cents,repair_guide_id,estimated_repair_minutes').eq('location_id',profile.location_id).eq('active',true).order('name'),
-      client.from('repair_guides').select('id,title,device_category,manufacturer,model_family,bench_time_minutes').eq('location_id',profile.location_id).eq('active',true).order('device_category').order('title')
+      client.from('repair_guides').select('id,title,device_category,manufacturer,model_family,bench_time_minutes').eq('location_id',profile.location_id).eq('active',true).order('device_category').order('title'),
+      client.rpc('get_pricing_labor_basis')
     ]);
     if (!business.error) settings=business.data;
     if (!parts.error) inventory=parts.data||[];
     if (!refs.error) guides=refs.data||[];
+    if (!basis.error) laborBasis=basis.data||null;
   }
 
   function partOptions(){
@@ -69,12 +72,14 @@
     const host=document.getElementById('settings');
     if(!host||!isManager()) return;
     document.getElementById('gc-pricing-engine-settings')?.remove();
-    const hourlyLabor=(Number(settings?.target_splh||0)*Number(settings?.target_labor_percent||0));
+    const fallbackHourly=(Number(settings?.target_splh||0)*Number(settings?.target_labor_percent||0));
+    const hourlyLaborCents=Number(laborBasis?.hourly_cents ?? Math.round(fallbackHourly*100));
+    const laborSource=laborBasis?.source==='blended_employee_compensation'?`blended from ${Number(laborBasis?.employee_count||0)} active bench-capable wage profile(s)`:'SPLH × labor % fallback until employee compensation is configured';
     host.insertAdjacentHTML('beforeend',`<section id="gc-pricing-engine-settings" class="card">
       <div class="card-title"><div><p class="eyebrow">Pricing engine</p><h2>Repair pricing targets</h2></div></div>
       <form id="gc-pricing-target-form" class="settings-list">
         <label>Target gross margin (%)<input name="target_gm" type="number" min="0" max="94" step="0.5" value="${Number(settings?.target_gross_margin_percent ?? 50)}" required></label>
-        <div class="demo-note"><strong>Current labor-cost basis:</strong> ${money(Math.round(hourlyLabor*100))}/bench hour. Portal derives this from target SPLH × target labor %. The repair target is calculated from part acquisition cost + estimated labor cost, then grossed up to the target GM.</div>
+        <div class="demo-note"><strong>Current labor-cost basis:</strong> ${money(hourlyLaborCents)}/bench hour · ${esc(laborSource)}. Portal blends active bench-capable employee compensation into one consistent bench-hour cost; hourly wages are used directly and salaries are converted to a 40-hour weekly equivalent. The repair target is calculated from part acquisition cost + estimated labor cost, then grossed up to the target GM.</div>
         <div class="demo-note"><strong>Current part mode:</strong> ${settings?.charge_parts_to_customer?'Parts shown separately + labor/service companion':'Part consumed internally at $0 + bundled Repair Service charge'}. Existing quotes are never repriced when this setting changes.</div>
         <p class="auth-message" role="status"></p><button class="primary-button" type="submit">Save target margin</button>
       </form>
