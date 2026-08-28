@@ -16,6 +16,7 @@ jobs:
       - name: Parse payment runtime
         run: |
           node --check checkout-receipts.js
+          node --check payment-center.js
           node --check portal-runtime-loader.js
       - name: Verify single runtime ownership
         run: |
@@ -23,14 +24,14 @@ jobs:
           const fs = require('fs');
           const loader = fs.readFileSync('portal-runtime-loader.js','utf8');
           const index = fs.readFileSync('index.html','utf8');
-          const retiredRuntime = ['leads.js','portal-live.js','payment-center.js','intake-modal-release.js','sales-ops-bootstrap.js'];
+          const retiredRuntime = ['leads.js','portal-live.js','intake-modal-release.js','sales-ops-bootstrap.js'];
           for (const file of retiredRuntime) {
             if (loader.includes(`'${file}'`) || loader.includes(`"${file}"`)) throw new Error(`${file} must not be loaded by the production runtime`);
           }
           for (const file of ['leads.js','intake-modal-release.js','sales-ops-bootstrap.js']) {
             if (fs.existsSync(file)) throw new Error(`${file} is fully retired and must not remain in the repository`);
           }
-          for (const file of ['sales-ops.js','dashboard-rail.js','checkout-receipts.js']) {
+          for (const file of ['payment-center.js','sales-ops.js','dashboard-rail.js','checkout-receipts.js']) {
             if (!loader.includes(`'${file}'`) && !loader.includes(`"${file}"`)) throw new Error(`${file} must be loaded by the authenticated runtime`);
           }
           for (const css of ['intake-modal-release.css','sales-ops.css','checkout-receipts.css']) {
