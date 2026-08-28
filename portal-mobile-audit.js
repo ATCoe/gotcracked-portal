@@ -43,7 +43,7 @@
   }
 
   async function loadMarlon() {
-    const version = '20260828-marlon28';
+    const version = '20260828-marlon-avatar-upload1';
     loadStyle(`marlon-assistant.css?v=${version}`, 'gcMarlonStyle');
     loadStyle(`marlon-extensions.css?v=${version}`, 'gcMarlonExtensions');
     loadStyle(`marlon-activity.css?v=${version}`, 'gcMarlonActivityStyle');
