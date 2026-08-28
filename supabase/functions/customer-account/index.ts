@@ -60,13 +60,28 @@ Deno.serve(async request => {
     }
     const receiptByTicket=new Map(receipts.map((r:any)=>[r.ticket_id,r]));
     const eventsByTicket=new Map<string,any[]>();for(const e of events){if(!eventsByTicket.has(e.ticket_id))eventsByTicket.set(e.ticket_id,[]);eventsByTicket.get(e.ticket_id)!.push({type:e.event_type,message:e.message,createdAt:e.created_at});}
+    const locationIds=[...new Set(repairs.map((r:any)=>r.location_id).filter(Boolean))];
+    let paymentSettings:any[]=[];let paymentConnections:any[]=[];
+    if(locationIds.length){
+      const [settingsResult,connectionsResult]=await Promise.all([
+        admin.from('business_settings').select('location_id,currency_code,online_payment_provider_key,customer_online_payments_enabled,customer_online_partial_payments,customer_online_payment_stages,payment_checkout_expiry_minutes').in('location_id',locationIds),
+        admin.from('payment_provider_connections').select('location_id,provider_key,display_name,connection_status,environment,capabilities').in('location_id',locationIds)
+      ]);
+      if(settingsResult.error)throw settingsResult.error;if(connectionsResult.error)throw connectionsResult.error;
+      paymentSettings=settingsResult.data||[];paymentConnections=connectionsResult.data||[];
+    }
+    const settingsByLocation=new Map(paymentSettings.map((s:any)=>[s.location_id,s]));
+    const connectionByKey=new Map(paymentConnections.map((c:any)=>[`${c.location_id}:${c.provider_key}`,c]));
     const safeRepairs=repairs.map((r:any)=>{
       const total=Math.max(0,Number(r.total_cents||0));const estimate=Math.max(0,Number(r.estimate_cents||0));const paid=Math.max(0,Number(r.amount_paid_cents||0));const due=Math.max(0,total-paid);
-      const receipt:any=receiptByTicket.get(r.id)||null;
-      return {id:r.id,ticket:`GC-${String(r.ticket_number).padStart(6,'0')}`,ticketNumber:r.ticket_number,status:r.status,issue:r.customer_issue,device:r.devices||null,estimateCents:estimate,totalCents:total,subtotalCents:Math.max(0,Number(r.subtotal_cents||0)),taxCents:Math.max(0,Number(r.tax_cents||0)),amountPaidCents:paid,balanceDueCents:due,paymentStatus:r.payment_status,approvedAt:r.approved_at,promisedAt:r.promised_at,checkedInAt:r.checked_in_at,completedAt:r.completed_at,pickupAt:r.pickup_at,readyForPickupAt:r.ready_for_pickup_at,updatedAt:r.updated_at,publicNotes:r.public_notes,warrantyExpiresAt:r.warranty_expires_at,intakeMethod:r.intake_method,partsStatus:r.parts_status,shippingStatus:r.shipping_status,outboundCarrier:r.outbound_carrier,outboundTracking:r.outbound_tracking,shippedAt:r.shipped_at,deliveredAt:r.delivered_at,events:eventsByTicket.get(r.id)||[],receipt:receipt?{id:receipt.id,number:receipt.receipt_number,businessDate:receipt.business_date,deviceDescription:receipt.device_description,subtotalCents:receipt.subtotal_cents,taxCents:receipt.tax_cents,totalCents:receipt.total_cents,amountPaidCents:receipt.amount_paid_cents,paymentMethod:receipt.payment_method,lineItems:receipt.line_items,createdAt:receipt.created_at}:null,actions:{canApprove:r.status==='awaiting_approval',canDecline:r.status==='awaiting_approval',canPay:due>0&&['repaired','ready_for_pickup','quality_inspection','sale_complete'].includes(String(r.status))}};
+      const receipt:any=receiptByTicket.get(r.id)||null;const settings:any=settingsByLocation.get(r.location_id)||{};const provider=String(settings.online_payment_provider_key||'').trim();const connection:any=connectionByKey.get(`${r.location_id}:${provider}`)||null;
+      const stages=Array.isArray(settings.customer_online_payment_stages)?settings.customer_online_payment_stages:['quality_inspection','repaired','ready_for_pickup'];const paymentEligible=due>0&&stages.includes(String(r.status));const customerEnabled=Boolean(settings.customer_online_payments_enabled);const providerConnected=Boolean(connection&&connection.connection_status==='connected');const paymentAvailable=paymentEligible&&customerEnabled&&providerConnected;
+      const paymentMessage=paymentAvailable?`Pay securely with ${connection.display_name||'GotCracked online checkout'}. Payment is applied only after provider verification.`:provider?(customerEnabled?`${connection?.display_name||'The selected payment provider'} is configured in GotCracked but is not connected yet. Your balance is ready for online checkout as soon as the provider API is wired.`:'Online checkout architecture is ready. Customer payment will activate when the selected provider is connected and enabled.'):'Online checkout architecture is ready. Your balance will become payable here after GotCracked connects a payment provider.';
+      const onlinePayment={architectureReady:true,available:paymentAvailable,eligible:paymentEligible,provider:provider||null,providerLabel:connection?.display_name||null,connectionStatus:connection?.connection_status||'disconnected',environment:connection?.environment||'test',partialPayments:Boolean(settings.customer_online_partial_payments),message:paymentMessage};
+      return {id:r.id,ticket:`GC-${String(r.ticket_number).padStart(6,'0')}`,ticketNumber:r.ticket_number,status:r.status,issue:r.customer_issue,device:r.devices||null,estimateCents:estimate,totalCents:total,subtotalCents:Math.max(0,Number(r.subtotal_cents||0)),taxCents:Math.max(0,Number(r.tax_cents||0)),amountPaidCents:paid,balanceDueCents:due,paymentStatus:r.payment_status,approvedAt:r.approved_at,promisedAt:r.promised_at,checkedInAt:r.checked_in_at,completedAt:r.completed_at,pickupAt:r.pickup_at,readyForPickupAt:r.ready_for_pickup_at,updatedAt:r.updated_at,publicNotes:r.public_notes,warrantyExpiresAt:r.warranty_expires_at,intakeMethod:r.intake_method,partsStatus:r.parts_status,shippingStatus:r.shipping_status,outboundCarrier:r.outbound_carrier,outboundTracking:r.outbound_tracking,shippedAt:r.shipped_at,deliveredAt:r.delivered_at,events:eventsByTicket.get(r.id)||[],receipt:receipt?{id:receipt.id,number:receipt.receipt_number,businessDate:receipt.business_date,deviceDescription:receipt.device_description,subtotalCents:receipt.subtotal_cents,taxCents:receipt.tax_cents,totalCents:receipt.total_cents,amountPaidCents:receipt.amount_paid_cents,paymentMethod:receipt.payment_method,lineItems:receipt.line_items,createdAt:receipt.created_at}:null,onlinePayment,actions:{canApprove:r.status==='awaiting_approval',canDecline:r.status==='awaiting_approval',canPay:paymentEligible}};
     });
-    const primary=customers[0]||{};
-    return {customer:{firstName:primary.first_name||'',lastName:primary.last_name||'',email:session.verified_email,preferredContact:primary.preferred_contact||'email'},repairs:safeRepairs,onlinePayment:{available:false,provider:null,message:'Secure online card payment is not connected yet. Your balance is shown here and will become payable from this screen when the verified payment provider is enabled.'},meta:{sessionExpiresAt:session.expires_at,repairCount:safeRepairs.length}};
+    const primary=customers[0]||{};const primaryPayment=safeRepairs.find((r:any)=>r.onlinePayment?.eligible)?.onlinePayment||safeRepairs[0]?.onlinePayment||{architectureReady:true,available:false,provider:null,connectionStatus:'disconnected',message:'Online checkout architecture is ready. It will activate here when GotCracked connects a payment provider.'};
+    return {customer:{firstName:primary.first_name||'',lastName:primary.last_name||'',email:session.verified_email,preferredContact:primary.preferred_contact||'email'},repairs:safeRepairs,onlinePayment:primaryPayment,meta:{sessionExpiresAt:session.expires_at,repairCount:safeRepairs.length}};
   };
 
   try{
@@ -128,6 +143,20 @@ Deno.serve(async request => {
     if(action==='profile'){
       const session=await sessionFromRequest();if(!session)return reply(origin,{error:'Your customer session has expired. Sign in again.'},401);
       return reply(origin,{ok:true,...await accountBundle(session)});
+    }
+
+    if(action==='create_payment_checkout'){
+      const session=await sessionFromRequest();if(!session)return reply(origin,{error:'Your customer session has expired. Sign in again.'},401);
+      await rate('customer-account-payment',`${session.id}|${ip}`,10,900);
+      const ticketId=String(body?.ticketId||'').trim();
+      const owned=await admin.from('repair_tickets').select('id,customer_id,total_cents,amount_paid_cents').eq('id',ticketId).in('customer_id',session.customer_ids).maybeSingle();
+      if(owned.error)throw owned.error;if(!owned.data)return reply(origin,{error:'Repair not found.'},404);
+      const due=Math.max(0,Number(owned.data.total_cents||0)-Number(owned.data.amount_paid_cents||0));
+      if(due<=0)return reply(origin,{error:'This repair has no remaining balance.'},409);
+      const gateway=await fetch(`${url}/functions/v1/payment-gateway`,{method:'POST',headers:{Authorization:`Bearer ${serviceKey}`,'Content-Type':'application/json'},body:JSON.stringify({action:'create_checkout',ticketId,amountCents:due})});
+      const result=await gateway.json().catch(()=>({}));
+      if(!gateway.ok)return reply(origin,{error:result?.error||'Secure payment checkout is not available yet.',code:result?.code||'PAYMENT_CHECKOUT_UNAVAILABLE',architectureReady:result?.architectureReady===true},gateway.status);
+      return reply(origin,{ok:true,checkoutUrl:result.checkoutUrl,provider:result.provider,providerLabel:result.providerLabel,expiresAt:result.expiresAt});
     }
 
     if(action==='approve_estimate'||action==='decline_estimate'){
