@@ -36,6 +36,15 @@ html[data-theme='light'] .gc-marlon-activity-task{color:#315465}html[data-theme=
 .gc-recognition-label{font-size:11px;font-weight:900;opacity:.8}
 .gc-recognition .gc-books-muted{opacity:.68;font-size:12px}
 
+/* Recognition is created dynamically after login. Scope its dark palette explicitly
+   instead of relying on the legacy --card fallback, which is white when --card is unset. */
+html[data-theme='dark'] .gc-recognition-card{background:#0e1925!important;border-color:#2b3c4f!important;color:#edf4fb!important;box-shadow:0 8px 24px rgba(0,0,0,.16)}
+html[data-theme='dark'] .gc-recognition-avatar{background:#172638!important;color:#dcecff!important;border:1px solid #2b3c4f}
+html[data-theme='dark'] .gc-recognition-head strong,html[data-theme='dark'] .gc-recognition-rank,html[data-theme='dark'] .gc-recognition-metrics strong{color:#edf4fb!important}
+html[data-theme='dark'] .gc-recognition-head small,html[data-theme='dark'] .gc-recognition-metrics small{color:#9eafc2!important}
+html[data-theme='dark'] .gc-recognition-metrics div{background:#142233!important;border:1px solid rgba(75,104,132,.18)}
+html[data-theme='dark'] .gc-recognition-label{color:#7fbaff!important}
+
 @media(max-width:1050px){.gc-recognition-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){
   .gc-recognition-grid{grid-template-columns:1fr}
