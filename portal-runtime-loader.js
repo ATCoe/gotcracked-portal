@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260828-payment-architecture1';
+  const VERSION = '20260828-workstation1';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -15,6 +15,7 @@
     'mobile-runtime-regression-fixes.js',
     'portal-refresh-stability.js',
     'operations-v1-core.js',
+    'workstation-mode.js',
     'payment-center.js',
     'portal-current-ui-fixes.js',
     'mobile-dialog-compat.js',
