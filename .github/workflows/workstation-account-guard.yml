@@ -17,6 +17,7 @@ jobs:
       - name: Parse workstation runtime
         run: |
           node --check workstation-mode.js
+          node --check operator-pin.js
           node --check portal-runtime-loader.js
       - name: Verify shared account boundary
         run: |
@@ -24,9 +25,13 @@ jobs:
           const fs=require('fs');
           const runtime=fs.readFileSync('portal-runtime-loader.js','utf8');
           const mode=fs.readFileSync('workstation-mode.js','utf8');
+          const pins=fs.readFileSync('operator-pin.js','utf8');
           const migration=fs.readFileSync('supabase/migrations/0075_shared_front_desk_workstation.sql','utf8');
+          const pinMigration=fs.readFileSync('supabase/migrations/0076_human_operator_pins_and_reset_dm.sql','utf8');
+          const dmRoute=fs.readFileSync('supabase/migrations/0077_operator_pin_reset_dm_route.sql','utf8');
+          const dmWorker=fs.readFileSync('supabase/functions/operator-pin-reset-dm/index.ts','utf8');
           if(!runtime.includes("'workstation-mode.js'")) throw new Error('Workstation mode must load after authentication.');
-          for(const token of ['shared_workstation','Basic workflow only','gc-workstation-hidden','ALLOWED_VIEWS']) {
+          for(const token of ['shared_workstation','Basic workflow only','gc-workstation-hidden','ALLOWED_VIEWS','operator-pin.js']) {
             if(!mode.includes(token)) throw new Error(`Workstation runtime missing ${token}`);
           }
           for(const token of [
@@ -42,6 +47,15 @@ jobs:
           ]) {
             if(!migration.includes(token)) throw new Error(`Workstation data boundary missing ${token}`);
           }
+          for(const token of ['staff_operator_pins','extensions.crypt','verify_workstation_operator_pin','request_operator_pin_reset','4 hours','5 minutes','operator_pin_reset']) {
+            if(!pinMigration.includes(token)) throw new Error(`Operator PIN data boundary missing ${token}`);
+          }
+          for(const token of ['Workstation PIN','Forgot PIN?','PIN setup required','get_my_operator_pin_status','verify_workstation_operator_pin','Reset PIN & DM employee']) {
+            if(!pins.includes(token)) throw new Error(`Operator PIN UI missing ${token}`);
+          }
+          if(!dmRoute.includes('operator-pin-reset-dm')) throw new Error('Operator PIN reset must route to the Marlon DM worker.');
+          if(!dmWorker.includes('Marlon · Front Desk PIN reset')||!dmWorker.includes('never ask you to send your PIN')) throw new Error('Marlon PIN reset DM safety copy is missing.');
           if(migration.includes("'timeclock.use',")) throw new Error('Shared workstation must never receive time-clock access.');
-          console.log('Shared workstation boundary is present.');
+          if(pinMigration.includes('pin_hash text not null')) throw new Error('Reset state must allow a null PIN hash.');
+          console.log('Shared workstation and human operator PIN boundaries are present.');
           NODE
