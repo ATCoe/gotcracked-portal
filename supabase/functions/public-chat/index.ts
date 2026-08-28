@@ -34,6 +34,33 @@ async function discord(path: string, init: RequestInit = {}) {
   return response.status === 204 ? null : response.json();
 }
 
+async function marlonCustomerReply(admin: ReturnType<typeof createClient>, sessionId: string, threadId: string | null, context: Record<string,unknown> = {}) {
+  try {
+    const history = await admin.from('website_chat_messages').select('sender,body').eq('session_id',sessionId).order('created_at',{ascending:true}).limit(30);
+    if (history.error) throw history.error;
+    const messages = (history.data || []).slice(-14).map((item:any) => ({ role:item.sender==='customer'?'user':'assistant', content:clean(item.body) }));
+    const response = await fetch('https://crackwave-ai.austncoe.workers.dev/public/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'}, signal:AbortSignal.timeout(15000),
+      body:JSON.stringify({ messages, context:{ path:'/customer-chat', page:'GotCracked customer chat', ...context } })
+    });
+    if (!response.ok) return null;
+    const payload:any = await response.json();
+    const reply = clean(payload?.reply);
+    if (!reply) return null;
+    let discordMessageId:string|null = null;
+    if (threadId) {
+      const posted = await discord(`/channels/${threadId}/messages`, { method:'POST', body:JSON.stringify({ allowed_mentions:{parse:[]}, content:`**Marlon Customer Care**\n${reply}` }) });
+      discordMessageId = posted?.id || null;
+    }
+    const saved = await admin.from('website_chat_messages').insert({ session_id:sessionId, sender:'system', body:reply, discord_message_id:discordMessageId });
+    if (saved.error) throw saved.error;
+    return { sender:'system', body:reply, created_at:new Date().toISOString() };
+  } catch (error) {
+    console.error('Marlon Customer Care reply unavailable:', error);
+    return null;
+  }
+}
+
 Deno.serve(async request => {
   const origin = request.headers.get('Origin');
   if (request.method === 'OPTIONS') return new Response('ok', { headers: cors(origin) });
@@ -63,7 +90,9 @@ Deno.serve(async request => {
       const posted = await discord(`/channels/${thread.id}/messages`, { method:'POST', body:JSON.stringify({ allowed_mentions:{parse:[]}, content:`**Customer · ${name}**\n${message}` }) });
       await admin.from('website_chat_sessions').update({ discord_message_id:parent.id, discord_thread_id:thread.id, updated_at:new Date().toISOString() }).eq('id',created.data.id);
       await admin.from('website_chat_messages').insert({ session_id:created.data.id, sender:'customer', body:message, discord_message_id:posted.id });
-      return json(origin, { ok:true, sessionId:created.data.id, token, messages:[{sender:'customer',body:message,created_at:new Date().toISOString()}] }, 201);
+      const customerMessage={sender:'customer',body:message,created_at:new Date().toISOString()};
+      const marlon=await marlonCustomerReply(admin,created.data.id,thread.id,{service:clean(body.service,120)});
+      return json(origin, { ok:true, sessionId:created.data.id, token, messages:[customerMessage,...(marlon?[marlon]:[])] }, 201);
     }
 
     const sessionId = clean(body.sessionId, 80), token = clean(body.token, 200);
@@ -80,6 +109,7 @@ Deno.serve(async request => {
       const posted = await discord(`/channels/${session.data.discord_thread_id}/messages`, { method:'POST', body:JSON.stringify({ allowed_mentions:{parse:[]}, content:`**Customer · ${session.data.customer_name}**\n${message}` }) });
       const saved = await admin.from('website_chat_messages').insert({ session_id:sessionId, sender:'customer', body:message, discord_message_id:posted.id });
       if (saved.error) throw saved.error;
+      await marlonCustomerReply(admin,sessionId,session.data.discord_thread_id);
     } else if (action === 'poll') {
       if (!(await allow(admin,request,'public-chat-poll',300,900))) return json(origin,{error:'Chat refresh limit reached. Please wait a moment and try again.'},429);
     } else {
