@@ -1,0 +1,101 @@
+/* Visual audit fixes: keep late-loaded modules within the portal canvas and
+   preserve readable surfaces in both themes. */
+.view {
+  padding-bottom: 128px;
+}
+
+.v1-stage-tabs {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+#staff-invite-form.settings-list label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+  align-items: start;
+}
+
+#staff-invite-form.settings-list input,
+#staff-invite-form.settings-list select,
+#staff-invite-form.settings-list textarea {
+  width: 100%;
+}
+
+#staff-invite-form .gc-welcome-grid {
+  min-width: 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+#staff-invite-form .gc-welcome-grid label {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+#gc-bookkeeper-report.gc-books {
+  grid-template-columns: minmax(0, 1fr) !important;
+  min-width: 0;
+  max-width: 100%;
+}
+
+#gc-bookkeeper-report > *,
+#gc-bookkeeper-report .gc-books-grid,
+#gc-bookkeeper-report .gc-books-card,
+#gc-bookkeeper-report .gc-books-kpis,
+#gc-bookkeeper-report .gc-books-kpi {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#gc-bookkeeper-report .gc-books-card,
+#gc-bookkeeper-report .gc-books-kpi,
+#gc-bookkeeper-report .gc-recognition-card {
+  overflow: hidden;
+}
+
+#support-tickets a,
+#support-tickets code,
+#support-tickets pre {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+html[data-theme="dark"] #gc-bookkeeper-report .gc-books-card,
+html[data-theme="dark"] #gc-bookkeeper-report .gc-books-kpi,
+html[data-theme="dark"] #gc-bookkeeper-report .gc-recognition-card {
+  color: #edf4fb !important;
+  background: #111d2a !important;
+  border-color: #2b3c4f !important;
+}
+
+html[data-theme="dark"] #gc-bookkeeper-report .gc-recognition-metrics div,
+html[data-theme="dark"] #gc-bookkeeper-report .gc-books-note,
+html[data-theme="dark"] #gc-bookkeeper-report .gc-audit-item {
+  color: #dce8f3;
+  background: rgba(119, 151, 181, .09);
+  border-color: #2b3c4f;
+}
+
+html[data-theme="dark"] #gc-bookkeeper-report .gc-books-table th,
+html[data-theme="dark"] #gc-bookkeeper-report .gc-books-table td {
+  color: inherit;
+  border-color: #2b3c4f;
+}
+
+@media (max-width: 1050px) {
+  #gc-bookkeeper-report .gc-books-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 650px) {
+  .view {
+    padding-bottom: 112px;
+  }
+
+  #gc-bookkeeper-report .gc-books-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
