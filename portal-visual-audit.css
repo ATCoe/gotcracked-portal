@@ -99,3 +99,42 @@ html[data-theme="dark"] #gc-bookkeeper-report .gc-books-table td {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The authentication shell is injected with workstation controls after first
+   paint. Pin the complete card to the viewport on phones so legacy/component
+   sizing cannot restore the 460px desktop width and clip the right edge. */
+@media (max-width: 540px) {
+  #login-screen.login-screen {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  #login-screen .login-panel {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+
+  #login-screen .login-panel > *,
+  #login-screen .gc-workstation-enroll-login,
+  #login-screen .discord-button,
+  #login-screen .secondary-button {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #login-screen .discord-button,
+  #login-screen .gc-workstation-enroll-login,
+  #login-screen .gc-workstation-enroll-login .secondary-button {
+    box-sizing: border-box;
+    width: 100% !important;
+  }
+
+  #login-screen .gc-workstation-enroll-login small,
+  #login-screen .access-note {
+    overflow-wrap: anywhere;
+  }
+}
