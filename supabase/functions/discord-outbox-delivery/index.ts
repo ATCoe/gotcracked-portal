@@ -6,6 +6,7 @@ const admin = () => createClient(supabaseUrl,Deno.env.get('SUPABASE_SERVICE_ROLE
 const text = (value: unknown, fallback='—') => String(value ?? '').trim() || fallback;
 const titleCase = (value: unknown) => String(value || '').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
 const hex = (buffer: ArrayBuffer) => [...new Uint8Array(buffer)].map(v=>v.toString(16).padStart(2,'0')).join('');
+const sleep = (ms:number) => new Promise(resolve=>setTimeout(resolve,ms));
 
 async function signatureFor(secret: string, message: string) {
   const key = await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
@@ -147,16 +148,41 @@ function shouldDm(row:any){
   return false;
 }
 
+async function discordFetch(url:string,init:RequestInit,label:string){
+  const maxAttempts=4;
+  for(let attempt=1;attempt<=maxAttempts;attempt++){
+    let response:Response;
+    try{
+      response=await fetch(url,init);
+    }catch(error){
+      if(attempt===maxAttempts) throw new Error(`Discord ${label} network failure after ${maxAttempts} attempts: ${error instanceof Error?error.message:String(error)}`);
+      await sleep(Math.min(250*Math.pow(2,attempt-1),2000));
+      continue;
+    }
+    if(response.ok) return response;
+    const body=(await response.text()).slice(0,500);
+    const retryable=response.status===429||response.status>=500;
+    if(!retryable||attempt===maxAttempts) throw new Error(`Discord ${label} ${response.status}: ${body}`);
+    let delayMs=Math.min(250*Math.pow(2,attempt-1),2000);
+    if(response.status===429){
+      try{
+        const retryAfter=Number(JSON.parse(body)?.retry_after);
+        if(Number.isFinite(retryAfter)&&retryAfter>=0) delayMs=Math.min(Math.max(Math.ceil(retryAfter*1000)+100,delayMs),3000);
+      }catch{}
+    }
+    await sleep(delayMs);
+  }
+  throw new Error(`Discord ${label} delivery failed.`);
+}
+
 async function sendMessage(token:string,channelId:string,payload:any){
-  const response=await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`,{method:'POST',headers:{Authorization:`Bot ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  if(!response.ok) throw new Error(`Discord ${response.status}: ${(await response.text()).slice(0,500)}`);
+  const response=await discordFetch(`https://discord.com/api/v10/channels/${channelId}/messages`,{method:'POST',headers:{Authorization:`Bot ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)},'message');
   return response.json().catch(()=>({}));
 }
 
 async function sendDm(db:any,token:string,row:any){
   const userId=await leadDmUserId(db,row);
-  const dm=await fetch('https://discord.com/api/v10/users/@me/channels',{method:'POST',headers:{Authorization:`Bot ${token}`,'Content-Type':'application/json'},body:JSON.stringify({recipient_id:userId})});
-  if(!dm.ok) throw new Error(`Discord DM channel ${dm.status}: ${(await dm.text()).slice(0,500)}`);
+  const dm=await discordFetch('https://discord.com/api/v10/users/@me/channels',{method:'POST',headers:{Authorization:`Bot ${token}`,'Content-Type':'application/json'},body:JSON.stringify({recipient_id:userId})},'DM channel');
   const channel=await dm.json();
   const payload=row.entity_type==='pc_build_request'?pcBuildDmPayload(row):leadDmPayload(row);
   await sendMessage(token,String(channel.id),payload);
