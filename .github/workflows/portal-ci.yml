@@ -149,7 +149,7 @@ jobs:
               raise SystemExit('Heavy operational scripts must load after authentication: ' + ', '.join(leaked))
 
           required_runtime = [
-              'analytics.js','shipping.js','inventory-audit.js','operations-v1-core.js',
+              'analytics.js','shipping.js','inventory-audit.js','operations-v1-core.js','payment-center.js',
               'training-store-guard.js','operations-v1-arrival.js','portal-v1-polish.js',
               'intake-profile-validation-fix.js','portal-v1-final.js','master-directory.js',
               'directory-advanced.js','time-clock.js','schedule-board.js','schedule-print.js',
@@ -162,7 +162,7 @@ jobs:
               raise SystemExit('Portal v1.1 profile validation must load after operations-v1-core.js.')
           if "schedule: ['schedule-board.js','schedule-print.js']" not in runtime:
               raise SystemExit('Schedule and its print action must remain view-scoped.')
-          for retired in ['workforce.js','leads.js','portal-live.js','payment-center.js']:
+          for retired in ['workforce.js','leads.js','portal-live.js']:
               if f"'{retired}'" in runtime or f'"{retired}"' in runtime:
                   raise SystemExit(f'Retired runtime must not load in production: {retired}')
 
