@@ -38,7 +38,10 @@ async function marlonCustomerReply(admin: ReturnType<typeof createClient>, sessi
   try {
     const history = await admin.from('website_chat_messages').select('sender,body').eq('session_id',sessionId).order('created_at',{ascending:true}).limit(30);
     if (history.error) throw history.error;
-    const messages = (history.data || []).slice(-14).map((item:any) => ({ role:item.sender==='customer'?'user':'assistant', content:clean(item.body) }));
+    const historyRows:any[] = history.data || [];
+    const humanOwnsChat = historyRows.some((item:any) => item.sender === 'staff') || historyRows.some((item:any) => item.sender === 'system' && clean(item.body).includes('bringing a GotCracked team member into this chat now'));
+    if (humanOwnsChat) return null;
+    const messages = historyRows.slice(-14).map((item:any) => ({ role:item.sender==='customer'?'user':'assistant', content:clean(item.body) }));
     const response = await fetch('https://crackwave-ai.austncoe.workers.dev/public/chat', {
       method:'POST', headers:{'Content-Type':'application/json'}, signal:AbortSignal.timeout(15000),
       body:JSON.stringify({ messages, context:{ path:'/customer-chat', page:'GotCracked customer chat', ...context } })
@@ -56,6 +59,16 @@ async function marlonCustomerReply(admin: ReturnType<typeof createClient>, sessi
         : `**Marlon Customer Care**\n${reply}`;
       const posted = await discord(`/channels/${threadId}/messages`, { method:'POST', body:JSON.stringify({ allowed_mentions:{parse:[]}, content }) });
       discordMessageId = posted?.id || null;
+      if (handoff) {
+        const escalationChannelId = Deno.env.get('DISCORD_TECH_SUPPORT_CHANNEL_ID') || Deno.env.get('DISCORD_LEAD_CHANNEL_ID');
+        if (escalationChannelId && escalationChannelId !== threadId) {
+          try {
+            await discord(`/channels/${escalationChannelId}/messages`, { method:'POST', body:JSON.stringify({ allowed_mentions:{parse:[]}, content:`**Customer chat needs a human**\nOpen <#${threadId}> and reply inside that thread.\nReason: ${handoffReason.replace(/_/g,' ')}` }) });
+          } catch (error) {
+            console.error('Customer chat escalation alert failed:', error);
+          }
+        }
+      }
     }
     const saved = await admin.from('website_chat_messages').insert({ session_id:sessionId, sender:'system', body:reply, discord_message_id:discordMessageId });
     if (saved.error) throw saved.error;
