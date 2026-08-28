@@ -47,14 +47,19 @@ async function marlonCustomerReply(admin: ReturnType<typeof createClient>, sessi
     const payload:any = await response.json();
     const reply = clean(payload?.reply);
     if (!reply) return null;
+    const handoff = payload?.handoff === true;
+    const handoffReason = clean(payload?.handoffReason, 120) || 'needs_human';
     let discordMessageId:string|null = null;
     if (threadId) {
-      const posted = await discord(`/channels/${threadId}/messages`, { method:'POST', body:JSON.stringify({ allowed_mentions:{parse:[]}, content:`**Marlon Customer Care**\n${reply}` }) });
+      const content = handoff
+        ? `**HUMAN ASSISTANCE REQUESTED**\nReason: ${handoffReason.replace(/_/g,' ')}\n\n**Marlon to customer**\n${reply}\n\nReply normally in this thread. Your message will appear in the customer's website chat.`
+        : `**Marlon Customer Care**\n${reply}`;
+      const posted = await discord(`/channels/${threadId}/messages`, { method:'POST', body:JSON.stringify({ allowed_mentions:{parse:[]}, content }) });
       discordMessageId = posted?.id || null;
     }
     const saved = await admin.from('website_chat_messages').insert({ session_id:sessionId, sender:'system', body:reply, discord_message_id:discordMessageId });
     if (saved.error) throw saved.error;
-    return { sender:'system', body:reply, created_at:new Date().toISOString() };
+    return { sender:'system', body:reply, created_at:new Date().toISOString(), handoff };
   } catch (error) {
     console.error('Marlon Customer Care reply unavailable:', error);
     return null;
