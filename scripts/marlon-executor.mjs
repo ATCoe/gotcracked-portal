@@ -137,7 +137,7 @@ async function prepare(){
   }
   output('resume','false');
   if(ticket.change_level!=='high_level' && protectedTicket(ticket)){
-    await report(token,runId,'blocked',{diagnosis:'This ticket touches authentication, authorization, payments, schema/deployment, or another protected surface.',error:'Protected execution requires a separately Owner-approved high-level request.'});
+    await report(token,runId,'blocked',{diagnosis:'This ticket requires work in a protected system surface. Marlon stopped before making changes and requested Owner approval for the exact ticket scope.',error:'Protected execution requires explicit Owner approval.',metadata:{owner_approval_escalation:true,protected_execution:true}});
     output('has_work','false');
     return;
   }
