@@ -435,3 +435,212 @@ html[data-theme="light"] #dashboard .metrics small {
     line-height: 1.4;
   }
 }
+
+/* Knowledge Base loads after the shell and reintroduces a visible sidebar
+   scrollbar. Keep the nav scrollable while restoring the clean rail. */
+.sidebar,
+.sidebar nav {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none;
+}
+
+.sidebar::-webkit-scrollbar,
+.sidebar nav::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Keep Marlon's closed-state launcher minimal. Activity remains visible when
+   there is something actionable, but an idle/checking pill should not compete
+   with the primary Need Help? button. */
+.gc-marlon-activity:not([data-state]),
+.gc-marlon-activity[data-state="idle"] {
+  display: none !important;
+}
+
+/* Intermediate desktop widths still carry the full sidebar (and, above 1180,
+   the dashboard utility rail). Use the Directory's compact record cards until
+   there is enough true content width for its full multi-column table. */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .gc-dir-search-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gc-dir-search-row > select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .gc-dir-columns {
+    display: none;
+  }
+
+  .gc-dir-list {
+    padding: 0 12px 12px;
+  }
+
+  .gc-dir-row {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 9px 12px;
+    margin: 0 0 9px;
+    padding: 13px;
+    border: 1px solid var(--line, #e1eaf1) !important;
+    border-radius: 12px;
+  }
+
+  .gc-dir-record {
+    grid-column: 1;
+    grid-row: 1;
+    flex-direction: row;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .gc-dir-customer {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .gc-dir-device {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .gc-dir-row > span:nth-child(4) {
+    grid-column: 1;
+    grid-row: 4;
+  }
+
+  .gc-dir-time {
+    grid-column: 2;
+    grid-row: 4;
+    text-align: right;
+  }
+
+  .gc-dir-time small,
+  .gc-dir-assigned,
+  .gc-dir-arrow {
+    display: none !important;
+  }
+}
+
+/* Customer rows have a 901–1050px gap between their desktop and component-
+   compact layouts. Drop the least important activity column in that band. */
+@media (min-width: 901px) and (max-width: 1050px) {
+  #customers .gc-customer-row {
+    grid-template-columns: 1.2fr .9fr .55fr .65fr !important;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #customers .gc-customer-row > *:nth-child(5) {
+    display: none !important;
+  }
+}
+
+/* Business-hours rows and the two-column timesheet employee grid both need
+   one extra compact band while the full desktop sidebar remains visible. */
+@media (min-width: 901px) and (max-width: 960px) {
+  #settings .gc-hours-grid,
+  #settings .gc-hours-row {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #settings .gc-hours-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+
+  #settings .gc-hours-day {
+    grid-column: 1;
+  }
+
+  #settings .gc-hours-open {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  #settings .gc-hours-row label,
+  #settings .gc-hours-row input[type="time"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #timesheets .gc-ts-employee-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #timesheets .gc-ts-employee-card,
+  #timesheets .gc-ts-employee-card > * {
+    min-width: 0;
+  }
+}
+
+/* Seven 128px schedule intelligence cards cannot coexist with the desktop
+   sidebar around 1180–1200px. Keep the four-column desktop-compact layout a
+   little longer, then return to seven columns once 1280px has real room. */
+@media (min-width: 1101px) and (max-width: 1240px) {
+  #schedule .gc-schedule-days {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  #schedule .gc-schedule-day-intel,
+  #schedule .gc-schedule-day-intel > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #schedule .gc-schedule-day-intel header {
+    flex-wrap: wrap;
+  }
+}
+
+/* Payment Settings also needs its compact component layout at intermediate
+   desktop widths because the persistent sidebar reduces the usable canvas. */
+@media (min-width: 901px) and (max-width: 1100px) {
+  #settings .gc-pay-settings-row,
+  #settings .gc-pay-settings-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #settings .gc-online-architecture,
+  #settings .gc-online-architecture-head,
+  #settings .gc-online-statuses,
+  #settings .gc-online-contract,
+  #settings .gc-pay-settings-row,
+  #settings .gc-pay-settings-grid,
+  #settings .gc-pay-toggle {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #settings .gc-online-architecture-head {
+    display: grid;
+  }
+
+  #settings .gc-pay-settings-row select,
+  #settings .gc-pay-settings-row input,
+  #settings .gc-pay-settings-grid select,
+  #settings .gc-pay-settings-grid input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* Payment field labels should read vertically inside each responsive column;
+   generic Settings label styles otherwise compress help text beside controls. */
+#settings .gc-pay-settings-row > label {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 7px !important;
+}
+
+#settings .gc-pay-settings-row > label > small {
+  min-width: 0;
+  max-width: 100%;
+}
