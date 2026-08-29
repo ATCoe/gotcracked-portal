@@ -644,3 +644,37 @@ html[data-theme="light"] #dashboard .metrics small {
   min-width: 0;
   max-width: 100%;
 }
+
+/* Repair-time learning is injected after the Reports shell. Its tables inherit
+   the portal's desktop table minimums, so constrain the component itself and
+   collapse to one column while the sidebar leaves a narrow reporting canvas. */
+#reports .gc-repair-learning {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  min-width: 0;
+  max-width: 100%;
+}
+
+#reports .gc-repair-learning > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#reports .gc-repair-learning table {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  table-layout: fixed;
+}
+
+#reports .gc-repair-learning th,
+#reports .gc-repair-learning td {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+@media (max-width: 1050px) {
+  #reports .gc-repair-learning {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
