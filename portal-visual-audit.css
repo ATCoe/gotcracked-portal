@@ -172,3 +172,266 @@ html[data-theme="dark"] #gc-bookkeeper-report .gc-books-table td {
 html[data-theme="light"] #dashboard .metrics small {
   color: #64748b;
 }
+/* Authenticated reporting tables must shrink with their cards rather than
+   preserving intrinsic text widths and being clipped by the report surface. */
+#gc-bookkeeper-report .gc-books-table {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  table-layout: fixed;
+}
+
+#gc-bookkeeper-report .gc-books-table th,
+#gc-bookkeeper-report .gc-books-table td {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+#support-tickets strong {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (min-width: 751px) and (max-width: 900px) {
+  /* Master Directory: use its compact record-card layout before the desktop
+     sidebar leaves too little room for the six-column directory table. */
+  .gc-dir-search-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gc-dir-search-row > select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .gc-dir-columns {
+    display: none;
+  }
+
+  .gc-dir-list {
+    padding: 0 12px 12px;
+  }
+
+  .gc-dir-row {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 9px 12px;
+    margin: 0 0 9px;
+    padding: 13px;
+    border: 1px solid var(--line, #e1eaf1) !important;
+    border-radius: 12px;
+  }
+  .gc-dir-record {
+    grid-column: 1;
+    grid-row: 1;
+    flex-direction: row;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .gc-dir-customer {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .gc-dir-device {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .gc-dir-row > span:nth-child(4) {
+    grid-column: 1;
+    grid-row: 4;
+  }
+
+  .gc-dir-time {
+    grid-column: 2;
+    grid-row: 4;
+    text-align: right;
+  }
+
+  .gc-dir-time small,
+  .gc-dir-arrow {
+    display: none !important;
+  }
+
+  /* Settings: activate component-compact layouts based on the usable canvas,
+     not only the full browser viewport. */
+  #settings .gc-pay-settings-row,
+  #settings .gc-pay-settings-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #settings .gc-online-architecture,
+  #settings .gc-online-architecture-head,
+  #settings .gc-online-statuses,
+  #settings .gc-online-contract,
+  #settings .gc-pay-settings-row,
+  #settings .gc-pay-settings-grid,
+  #settings .gc-pay-toggle {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #settings .gc-online-architecture-head {
+    display: grid;
+  }
+
+  #settings .gc-pay-settings-row select,
+  #settings .gc-pay-settings-row input,
+  #settings .gc-pay-settings-grid select,
+  #settings .gc-pay-settings-grid input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #settings .gc-hours-grid,
+  #settings .gc-hours-row {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #settings .gc-hours-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  #settings .gc-hours-day {
+    grid-column: 1;
+  }
+
+  #settings .gc-hours-open {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  #settings .gc-hours-row label,
+  #settings .gc-hours-row input[type="time"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Schedule intelligence reads better as two compact columns on tablet than
+     as a seven-column strip clipped by the sidebar. */
+  #schedule .gc-schedule-days {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #schedule .gc-schedule-day-intel,
+  #schedule .gc-schedule-day-intel > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #schedule .gc-schedule-day-intel header {
+    flex-wrap: wrap;
+  }
+
+  /* Repair Reference has a search control with a 320px minimum beside mode
+     tabs. Stack those controls while the desktop sidebar is still present. */
+  #repair-reference .gc-kb-shell,
+  #repair-reference .gc-kb-hero,
+  #repair-reference .gc-kb-search-panel,
+  #repair-reference .gc-kb-library,
+  #repair-reference .gc-kb-results,
+  #repair-reference .gc-kb-guide {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #repair-reference .gc-kb-search-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #repair-reference .gc-kb-search {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #repair-reference .gc-kb-mode-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  #repair-reference .gc-kb-section-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+}
+
+/* Reports still contain a few legacy 720px tables. Keep those inside one
+   deliberate table scroller instead of allowing the card itself to widen. */
+#reports .table-wrap {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+#reports .card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (min-width: 751px) and (max-width: 900px) {
+  /* The shipping settings form inherits a generic two-column form layout whose
+     220px controls exceed the post-sidebar tablet canvas. */
+  #shipping-settings-form .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #shipping-settings-form .form-grid > label,
+  #shipping-settings-form .form-grid > label.full,
+  #shipping-settings-form .form-grid input,
+  #shipping-settings-form .form-grid select,
+  #shipping-settings-form .form-grid textarea {
+    grid-column: auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #shipping-settings-form .form-grid input,
+  #shipping-settings-form .form-grid select,
+  #shipping-settings-form .form-grid textarea {
+    width: 100%;
+  }
+
+  #shipping-settings-form .switch-row {
+    min-width: 0;
+    max-width: 100%;
+    gap: 12px;
+  }
+}
+
+@media (min-width: 751px) and (max-width: 900px) {
+  #settings .gc-pay-settings-row > label {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 7px !important;
+    align-items: start !important;
+  }
+
+  #settings .gc-pay-settings-row > label > select,
+  #settings .gc-pay-settings-row > label > input {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #settings .gc-pay-settings-row > label > small {
+    min-width: 0;
+    max-width: 100%;
+    line-height: 1.4;
+  }
+}
