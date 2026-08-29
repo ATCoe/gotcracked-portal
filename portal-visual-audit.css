@@ -166,3 +166,9 @@ html[data-theme="dark"] #gc-bookkeeper-report .gc-books-table td {
     max-width: 100%;
   }
 }
+
+/* KPI metadata was too faint against the light metric cards. Keep secondary
+   copy quiet, but readable enough to scan without squinting. */
+html[data-theme="light"] #dashboard .metrics small {
+  color: #64748b;
+}
