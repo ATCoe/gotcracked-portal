@@ -108,7 +108,7 @@
   function loadKnowledgeBase() {
     if (window.GotCrackedKnowledgeBase || document.querySelector('script[data-gc-knowledge-base-runtime]')) return;
     const script = document.createElement('script');
-    script.src = 'knowledge-base.js?v=20260827-kb1';
+    script.src = 'knowledge-base.js?v=20260903-nav-scroll1';
     script.async = false;
     script.dataset.gcKnowledgeBaseRuntime = '20260827-kb1';
     script.addEventListener('error', () => {
@@ -172,3 +172,4 @@
   setTimeout(scheduleDecorate, 0);
   setTimeout(scheduleDecorate, 1200);
 })();
+

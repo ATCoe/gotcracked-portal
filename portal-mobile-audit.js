@@ -43,7 +43,7 @@
   }
 
   async function loadMarlon() {
-    const version = '20260828-marlon-avatar-upload1';
+    const version = '20260903-owner-review1';
     loadStyle(`marlon-assistant.css?v=${version}`, 'gcMarlonStyle');
     loadStyle(`marlon-extensions.css?v=${version}`, 'gcMarlonExtensions');
     loadStyle(`marlon-activity.css?v=${version}`, 'gcMarlonActivityStyle');
@@ -73,3 +73,4 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once:true });
   else start();
 })();
+

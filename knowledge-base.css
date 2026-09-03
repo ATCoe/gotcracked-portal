@@ -11,7 +11,7 @@
   scrollbar-color:#3b4a61 transparent;
 }
 
-.sidebar nav::-webkit-scrollbar{width:6px}
+.sidebar nav::-webkit-scrollbar{display:block!important;width:6px!important}
 .sidebar nav::-webkit-scrollbar-thumb{background:#3b4a61;border-radius:999px}
 .sidebar nav>.nav-link{margin:2px 0}
 
@@ -290,3 +290,4 @@ html[data-theme="dark"] .gc-kb-empty{background:#0e1925;border-color:#35475a}
   .gc-kb-source-head{grid-template-columns:38px 1fr}
   .gc-kb-source-status{grid-column:2;justify-self:start}
 }
+

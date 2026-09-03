@@ -45,8 +45,10 @@
   document.addEventListener('input',event=>{if(!event.target?.matches?.('[data-support-search]'))return;const q=event.target.value.toLowerCase();document.querySelectorAll('.gc-support-row').forEach(row=>row.hidden=!row.textContent.toLowerCase().includes(q))});
   document.addEventListener('change',event=>{if(!event.target?.matches?.('[data-support-filter]'))return;const v=event.target.value;document.querySelectorAll('.gc-support-row').forEach(row=>{const t=state.tickets.find(x=>x.id===row.dataset.ticketId);row.hidden=v==='active'?['resolved','closed'].includes(t?.status):v==='resolved'?!['resolved','closed'].includes(t?.status):false})});
   document.addEventListener('gc-marlon-new-ticket',event=>{ensureView();window.GotCrackedUI?.activateView?.('support-tickets');openNew({title:'Marlon support follow-up',description:conversationPrefill(event.detail),surface:'portal',category:'portal_ui'})});
+  document.addEventListener('gc-open-support-ticket',event=>{const id=String(event.detail?.ticketId||'');if(!id)return;ensureView();window.GotCrackedUI?.activateView?.('support-tickets');void load().then(()=>openTicket(id));});
   document.addEventListener('gc-view-changed',event=>{if(event.detail==='support-tickets')void load()});
   const observer=new MutationObserver(()=>{ensureNav();ensureView()});observer.observe(document.body,{childList:true,subtree:true});
   ensureStyle();ensureNav();ensureView();ensureDialogs();setTimeout(load,650);
   window.GotCrackedSupportTickets={version:'1.0.0',state,load,create,createAuto,openNew};
 })();
+

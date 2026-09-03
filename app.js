@@ -79,14 +79,14 @@
         card = document.createElement('article');
         card.className = 'gc-diagnostic gc-maintenance-approval';
         card.dataset.gcMaintenanceTicket = ticketId;
-        card.innerHTML = `<div class="gc-diagnostic-icon" aria-hidden="true">⚙</div><div class="gc-diagnostic-copy"><strong></strong><p></p><small></small><div class="gc-diagnostic-actions"><button type="button" class="gc-maintenance-approve" data-gc-maintenance-approve>Approve</button><button type="button" class="gc-maintenance-deny" data-gc-maintenance-deny>Deny</button></div></div>`;
+        card.innerHTML = `<div class="gc-diagnostic-icon" aria-hidden="true">!</div><div class="gc-diagnostic-copy"><strong></strong><p></p><small></small><div class="gc-diagnostic-actions"><button type="button" class="gc-maintenance-review" data-gc-maintenance-review>Review in Support Desk</button></div></div>`;
         host.prepend(card);
       }
       const code = options.ticketNumber ? `SUP-${String(options.ticketNumber).padStart(4,'0')}` : 'Marlon';
-      card.querySelector('strong').textContent = `Maintenance approval required · ${code}`;
+      card.querySelector('strong').textContent = `Action review needed · ${code}`;
       card.querySelector('p').textContent = String(options.title || 'Marlon needs Owner approval before continuing this protected task.');
       const count=Math.max(1,Number(options.pendingCount||1));
-      card.querySelector('small').textContent = count>1 ? `${count} approvals pending · Showing oldest · Surface: ${String(options.surface || 'Portal')} · Priority: ${String(options.priority || 'High')}` : `Surface: ${String(options.surface || 'Portal')} · Priority: ${String(options.priority || 'High')} · Stays until decided.`;
+      card.querySelector('small').textContent = count>1 ? `${count} items await an Owner decision · Showing oldest · Surface: ${String(options.surface || 'Portal')} · Priority: ${String(options.priority || 'High')}` : `Surface: ${String(options.surface || 'Portal')} · Priority: ${String(options.priority || 'High')} · Open Support Desk to review.`;
       card.querySelectorAll('button').forEach(button => button.disabled = false);
       requestAnimationFrame(() => card.classList.add('is-visible'));
       return ticketId;
@@ -103,6 +103,12 @@
       if (!card) return;
       const approve = event.target.closest('[data-gc-maintenance-approve]');
       const deny = event.target.closest('[data-gc-maintenance-deny]');
+      const review = event.target.closest('[data-gc-maintenance-review]');
+      if (review) {
+        window.GotCrackedUI?.activateView?.('support-tickets');
+        setTimeout(() => document.dispatchEvent(new CustomEvent('gc-open-support-ticket',{detail:{ticketId:card.dataset.gcMaintenanceTicket}})), 150);
+        return;
+      }
       if (approve || deny) {
         card.querySelectorAll('button').forEach(button => button.disabled = true);
         document.dispatchEvent(new CustomEvent('gc-maintenance-approval-decision',{detail:{ticketId:card.dataset.gcMaintenanceTicket,approved:Boolean(approve)}}));
