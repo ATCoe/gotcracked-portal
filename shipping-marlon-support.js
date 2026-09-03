@@ -110,9 +110,10 @@
     try{const result=await client.functions.invoke('shipping-provider',{body:{action:'configure',mode:status.mode||'test',preference:select.value,default_parcel:d}});if(result.error||result.data?.ok===false)throw new Error(result.data?.error||result.error?.message||'Unable to save preference.');if(shipping?.status)shipping.status.preference=select.value;await refreshContext()}catch(error){alert(error.message||'Unable to save shipping preference.')}
   }
 
+  let supplierPreferenceDecorating=false;
   async function decorateSupplierPreference(){
-    const host=document.querySelector('#gc-mobilesentrix-settings .gc-ms-grid');if(!host||host.querySelector('[data-gc-supplier-shipping-preference]'))return;const p=profile();if(!p?.location_id)return;
-    const result=await client.from('business_settings').select('supplier_shipping_preference').eq('location_id',p.location_id).maybeSingle();if(result.error)return;const value=result.data?.supplier_shipping_preference||'balanced';const label=document.createElement('label');label.innerHTML=`Marlon supplier shipping preference<select data-gc-supplier-shipping-preference><option value="balanced" ${value==='balanced'?'selected':''}>Balanced cost + deadline</option><option value="lowest_cost" ${value==='lowest_cost'?'selected':''}>Lowest cost</option><option value="fastest" ${value==='fastest'?'selected':''}>Fastest</option></select><small>Used for MobileSentrix shipping recommendations only.</small>`;host.appendChild(label);
+    const host=document.querySelector('#gc-mobilesentrix-settings .gc-ms-grid');if(!host||host.querySelector('[data-gc-supplier-shipping-preference]')||supplierPreferenceDecorating)return;const p=profile();if(!p?.location_id)return;
+    supplierPreferenceDecorating=true;try{const result=await client.from('business_settings').select('supplier_shipping_preference').eq('location_id',p.location_id).maybeSingle();if(result.error)return; if(host.querySelector('[data-gc-supplier-shipping-preference]'))return;const value=result.data?.supplier_shipping_preference||'balanced';const label=document.createElement('label');label.innerHTML=`Marlon supplier shipping preference<select data-gc-supplier-shipping-preference><option value="balanced" ${value==='balanced'?'selected':''}>Balanced cost + deadline</option><option value="lowest_cost" ${value==='lowest_cost'?'selected':''}>Lowest cost</option><option value="fastest" ${value==='fastest'?'selected':''}>Fastest</option></select><small>Used for MobileSentrix shipping recommendations only.</small>`;host.appendChild(label);}finally{supplierPreferenceDecorating=false}
   }
 
   async function saveSupplierPreference(select){const p=profile();if(!p?.location_id)return;const result=await client.from('business_settings').update({supplier_shipping_preference:select.value,updated_at:new Date().toISOString()}).eq('location_id',p.location_id);if(result.error){alert(result.error.message||'Unable to save supplier shipping preference.');return}state.poRecommendations.clear();await refreshContext();setTimeout(()=>void decoratePreparedOrders(),80)}
@@ -127,3 +128,4 @@
   setTimeout(()=>void refresh(),180);
   window.GotCrackedMarlonShippingSupport={version:'1.0.0',state,refresh,recommendationForPo};
 })();
+
