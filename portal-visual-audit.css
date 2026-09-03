@@ -114,4 +114,8 @@ html[data-theme="dark"] .gc-rma-flow-badge { background:#102c35; border-color:#2
 html[data-theme="dark"] .gc-rma-flow-grid > div { background:#10202c; border-color:#2e4252; }
 html[data-theme="dark"] .gc-rma-flow-note { background:#102a31; color:#c6e7ea; }
 @media (max-width:760px) { .gc-rma-flow-grid { grid-template-columns:1fr 1fr; } }
+/* Final asset pass: a quiet local device illustration gives the RMA summary
+   a visual anchor without competing with operational numbers. */
+.gc-rma-stat{position:relative;overflow:hidden}
+.gc-rma-stat:first-child:after{content:"";position:absolute;right:-8px;bottom:-14px;width:76px;height:76px;background:url("assets/device-phone.svg") center/contain no-repeat;opacity:.16;pointer-events:none}
 
