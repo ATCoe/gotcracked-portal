@@ -107,8 +107,10 @@
       const deny = event.target.closest('[data-gc-maintenance-deny]');
       const review = event.target.closest('[data-gc-maintenance-review]');
       if (review) {
+        const openReview = () => document.dispatchEvent(new CustomEvent('gc-open-support-ticket',{detail:{ticketId:card.dataset.gcMaintenanceTicket}}));
         window.GotCrackedUI?.activateView?.('support-tickets');
-        setTimeout(() => document.dispatchEvent(new CustomEvent('gc-open-support-ticket',{detail:{ticketId:card.dataset.gcMaintenanceTicket}})), 150);
+        setTimeout(openReview, 180);
+        setTimeout(() => { if (!document.getElementById('gc-support-detail-dialog')?.open) openReview(); }, 600);
         return;
       }
       if (approve || deny) {
