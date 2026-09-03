@@ -88,4 +88,3 @@
     root.dataset.gcThemeBootstrap = 'ready';
   }
 })();
-

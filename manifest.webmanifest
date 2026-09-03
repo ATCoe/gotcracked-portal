@@ -10,11 +10,10 @@
   "theme_color": "#081625",
   "icons": [
     {
-      "src": "/assets/gotcracked-favicon.png",
-      "sizes": "1254x1254",
+      "src": "/assets/gotcracked-portal-app-icon-192.png",
+      "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     }
   ]
 }
-

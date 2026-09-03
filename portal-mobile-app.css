@@ -15,6 +15,8 @@
 .gc-portal-companion-copy span{display:block;margin-top:3px;color:#c5e8fb;font-size:12px;line-height:1.35}
 .gc-portal-companion .gc-portal-companion-action{min-height:38px;padding:0 15px;border:1px solid rgba(255,255,255,.2);border-radius:11px;color:#08243c;background:#fff;font:800 12px/1 inherit;cursor:pointer;white-space:nowrap}
 .gc-portal-companion .gc-portal-companion-action:hover,.gc-portal-companion .gc-portal-companion-action:focus-visible{outline:0;transform:translateY(-1px);box-shadow:0 7px 18px rgba(0,0,0,.19)}
+.gc-portal-companion .gc-portal-companion-action:disabled{cursor:wait;opacity:.72;transform:none;box-shadow:none}
+.gc-kiosk-download-status{min-height:1.2em;color:#a8daf5;font-weight:700}
 .gc-portal-companion-dialog{width:min(420px,calc(100vw - 32px));padding:0;border:0;border-radius:18px;color:#102033;background:#fff;box-shadow:0 26px 72px rgba(3,13,24,.38)}
 .gc-portal-companion-dialog::backdrop{background:rgba(3,12,22,.64);backdrop-filter:blur(4px)}
 .gc-portal-companion-dialog>div{padding:24px}
@@ -34,4 +36,3 @@ html[data-theme="dark"] .gc-portal-companion-dialog p,html[data-theme="dark"] .g
   .gc-portal-companion{grid-template-columns:auto minmax(0,1fr);gap:12px;padding:14px}
   .gc-portal-companion .gc-portal-companion-action{grid-column:1/-1;width:100%}
 }
-

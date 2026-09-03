@@ -10,6 +10,12 @@
   let accessChannel = null;
   let staff = null;
 
+  function isMobileSurface() {
+    const ua = navigator.userAgent || '';
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(ua)
+      || (window.matchMedia?.('(pointer: coarse)')?.matches && window.matchMedia?.('(max-width: 1100px)')?.matches);
+  }
+
   function hasAccess() {
     return !isStandalone || accessState === 'allowed';
   }
@@ -99,7 +105,7 @@
   }
 
   function mountInstallCard() {
-    if (isStandalone || document.querySelector('#gc-portal-companion-install-card')) return;
+    if (isStandalone || !isMobileSurface() || document.querySelector('#gc-portal-companion-install-card')) return;
     const heading = document.querySelector('#dashboard .page-heading');
     if (!heading) return;
     const card = document.createElement('aside');
@@ -110,6 +116,89 @@
     heading.insertAdjacentElement('afterend', card);
     card.querySelector('[data-gc-portal-companion-install]')?.addEventListener('click', install);
     updateInstallButton();
+  }
+
+  function mountKioskCard() {
+    if (isStandalone || !isMobileSurface() || !canDownloadKioskSetup() || document.querySelector('#gc-kiosk-download-card')) return;
+    const heading = document.querySelector('#dashboard .page-heading');
+    if (!heading) return;
+    const card = document.createElement('aside');
+    card.id = 'gc-kiosk-download-card';
+    card.className = 'gc-portal-companion gc-kiosk-download';
+    card.setAttribute('aria-label', 'Download the GotCracked self-service kiosk setup');
+    card.innerHTML = '<span class="gc-portal-companion-mark" aria-hidden="true">▣</span><div class="gc-portal-companion-copy"><small>Device setup</small><strong>Set up a self-service kiosk</strong><span>Download the private kiosk bundle for an approved tablet. Portal verifies your active manager access before it is prepared.</span><span class="gc-kiosk-download-status" data-gc-kiosk-download-status aria-live="polite"></span></div><button class="gc-portal-companion-action" type="button" data-gc-kiosk-download>Download setup</button>';
+    heading.insertAdjacentElement('afterend', card);
+    card.querySelector('[data-gc-kiosk-download]')?.addEventListener('click', downloadKioskSetup);
+  }
+
+  function canDownloadKioskSetup() {
+    const role = String(staff?.role || '').toLowerCase();
+    return staff?.active !== false && staff?.account_type !== 'shared_workstation' && ['owner', 'manager'].includes(role);
+  }
+
+  function setKioskDownloadState(message = '', pending = false) {
+    const card = document.querySelector('#gc-kiosk-download-card');
+    const status = card?.querySelector('[data-gc-kiosk-download-status]');
+    const button = card?.querySelector('[data-gc-kiosk-download]');
+    if (status) status.textContent = message;
+    if (button) {
+      button.disabled = pending;
+      button.textContent = pending ? 'Preparing…' : 'Download setup';
+    }
+  }
+
+  async function downloadKioskSetup() {
+    const client = window.supabaseClient;
+    const button = document.querySelector('[data-gc-kiosk-download]');
+    if (!client || !button || !canDownloadKioskSetup()) return;
+    setKioskDownloadState('', true);
+    try {
+      const { data: sessionData, error: sessionError } = await client.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (sessionError || !token) throw new Error('Sign in again to prepare kiosk setup.');
+      const functionUrl = `${String(client.supabaseUrl || '').replace(/\/$/, '')}/functions/v1/private-kiosk-download`;
+      if (!functionUrl.startsWith('https://')) throw new Error('Kiosk setup is unavailable outside the secure Portal connection.');
+      const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+      if (client.supabaseKey) headers.apikey = client.supabaseKey;
+      const response = await fetch(functionUrl, { method:'POST', headers, body:'{}', cache:'no-store' });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || 'Portal could not prepare kiosk setup.');
+      }
+      const bundle = await response.blob();
+      if (bundle.size < 512) throw new Error('Portal returned an invalid kiosk bundle.');
+      const disposition = response.headers.get('content-disposition') || '';
+      const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || 'gotcracked-kiosk-0.1.0.zip';
+      const link = document.createElement('a');
+      const objectUrl = URL.createObjectURL(bundle);
+      link.href = objectUrl;
+      link.download = filename;
+      link.hidden = true;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      setKioskDownloadState('Ready for your approved tablet.');
+    } catch (error) {
+      setKioskDownloadState(error?.message || 'Portal could not prepare kiosk setup.');
+    } finally {
+      button.disabled = false;
+      if (button.textContent === 'Preparing…') button.textContent = 'Download setup';
+    }
+  }
+
+  function syncMobileDownloads() {
+    const mobile = isMobileSurface();
+    if (!mobile) {
+      document.querySelector('#gc-portal-companion-install-card')?.remove();
+      document.querySelector('#gc-kiosk-download-card')?.remove();
+      return;
+    }
+    if (staff) {
+      mountInstallCard();
+      if (canDownloadKioskSetup()) mountKioskCard();
+      else document.querySelector('#gc-kiosk-download-card')?.remove();
+    }
   }
 
   async function registerServiceWorker() {
@@ -136,6 +225,7 @@
   document.addEventListener('gc-portal-authenticated', event => {
     staff = event.detail || {};
     mountInstallCard();
+    mountKioskCard();
     void registerServiceWorker();
     void enforceAccess();
   });
@@ -144,12 +234,15 @@
     staff = null;
     accessState = isStandalone ? 'pending' : 'not-required';
     closeAccessChannel();
+    document.querySelector('#gc-portal-companion-install-card')?.remove();
+    document.querySelector('#gc-kiosk-download-card')?.remove();
   });
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') void enforceAccess();
   });
   window.addEventListener('online', () => { void enforceAccess(); });
+  window.addEventListener('resize', syncMobileDownloads, { passive:true });
   window.setInterval(() => { void enforceAccess(); }, ACCESS_REFRESH_MS);
 
   window.GotCrackedMobilePortal = {
@@ -159,4 +252,3 @@
     install
   };
 })();
-

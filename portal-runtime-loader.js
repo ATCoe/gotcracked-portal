@@ -35,7 +35,7 @@
   const loading=new Map(),delay=ms=>new Promise(resolve=>setTimeout(resolve,ms)),isTraining=()=>localStorage.getItem('gc-training-store')==='1';
   const profileIndependentScripts=new Set(['theme-controller.js','training-shared-sync.js','runtime-stability.js','mobile-runtime-regression-fixes.js','portal-refresh-stability.js','operations-v1-core.js']);
 
-  function srcFor(file){const versions={'account-page.js':ACCOUNT_PAGE_VERSION,'sales-ops.js':SALES_OPS_VERSION,'appointments-board.js':APPOINTMENTS_VERSION,'appointments-owner-guard.js':APPOINTMENTS_VERSION,'customers-board.js':CUSTOMERS_VERSION};return `${file}?v=${versions[file]||VERSION}`;}
+  function srcFor(file){const versions={'account-page.js':ACCOUNT_PAGE_VERSION,'sales-ops.js':SALES_OPS_VERSION,'appointments-board.js':APPOINTMENTS_VERSION,'appointments-owner-guard.js':APPOINTMENTS_VERSION,'customers-board.js':CUSTOMERS_VERSION,'operations-v1-core.js':'20260903-record-lifecycle1','reporting-capacity-enhancements.js':'20260903-subtle-capacity1','portal-mobile-app.js':'20260903-private-download-api1'};return `${file}?v=${versions[file]||VERSION}`;}
   function preload(files){for(const file of files){if(document.querySelector(`link[data-gc-runtime-preload="${file}"]`))continue;const link=document.createElement('link');link.rel='preload';link.as='script';link.href=srcFor(file);link.dataset.gcRuntimePreload=file;document.head.appendChild(link);}}
   function loadScript(file){if(document.querySelector(`script[data-gc-runtime="${file}"]`))return Promise.resolve();if(loading.has(file))return loading.get(file);const promise=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=srcFor(file);script.async=false;script.dataset.gcRuntime=file;script.addEventListener('load',resolve,{once:true});script.addEventListener('error',()=>reject(new Error(`Failed to load ${file}`)),{once:true});document.body.appendChild(script);}).finally(()=>loading.delete(file));loading.set(file,promise);return promise;}
   function protectedRuntimeAllowed(){const login=document.getElementById('login-screen');const companion=window.GotCrackedMobilePortal;return(!login||login.classList.contains('hidden'))&&(!companion||companion.isRuntimeAllowed());}
@@ -57,4 +57,3 @@
   window.GotCrackedRuntime={ensureView:ensureViewRuntime,startDeferred:startDeferredRuntime,waitForProfile:waitForOperationsProfile,get profile(){return profileReady;}};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',watchLoginState,{once:true});else watchLoginState();
 })();
-
