@@ -1,0 +1,20 @@
+{
+  "id": "/portal-companion",
+  "name": "GotCracked Portal Companion",
+  "short_name": "GC Portal",
+  "description": "Private GotCracked staff portal companion.",
+  "start_url": "/index.html?app=1#dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#081625",
+  "theme_color": "#081625",
+  "icons": [
+    {
+      "src": "/assets/gotcracked-favicon.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
