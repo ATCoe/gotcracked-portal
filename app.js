@@ -271,7 +271,8 @@
 
     setMobileMenu(false);
     document.dispatchEvent(new CustomEvent('gc-view-changed', { detail: id }));
-    target.scrollIntoView({ block: 'start' });
+    window.scrollTo({ top:0, left:0, behavior:'instant' });
+    document.querySelector('main')?.scrollTo?.({ top:0, left:0, behavior:'instant' });
     return true;
   }
 
@@ -346,3 +347,4 @@
 
   window.GotCrackedUI = { renderRepairs, filterRepairs, showTicket, activateView, setMobileMenu };
 })();
+
