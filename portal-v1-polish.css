@@ -41,8 +41,8 @@ main{background:radial-gradient(circle at 82% 0,rgba(24,119,242,.045),transparen
 .nav-link:hover{transform:translateX(2px)}
 .nav-link.active{background:linear-gradient(90deg,#243a55,#22354d);border-color:#304760;box-shadow:inset 3px 0 0 #4c9cf0}
 .topbar{box-shadow:0 2px 14px rgba(14,34,54,.035)}
-.v1-store-switch{padding:0 9px!important;border:1px solid transparent!important}
-.v1-store-switch:hover{border-color:#dce5ee!important;background:#f7faff!important}
+.v1-store-switch{padding:0 12px!important;border:1px solid rgba(148,163,184,.34)!important;background:rgba(15,29,43,.92)!important;color:inherit!important}
+.v1-store-switch:hover,.v1-store-switch:focus-visible{border-color:#3b82f6!important;background:#172b40!important;color:inherit!important}
 
 /* Headings/actions. */
 .page-heading{margin-bottom:23px}
@@ -233,3 +233,4 @@ body.v1-overlay-open{overflow:hidden}
 }
 
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.v1-toast,.nav-link,.primary-button,.secondary-button,.v1-stage-tabs button{animation:none;transition:none}}
+
