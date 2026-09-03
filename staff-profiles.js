@@ -183,6 +183,7 @@
   function renderStaffCards() {
     const staff = document.getElementById('staff');
     if (!staff) return;
+    document.getElementById('staff-management-list')?.replaceChildren();
 
     let host = document.getElementById('gc-staff-profiles');
     if (!host) {
