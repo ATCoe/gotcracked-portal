@@ -49,7 +49,7 @@
   function render(){
     const host=document.getElementById('inventory');if(!host)return;style();
     const body=state.tab==='stock'?stockView():state.tab==='orders'?preparedOrdersView():state.tab==='receiving'?receivingView():mailInView();
-    host.innerHTML=`<div class="page-heading"><div><p class="eyebrow">Parts & receiving</p><h1>Inventory</h1><p class="subtle">Physical stock, reservations, supplier ordering, receiving, and scanned mail-in intake in one workspace.</p></div><div class="quick-actions"></div></div><div class="gc-inv-tabs" role="tablist"><button class="gc-inv-tab ${state.tab==='stock'?'active':''}" data-gc-inventory-tab="stock">Stock</button><button class="gc-inv-tab ${state.tab==='orders'?'active':''}" data-gc-inventory-tab="orders">Prepared Orders</button><button class="gc-inv-tab ${state.tab==='receiving'?'active':''}" data-gc-inventory-tab="receiving">PO Receiving</button><button class="gc-inv-tab ${state.tab==='mailin'?'active':''}" data-gc-inventory-tab="mailin">Mail-in Receiving</button></div><div id="gc-inventory-tab-body">${body}</div>`;
+    host.innerHTML=`<div class="page-heading"><div><p class="eyebrow">Global parts database</p><h1>Inventory</h1><p class="subtle">Shared parts catalog across the organization, with physical stock, reservations, supplier ordering, receiving, and scanned mail-in intake in one workspace.</p></div><div class="quick-actions"></div></div><div class="gc-inv-tabs" role="tablist"><button class="gc-inv-tab ${state.tab==='stock'?'active':''}" data-gc-inventory-tab="stock">Stock</button><button class="gc-inv-tab ${state.tab==='orders'?'active':''}" data-gc-inventory-tab="orders">Prepared Orders</button><button class="gc-inv-tab ${state.tab==='receiving'?'active':''}" data-gc-inventory-tab="receiving">PO Receiving</button><button class="gc-inv-tab ${state.tab==='mailin'?'active':''}" data-gc-inventory-tab="mailin">Mail-in Receiving</button></div><div id="gc-inventory-tab-body">${body}</div>`;
     document.dispatchEvent(new CustomEvent('gc-inventory-command-center-rendered'));
     if(state.tab==='mailin')setTimeout(()=>document.querySelector('#gc-mailin-scan-form [name="scan"]')?.focus(),80);
   }
@@ -65,3 +65,4 @@
   document.addEventListener('gc-view-changed',maybe);window.addEventListener('hashchange',maybe);window.addEventListener('gotcracked:staff-ready',maybe);maybe();
   window.GotCrackedInventoryCommandCenter={version:'1.1.0',state,load,render};
 })();
+
