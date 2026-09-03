@@ -143,6 +143,7 @@
     syncCurrentProfile();
     renderProfileView(state.selected || current()?.id);
     renderStaffCards();
+    window.dispatchEvent(new CustomEvent('gc-staff-profiles-loaded'));
     decorateActivity();
   }
 
