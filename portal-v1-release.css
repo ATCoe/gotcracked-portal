@@ -35,8 +35,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
    APP SHELL / TOP BAR
    ------------------------------------------------------------------------- */
 .app-shell{grid-template-columns:var(--gc-sidebar-desktop) minmax(0,1fr)}
-.topbar{position:sticky;top:0;z-index:30;min-width:0;background:#fff}
-.location{min-width:0;overflow:visible;text-overflow:ellipsis;white-space:nowrap}
+.topbar{position:sticky;top:0;z-index:100;min-width:0;overflow:visible!important;isolation:isolate;background:#fff}
+.location{position:relative;z-index:1;min-width:0;overflow:visible!important;text-overflow:ellipsis;white-space:nowrap}
+.location[data-menu-open]{z-index:101}
+.topbar .v1-store-switch-menu{z-index:102!important;visibility:visible!important;pointer-events:auto}
 .v1-store-switch-menu:not([hidden]){opacity:1;transform:none;animation:none}
 .icon-button,.help{min-width:var(--gc-touch);min-height:var(--gc-touch)}
 .view{min-width:0}
