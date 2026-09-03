@@ -143,6 +143,9 @@
     syncCurrentProfile();
     renderProfileView(state.selected || current()?.id);
     renderStaffCards();
+    if (window.GotCrackedOperationsV1?.state && !window.GotCrackedOperationsV1.state.staff.length) {
+      window.GotCrackedOperationsV1.state.staff = state.profiles;
+    }
     window.dispatchEvent(new CustomEvent('gc-staff-profiles-loaded'));
     decorateActivity();
   }
