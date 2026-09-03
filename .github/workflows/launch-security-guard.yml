@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "Set up Front Desk Workstation" discord-integration.js
+          grep -q "Set up this shop device" discord-integration.js
           grep -q "workstation-enroll" discord-integration.js
           grep -q "verifyOtp" discord-integration.js
           grep -q "complete_workstation_enrollment" discord-integration.js
