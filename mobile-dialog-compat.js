@@ -11,6 +11,7 @@
     'gc-pcbuild-dialog'
   ]);
   const viewport = window.visualViewport;
+  const returnFocusByDialog = new WeakMap();
   let viewportFrame = 0;
 
   const proto = window.HTMLDialogElement?.prototype;
@@ -63,7 +64,12 @@
 
     if (dialog.dataset.gcMobileDialogCleanupBound !== 'true') {
       dialog.dataset.gcMobileDialogCleanupBound = 'true';
-      dialog.addEventListener('close', () => cleanup(dialog));
+      dialog.addEventListener('close', () => {
+        cleanup(dialog);
+        const destination=returnFocusByDialog.get(dialog);
+        returnFocusByDialog.delete(dialog);
+        if(destination?.isConnected)requestAnimationFrame(()=>destination.focus({preventScroll:true}));
+      });
     }
   }
 
@@ -73,6 +79,7 @@
     }
 
     if (this.open) return;
+    if(document.activeElement instanceof HTMLElement)returnFocusByDialog.set(this,document.activeElement);
     prepare(this);
 
     /*
@@ -120,3 +127,4 @@
     sync: scheduleViewportSync
   };
 })();
+
