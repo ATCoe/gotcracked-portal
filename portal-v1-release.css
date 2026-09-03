@@ -37,6 +37,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .app-shell{grid-template-columns:var(--gc-sidebar-desktop) minmax(0,1fr)}
 .topbar{position:sticky;top:0;z-index:30;min-width:0;background:#fff}
 .location{min-width:0;overflow:visible;text-overflow:ellipsis;white-space:nowrap}
+.v1-store-switch-menu:not([hidden]){opacity:1;transform:none;animation:none}
 .icon-button,.help{min-width:var(--gc-touch);min-height:var(--gc-touch)}
 .view{min-width:0}
 
