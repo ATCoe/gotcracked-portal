@@ -35,4 +35,6 @@
   .login-panel h1 { font-size: 30px; }
   .login-panel button, .login-panel input { max-width: 100%; }
   .login-panel .gc-workstation-enroll-login small { overflow-wrap: anywhere; }
+  .login-panel .gc-workstation-enroll-login { margin-top: 15px; padding-top: 15px; }
 }
+

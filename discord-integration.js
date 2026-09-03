@@ -11,6 +11,8 @@
   const WORKSTATION_DEVICE = 'gc-workstation-device-id';
   const WORKSTATION_GRANT = 'gc-workstation-enrollment-grant';
   const WORKSTATION_LABEL = 'gc-workstation-enrollment-label';
+  const WORKSTATION_REQUEST_LABEL = 'gc-workstation-request-label';
+  const KIOSK_INTENT = 'gc-kiosk-setup-intent';
 
   function ensureDeviceId() {
     let value = localStorage.getItem(WORKSTATION_DEVICE);
@@ -101,9 +103,10 @@
   async function beginWorkstationEnrollment() {
     if (sessionStorage.getItem(WORKSTATION_INTENT) !== '1') return false;
     const deviceId = ensureDeviceId();
-    authMessage('Authorizing this browser as the Front Desk Workstation…');
+    const requestedLabel = sessionStorage.getItem(WORKSTATION_REQUEST_LABEL)?.trim() || 'Shared shop computer';
+    authMessage(`Authorizing ${requestedLabel}…`);
     const { data, error } = await client.functions.invoke('workstation-enroll', {
-      body: { deviceId, deviceLabel:'Front Desk PC' }
+      body: { deviceId, deviceLabel:requestedLabel }
     });
     if (error || !data?.ok) {
       sessionStorage.removeItem(WORKSTATION_INTENT);
@@ -111,13 +114,14 @@
     }
 
     sessionStorage.setItem(WORKSTATION_GRANT, data.enrollmentToken);
-    sessionStorage.setItem(WORKSTATION_LABEL, data.deviceLabel || 'Front Desk PC');
+    sessionStorage.setItem(WORKSTATION_LABEL, data.deviceLabel || requestedLabel);
     sessionStorage.removeItem(WORKSTATION_INTENT);
+    sessionStorage.removeItem(WORKSTATION_REQUEST_LABEL);
 
     const verified = await client.auth.verifyOtp({ token_hash:data.otpTokenHash, type:'email' });
     if (verified.error || !verified.data?.session) throw verified.error || new Error('The one-time workstation sign-in could not be completed.');
     const grant = sessionStorage.getItem(WORKSTATION_GRANT) || '';
-    const label = sessionStorage.getItem(WORKSTATION_LABEL) || 'Front Desk PC';
+    const label = sessionStorage.getItem(WORKSTATION_LABEL) || 'Shared shop computer';
     const completed = await client.rpc('complete_workstation_enrollment', {
       enrollment_token:grant,
       device_id:deviceId,
@@ -144,13 +148,44 @@
     const completed = await client.rpc('complete_workstation_enrollment', {
       enrollment_token:grant,
       device_id:deviceId,
-      device_label:sessionStorage.getItem(WORKSTATION_LABEL) || 'Front Desk PC'
+      device_label:sessionStorage.getItem(WORKSTATION_LABEL) || 'Shared shop computer'
     });
     if (completed.error || !completed.data?.ok) throw completed.error || new Error('The workstation enrollment expired. Sign in with Discord and enroll it again.');
     sessionStorage.removeItem(WORKSTATION_GRANT);
     sessionStorage.removeItem(WORKSTATION_LABEL);
     sessionStorage.removeItem('gotcracked-staff');
     location.replace(`${location.pathname}#dashboard`);
+    return true;
+  }
+
+  async function downloadKioskSetupFromLogin() {
+    if (sessionStorage.getItem(KIOSK_INTENT) !== '1') return false;
+    const restored = window.GotCrackedAuth?.restoreSession
+      ? await window.GotCrackedAuth.restoreSession({ force:true })
+      : await client.auth.getSession().then(({data,error}) => ({session:data?.session || null,error}));
+    const token = restored?.session?.access_token;
+    if (!token) throw new Error('Sign in again to prepare kiosk setup.');
+    authMessage('Preparing the protected kiosk setup…');
+    const endpoint = `${String(client.supabaseUrl || '').replace(/\/$/, '')}/functions/v1/private-kiosk-download`;
+    if (!endpoint.startsWith('https://')) throw new Error('Kiosk setup is unavailable outside the secure Portal connection.');
+    const headers = { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' };
+    if (client.supabaseKey) headers.apikey = client.supabaseKey;
+    const response = await fetch(endpoint, { method:'POST', headers, body:'{}', cache:'no-store' });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload?.error || 'Only active owners and managers can prepare kiosk setup.');
+    }
+    const bundle = await response.blob();
+    if (bundle.size < 512) throw new Error('Portal returned an invalid kiosk bundle.');
+    const disposition = response.headers.get('content-disposition') || '';
+    const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || 'gotcracked-kiosk-setup.zip';
+    const url = URL.createObjectURL(bundle);
+    const link = document.createElement('a');
+    link.href = url; link.download = filename; link.style.display = 'none';
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    sessionStorage.removeItem(KIOSK_INTENT);
+    sessionStorage.setItem('gc-kiosk-setup-ready', '1');
     return true;
   }
 
@@ -220,11 +255,15 @@
     const discord=document.getElementById('discord-login');
     if (!discord) return;
     const wrap=document.createElement('div'); wrap.className='gc-workstation-enroll-login';
-    const button=document.createElement('button'); button.id='workstation-enroll'; button.type='button'; button.className='secondary-button'; button.textContent='Set up Front Desk Workstation';
-    const note=document.createElement('small'); note.textContent='Owners and managers: securely trust this shop computer using your Discord account.';
-    wrap.append(button,note); discord.insertAdjacentElement('afterend',wrap);
+    const heading=document.createElement('p'); heading.className='gc-shop-setup-heading'; heading.textContent='Set up this shop device';
+    const label=document.createElement('label'); label.className='gc-workstation-label'; label.htmlFor='workstation-device-label'; label.textContent='Computer name';
+    const input=document.createElement('input'); input.id='workstation-device-label'; input.name='workstation-device-label'; input.type='text'; input.maxLength=120; input.autocomplete='off'; input.placeholder='e.g. Front desk, Bench 2, Receiving';
+    const button=document.createElement('button'); button.id='workstation-enroll'; button.type='button'; button.className='secondary-button'; button.textContent='Set up shared shop computer';
+    const kiosk=document.createElement('button'); kiosk.id='kiosk-setup-download'; kiosk.type='button'; kiosk.className='text-button gc-kiosk-login-action'; kiosk.textContent='Download self-service kiosk setup';
+    const note=document.createElement('small'); note.textContent='Owners and managers authorize shared shop computers with Discord. Kiosk setup is prepared only for an approved tablet.';
+    wrap.append(heading,label,input,button,kiosk,note); discord.insertAdjacentElement('afterend',wrap);
     if (!document.getElementById('gc-workstation-enroll-login-style')) {
-      const style=document.createElement('style'); style.id='gc-workstation-enroll-login-style'; style.textContent='.gc-workstation-enroll-login{display:grid;gap:8px;margin-top:10px}.gc-workstation-enroll-login .secondary-button{width:100%}.gc-workstation-enroll-login small{display:block;line-height:1.45;opacity:.7}'; document.head.appendChild(style);
+      const style=document.createElement('style'); style.id='gc-workstation-enroll-login-style'; style.textContent='.gc-workstation-enroll-login{display:grid;gap:9px;margin-top:18px;padding-top:18px;border-top:1px solid rgba(143,183,221,.18)}.gc-shop-setup-heading{margin:0;color:#dceafb;font-size:12px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.gc-workstation-label{display:grid;gap:6px;color:#9eb2ca;font-size:12px;font-weight:750}.gc-workstation-label+input{width:100%;min-height:44px}.gc-workstation-enroll-login .secondary-button{width:100%}.gc-kiosk-login-action{justify-self:start;padding:4px 0;color:#79c8ff;font-weight:750}.gc-workstation-enroll-login small{display:block;line-height:1.45;opacity:.72}'; document.head.appendChild(style);
     }
   }
 
@@ -236,10 +275,17 @@
       catch (error) { authMessage(error.message,true); button.disabled=false; button.textContent='Continue with Discord'; }
     });
     document.querySelector('#workstation-enroll')?.addEventListener('click', async event => {
-      const button=event.currentTarget; button.disabled=true; button.textContent='Opening secure authorization…';
+      const button=event.currentTarget; const deviceLabel=document.querySelector('#workstation-device-label')?.value?.trim() || 'Shared shop computer'; button.disabled=true; button.textContent='Opening secure authorization…';
       sessionStorage.setItem(WORKSTATION_INTENT,'1');
+      sessionStorage.setItem(WORKSTATION_REQUEST_LABEL,deviceLabel);
       try { await signInWithDiscord(); }
-      catch(error){sessionStorage.removeItem(WORKSTATION_INTENT);authMessage(error.message,true);button.disabled=false;button.textContent='Set up Front Desk Workstation';}
+      catch(error){sessionStorage.removeItem(WORKSTATION_INTENT);sessionStorage.removeItem(WORKSTATION_REQUEST_LABEL);authMessage(error.message,true);button.disabled=false;button.textContent='Set up shared shop computer';}
+    });
+    document.querySelector('#kiosk-setup-download')?.addEventListener('click', async event => {
+      const button=event.currentTarget; button.disabled=true; button.textContent='Opening secure authorization…';
+      sessionStorage.setItem(KIOSK_INTENT,'1');
+      try { await signInWithDiscord(); }
+      catch(error){sessionStorage.removeItem(KIOSK_INTENT);authMessage(error.message,true);button.disabled=false;button.textContent='Download self-service kiosk setup';}
     });
 
     const priorError=sessionStorage.getItem('gc-auth-error');
@@ -269,6 +315,10 @@
         try { await beginWorkstationEnrollment(); return; }
         catch(error){sessionStorage.setItem('gc-auth-error',error?.message||'Workstation enrollment failed.');authMessage(error?.message,true);}
       }
+      if(result.authorized && sessionStorage.getItem(KIOSK_INTENT)==='1') {
+        try { await downloadKioskSetupFromLogin(); return; }
+        catch(error){sessionStorage.removeItem(KIOSK_INTENT);sessionStorage.setItem('gc-auth-error',error?.message||'Kiosk setup could not be prepared.');authMessage(error?.message,true);}
+      }
       if(!result.authorized&&result.transient)setTimeout(()=>verifyOnce({force:false}).catch(()=>{}),15000);
     };
     if(force)return setTimeout(run,50);
@@ -287,3 +337,4 @@
   scheduleBackgroundVerify(false);
   wireUi();
 })();
+
