@@ -25,7 +25,7 @@
     customers: ['customers-board.js'],
     reports:['analytics.js','reconciliation-center.js','reporting-bookkeeper.js','reporting-capacity-enhancements.js'],
     shipping:['shipping.js','shipping-integrated.js','shipping-marlon-support.js'],
-    inventory:['inventory-command-center.js','inventory-audit.js','parts-registry.js','shipping-marlon-support.js'],
+    inventory:['inventory-command-center.js','inventory-audit.js','parts-registry.js','shipping-marlon-support.js','rma-flow-labs.js'],
     staff:['avatar-presets.js','staff-profiles.js','account-page.js','premium-onboarding-v2.js','workforce-premium.js','timesheets.js'],
     settings:['business-settings.js','google-settings-integration.js','pricing-settings.js','procurement-settings.js','mobilesentrix-integration.js','shipping-integrated.js','shipping-marlon-support.js','reporting-capacity-enhancements.js','workstation-admin.js']
   };
@@ -55,3 +55,4 @@
   window.GotCrackedRuntime={ensureView:ensureViewRuntime,startDeferred:startDeferredRuntime,waitForProfile:waitForOperationsProfile,get profile(){return profileReady;}};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',watchLoginState,{once:true});else watchLoginState();
 })();
+
