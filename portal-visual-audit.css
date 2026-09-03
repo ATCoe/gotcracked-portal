@@ -100,6 +100,9 @@ html[data-theme="dark"] #gc-bookkeeper-report .gc-books-table td {
   }
 }
 /* RMA Flow Labs: restrained, brand-aligned beta surface. */
+#gc-bookkeeper-report .gc-books-card{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.gc-support-row>span:nth-child(2){min-width:0;overflow-wrap:anywhere}
+.gc-support-row>span:nth-child(2) strong{white-space:normal;word-break:break-word}
 .gc-rma-flow-labs { margin-top: 18px; }
 .gc-rma-flow-labs .card-title { align-items: flex-start; }
 .gc-rma-flow-badge { display:inline-flex; align-items:center; padding:5px 9px; border:1px solid #9fd8e3; border-radius:999px; color:#087b9e; background:#effbfc; font-size:11px; font-weight:800; white-space:nowrap; }
