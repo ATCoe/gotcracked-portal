@@ -46,10 +46,11 @@
   async function checkAccess(){
     const p=profile();if(!p?.id)return false;
     const results=await Promise.all([
-      db.from('rma_flow_labs_access').select('enabled').eq('profile_id',p.id).eq('feature_key','RMA_FLOW_LABS').maybeSingle(),
+      db.rpc('rma_flow_labs_enabled'),
       db.rpc('has_permission',{permission_key:'purchasing.manage'})
     ]);
-    state.enabled=results[0].data?.enabled===true;
+    if(results[0].error)window.GotCrackedDiagnostics?.error?.(results[0].error,{context:'RMA Flow Labs access check failed'});
+    state.enabled=results[0].data===true;
     state.manage=results[1].data===true||p.role==='owner';
     state.enabled?addShell():removeShell();
     return state.enabled;
