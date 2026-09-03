@@ -145,7 +145,7 @@ begin
       )
     ) into detail
     from public.customers c
-    where c.id=customer_id_input and c.location_id=loc;
+      where c.id=customer_id_input;
 
     if detail is null then raise exception 'Customer not found.'; end if;
   end if;
@@ -164,7 +164,7 @@ begin
         (select max(coalesce(l.updated_at,l.created_at)) from public.leads l where l.location_id=loc and l.customer_id=c.id)
       ) as last_activity
     from public.customers c
-    where c.location_id=loc
+    where true
       and (
         q is null
         or concat_ws(' ',c.first_name,c.last_name) ilike '%'||q||'%'
@@ -195,10 +195,10 @@ begin
     'offset',off,
     'limit',lim,
     'summary',jsonb_build_object(
-      'total_customers',(select count(*) from public.customers c where c.location_id=loc),
+      'total_customers',(select count(*) from public.customers),
       'customers_with_active_repairs',(select count(distinct t.customer_id) from public.repair_tickets t where t.location_id=loc and t.status::text not in ('sale_complete','abandoned','unrepairable','customer_declined','cancelled','completed')),
       'customers_ready_for_pickup',(select count(distinct t.customer_id) from public.repair_tickets t where t.location_id=loc and t.status::text in ('repaired','ready_for_pickup')),
-      'new_last_30_days',(select count(*) from public.customers c where c.location_id=loc and c.created_at>=now()-interval '30 days')
+      'new_last_30_days',(select count(*) from public.customers c where c.created_at>=now()-interval '30 days')
     ),
     'customers',coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -301,3 +301,4 @@ revoke all on function public.get_customer_command_center(text,uuid,integer,inte
 revoke all on function public.save_customer_profile(uuid,text,text,text,text,text,text,text,text,text,text,text,text) from public,anon;
 grant execute on function public.get_customer_command_center(text,uuid,integer,integer) to authenticated;
 grant execute on function public.save_customer_profile(uuid,text,text,text,text,text,text,text,text,text,text,text,text) to authenticated;
+
