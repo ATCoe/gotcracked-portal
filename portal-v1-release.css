@@ -36,7 +36,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
    ------------------------------------------------------------------------- */
 .app-shell{grid-template-columns:var(--gc-sidebar-desktop) minmax(0,1fr)}
 .topbar{position:sticky;top:0;z-index:30;min-width:0;background:#fff}
-.location{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.location{min-width:0;overflow:visible;text-overflow:ellipsis;white-space:nowrap}
 .icon-button,.help{min-width:var(--gc-touch);min-height:var(--gc-touch)}
 .view{min-width:0}
 
@@ -444,4 +444,5 @@ dialog::backdrop,#v1-intake-dialog::backdrop,#v1-po-dialog::backdrop,#portal-v1-
 .gc-diagnostic-actions{display:flex;gap:12px;margin-top:9px}.gc-diagnostic-actions button{min-height:28px;padding:0;border:0;background:transparent;color:#8c211a;font-size:.7rem;font-weight:800;text-decoration:underline;cursor:pointer}
 @media(max-width:750px){.gc-diagnostic-stack{right:14px;bottom:max(14px,env(safe-area-inset-bottom));width:calc(100vw - 28px)}}
 @media(prefers-reduced-motion:reduce){.gc-diagnostic{transition:none}}
+
 
