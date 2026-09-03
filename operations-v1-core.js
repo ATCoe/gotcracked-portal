@@ -154,10 +154,10 @@
   async function loadProduction(){
     const loc=state.profile.location_id;
     const jobs={
-      customers:client.from('customers').select('*,devices(*),repair_tickets(id,ticket_number,status,customer_issue,total_cents,created_at,device_id)').eq('location_id',loc).order('created_at',{ascending:false}).limit(500),
+      customers:client.from('customers').select('*,devices(*),repair_tickets(id,ticket_number,status,customer_issue,total_cents,created_at,device_id)').order('created_at',{ascending:false}).limit(1000),
       workOrders:can('repairs.view')?client.from('repair_tickets').select('*,customers(*),devices(*),profiles:assigned_user_id(display_name),work_order_items(*),ticket_events(*,actor:actor_user_id(display_name))').eq('location_id',loc).order('created_at',{ascending:false}).limit(500):Promise.resolve({data:[]}),
       leads:can('leads.view')?client.from('leads').select('*').order('created_at',{ascending:false}).limit(500):Promise.resolve({data:[]}),
-      inventory:can('inventory.view')?client.from('inventory_items').select('*').eq('active',true).order('name').limit(1000):Promise.resolve({data:[]}),
+      inventory:can('inventory.view')?client.from('inventory_items').select('*').eq('active',true).order('name').limit(5000):Promise.resolve({data:[]}),
       services:client.from('services').select('*').eq('active',true).order('name'),
       guides:can('reference.view')?client.from('repair_guides').select('*').eq('active',true).order('device_category').order('title'):Promise.resolve({data:[]}),
       templates:can('repairs.intake')?client.from('intake_templates').select('*').eq('active',true):Promise.resolve({data:[]}),
@@ -325,8 +325,8 @@
       const ticket={id:uid('ticket'),ticket_number:900000+state.workOrders.length+2,location_id:'training',customer_id:customer.id,device_id:device.id,status:'awaiting_customer',customer_issue:lead.customer_issue||lead.service||'Repair inquiry',lead_id:lead.id,created_at:now(),updated_at:now(),customers:{...customer},devices:{...device},profiles:null,work_order_items:[],ticket_events:[]};state.workOrders.unshift(ticket);lead.pipeline_status='converted';lead.status='won';lead.converted_ticket_id=ticket.id;saveTraining();closeDrawer();renderAll();openWorkOrder(ticket.id);return;
     }
     let customer=null;const phone=digits(lead.phone);
-    if(phone){const result=await client.from('customers').select('*').eq('location_id',state.profile.location_id).eq('phone_normalized',phone).maybeSingle();if(!result.error)customer=result.data;}
-    if(!customer&&lead.email){const result=await client.from('customers').select('*').eq('location_id',state.profile.location_id).ilike('email',lead.email).maybeSingle();if(!result.error)customer=result.data;}
+    if(phone){const result=await client.from('customers').select('*').eq('phone_normalized',phone).maybeSingle();if(!result.error)customer=result.data;}
+    if(!customer&&lead.email){const result=await client.from('customers').select('*').ilike('email',lead.email).maybeSingle();if(!result.error)customer=result.data;}
     if(!customer){const names=String(lead.name||'Customer').trim().split(/\s+/);const last=names.length>1?names.pop():'Customer';const result=await client.from('customers').insert({location_id:state.profile.location_id,first_name:names.join(' ')||'Customer',last_name:last,phone:lead.phone||'',phone_normalized:phone,contact_phone:lead.phone||'',email:lead.email||null}).select().single();if(result.error)return alert(result.error.message);customer=result.data;}
     let device=null;const existingDevices=await client.from('devices').select('*').eq('customer_id',customer.id);if(!existingDevices.error)device=(existingDevices.data||[]).find(d=>String(d.manufacturer||'').toLowerCase()===String(lead.manufacturer||'').toLowerCase()&&String(d.model||'').toLowerCase()===String(lead.model||'').toLowerCase());
     if(!device){const result=await client.from('devices').insert({customer_id:customer.id,category:lead.device_category||'Other',manufacturer:lead.manufacturer||null,model:lead.model||'Unspecified device',last_seen_at:now()}).select().single();if(result.error)return alert(result.error.message);device=result.data;}
@@ -595,4 +595,5 @@
   client.auth.onAuthStateChange(event=>{if(['SIGNED_IN','INITIAL_SESSION'].includes(event))setTimeout(start,900);});
   setTimeout(start,1400);
 })();
+
 
