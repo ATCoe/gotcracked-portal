@@ -38,6 +38,8 @@ main{background:radial-gradient(circle at 82% 0,rgba(24,119,242,.045),transparen
 .sidebar nav::-webkit-scrollbar{width:5px}
 .sidebar nav::-webkit-scrollbar-thumb{background:#35475e;border-radius:999px}
 .nav-link{position:relative;border:1px solid transparent;transition:background .14s ease,color .14s ease,border-color .14s ease,transform .14s ease}
+.nav-icon{width:18px;height:18px;flex:0 0 18px;display:inline-block;background:currentColor;mask:var(--nav-icon) center/contain no-repeat;-webkit-mask:var(--nav-icon) center/contain no-repeat;opacity:.86}
+.nav-icon-dashboard{--nav-icon:url("assets/nav-dashboard.svg")}.nav-icon-repairs{--nav-icon:url("assets/nav-repairs.svg")}.nav-icon-shipping{--nav-icon:url("assets/nav-shipping.svg")}.nav-icon-leads{--nav-icon:url("assets/nav-leads.svg")}.nav-icon-calendar{--nav-icon:url("assets/nav-calendar.svg")}.nav-icon-customers{--nav-icon:url("assets/nav-customers.svg")}.nav-icon-inventory{--nav-icon:url("assets/nav-inventory.svg")}.nav-icon-reports{--nav-icon:url("assets/nav-reports.svg")}.nav-icon-staff{--nav-icon:url("assets/nav-staff.svg")}.nav-icon-settings{--nav-icon:url("assets/nav-settings.svg")}
 .nav-link:hover{transform:translateX(2px)}
 .nav-link.active{background:linear-gradient(90deg,#243a55,#22354d);border-color:#304760;box-shadow:inset 3px 0 0 #4c9cf0}
 .topbar{box-shadow:0 2px 14px rgba(14,34,54,.035)}
