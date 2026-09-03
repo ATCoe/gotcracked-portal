@@ -264,6 +264,15 @@
       nav.classList.toggle('active', nav.dataset.view === id);
     });
 
+    const animateView = () => {
+      target.classList.remove('gc-motion-view-enter');
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      void target.offsetWidth;
+      target.classList.add('gc-motion-view-enter');
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(animateView);
+    else animateView();
+
     if (updateHash) {
       const nextHash = `#${id}`;
       if (window.location.hash !== nextHash) history.pushState(null, '', nextHash);
