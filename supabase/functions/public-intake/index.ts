@@ -152,8 +152,10 @@ Deno.serve(async request => {
     const sourceLabel = source === 'gotcracked-kiosk' ? 'the GotCracked self-service kiosk' : 'gotcracked.co';
     const preferredDate = intakeMethod === 'walk_in' ? clean(body.date, 10) : '';
     const preferredTime = intakeMethod === 'walk_in' ? clean(body.time, 80) : '';
+    const clientRequestId = clean(body.clientRequestId, 80);
     const shippingAddress = intakeMethod === 'mail_in' ? { line1: clean(body.address1, 160), line2: clean(body.address2, 160) || null, city: clean(body.city, 100), state: clean(body.state, 40).toUpperCase(), postal_code: clean(body.postalCode, 20) } : null;
     if (!firstName || !lastName || !phone || !email || !model || !issue || body.consent !== 'on') return json(origin, { error: 'Complete all required fields and consent to contact.' }, 400);
+    if (clientRequestId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clientRequestId)) return json(origin, { error: 'Please reload the form and try again.' }, 400);
     if (intakeMethod === 'mail_in' && (!shippingAddress?.line1 || !shippingAddress.city || !shippingAddress.state || !shippingAddress.postal_code)) return json(origin, { error: 'Complete the return shipping address.' }, 400);
     if (!/^\S+@\S+\.\S+$/.test(email)) return json(origin, { error: 'Enter a valid email address.' }, 400);
 
@@ -179,6 +181,14 @@ Deno.serve(async request => {
       }
     }
 
+    if (clientRequestId) {
+      const prior = await admin.from('leads').select('id,public_reference,appointment_id').eq('client_request_id', clientRequestId).maybeSingle();
+      if (prior.error) throw prior.error;
+      if (prior.data) {
+        return json(origin, { ok:true, reference:prior.data.public_reference, appointmentId:prior.data.appointment_id || null, discordDelivered:false, emailDelivered:false, duplicate:true }, 200);
+      }
+    }
+
     let partMapping: Record<string, any> = { matched:false, verified:false, parts_available:false };
     let bookingRecommendation: Record<string, any> | null = null;
     if (intakeMethod === 'walk_in') {
@@ -200,7 +210,7 @@ Deno.serve(async request => {
     const externalId = `${source === 'gotcracked-kiosk' ? 'kiosk' : 'web'}-${crypto.randomUUID()}`;
     const notes = [issue, `Preferred contact: ${preferredContact}`, timingNote ? `Timing/deadline: ${timingNote}` : null].filter(Boolean).join('\n\n');
     const leadRecord = {
-      external_id: externalId, public_reference: reference, location_id: locationId,
+      external_id: externalId, client_request_id: clientRequestId || null, public_reference: reference, location_id: locationId,
       name: `${firstName} ${lastName}`, phone, email, service: issue.slice(0, 180), source, notes,
       device_type: deviceType, device_model: model, intake_method: intakeMethod, shipping_address: shippingAddress,
       preferred_date: intakeMethod === 'walk_in' ? preferredDate : null,
