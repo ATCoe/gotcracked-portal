@@ -39,7 +39,10 @@ begin
     where profile.id = auth.uid()
       and profile.active = true
       and coalesce(profile.account_type, 'staff') = 'staff'
-      and human_session.verification_method in ('discord', 'owner_recovery')
+      and (
+        human_session.verification_method = 'discord'
+        or (human_session.verification_method = 'owner_recovery' and profile.role::text = 'owner')
+      )
       and (auth_session.not_after is null or auth_session.not_after > now())
   ) then
     return jsonb_build_object('allowed', true);
