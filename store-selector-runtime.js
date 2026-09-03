@@ -5,6 +5,12 @@
   const render = () => {
     const host = document.querySelector('.topbar .location');
     if (!host || host.querySelector('[data-v1-store-menu-toggle]')) return;
+    if (!document.getElementById('gc-store-selector-contrast')) {
+      const style = document.createElement('style');
+      style.id = 'gc-store-selector-contrast';
+      style.textContent = '.topbar .location{overflow:visible!important;color:#e8f1f8!important}.topbar .location .v1-store-switch{color:#102131!important;background:#f8fbff!important;border:1px solid #9fb2c4!important;box-shadow:0 8px 20px rgba(0,0,0,.22)!important}.topbar .location .v1-store-switch strong{color:#102131!important}.v1-store-switch-menu{display:block!important;background:#102131!important;color:#f8fbff!important}.v1-store-switch-menu[hidden]{display:none!important}.v1-store-option,.v1-store-option strong{color:#f8fbff!important}.v1-store-option small{color:#b8c9d8!important}';
+      document.head.appendChild(style);
+    }
     const activeTraining = training();
     host.innerHTML = `<button class="v1-store-switch" type="button" data-v1-store-menu-toggle aria-haspopup="menu" aria-expanded="false"><span class="status-dot"></span><strong>${activeTraining ? 'Training Store' : 'Blacksburg'}</strong><span aria-hidden="true">⌄</span></button><div class="v1-store-switch-menu" role="menu" hidden><button class="v1-store-option" type="button" role="menuitem" data-v1-store-option="production" aria-current="${activeTraining ? 'false' : 'true'}"><span class="status-dot"></span><span><strong>Blacksburg</strong><small>Live production data</small></span></button><button class="v1-store-option" type="button" role="menuitem" data-v1-store-option="training" aria-current="${activeTraining ? 'true' : 'false'}"><span>◌</span><span><strong>Training Store</strong><small>Sandbox data only</small></span></button></div>`;
   };
