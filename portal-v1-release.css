@@ -448,4 +448,14 @@ dialog::backdrop,#v1-intake-dialog::backdrop,#v1-po-dialog::backdrop,#portal-v1-
 @media(max-width:750px){.gc-diagnostic-stack{right:14px;bottom:max(14px,env(safe-area-inset-bottom));width:calc(100vw - 28px)}}
 @media(prefers-reduced-motion:reduce){.gc-diagnostic{transition:none}}
 
+/* Explicit recovery state for a failed authenticated boot. Hidden during the
+   normal path so it cannot compete with the live Portal shell. */
+.gc-portal-boot-recovery{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:24px;background:rgba(3,11,20,.82);backdrop-filter:blur(10px)}
+.gc-portal-boot-recovery[hidden]{display:none}
+.gc-portal-boot-recovery-card{display:flex;align-items:flex-start;gap:16px;max-width:520px;padding:28px;border:1px solid rgba(91,180,255,.28);border-radius:20px;background:linear-gradient(145deg,#12253b,#091522);box-shadow:0 24px 70px rgba(0,0,0,.38);color:#edf7ff}
+.gc-portal-boot-recovery-mark{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border-radius:12px;background:rgba(255,190,70,.16);border:1px solid rgba(255,190,70,.34);color:#ffd37a;font-weight:900;font-size:22px}
+.gc-portal-boot-recovery-card h1{margin:3px 0 8px;font-size:clamp(22px,3vw,30px);letter-spacing:-.03em}
+.gc-portal-boot-recovery-card p:not(.eyebrow){margin:0 0 18px;color:#b8cee0;line-height:1.55}
+.gc-portal-boot-recovery-card .primary-button{min-height:44px}
+@media (max-width:560px){.gc-portal-boot-recovery{padding:16px}.gc-portal-boot-recovery-card{padding:22px;gap:12px}.gc-portal-boot-recovery-mark{flex-basis:32px;width:32px;height:32px;font-size:18px}}
 
