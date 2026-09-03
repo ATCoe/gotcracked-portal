@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260902-staff-permissions1';
+  const VERSION = '20260902-staff-permissions2';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
