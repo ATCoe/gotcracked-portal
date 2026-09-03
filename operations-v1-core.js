@@ -192,6 +192,41 @@
     renderAll();
   }
 
+  function storeMenuMarkup(){
+    const storeName=esc(state.profile?.locations?.name||'Main Store');
+    return `<button class="v1-store-option" type="button" role="menuitem" data-v1-store-option="production" aria-current="${state.training?'false':'true'}"><span class="status-dot"></span><span><strong>${storeName}</strong><small>Live production data</small></span></button><button class="v1-store-option" type="button" role="menuitem" data-v1-store-option="training" aria-current="${state.training?'true':'false'}"><span>◌</span><span><strong>Training Store</strong><small>Sandbox data only</small></span></button>`;
+  }
+
+  function positionStoreMenu(menu=document.getElementById('v1-store-switch-menu'),toggle=document.querySelector('[data-v1-store-menu-toggle]')){
+    if(!menu||!toggle||menu.hidden)return;
+    const rect=toggle.getBoundingClientRect(),width=menu.offsetWidth||220;
+    menu.style.left=`${Math.max(8,Math.min(rect.left,window.innerWidth-width-8))}px`;
+    menu.style.top=`${Math.max(8,rect.bottom+8)}px`;
+  }
+
+  function closeStoreMenu({focus=false}={}){
+    const menu=document.getElementById('v1-store-switch-menu'),toggle=document.querySelector('[data-v1-store-menu-toggle]');
+    if(!menu)return;
+    menu.hidden=true;
+    toggle?.setAttribute('aria-expanded','false');
+    toggle?.parentElement?.removeAttribute('data-menu-open');
+    if(focus)toggle?.focus();
+  }
+
+  function ensureStoreMenu(){
+    let menu=document.getElementById('v1-store-switch-menu');
+    const wasOpen=Boolean(menu&&!menu.hidden);
+    if(!menu){menu=document.createElement('div');menu.id='v1-store-switch-menu';menu.className='v1-store-switch-menu';menu.setAttribute('role','menu');menu.hidden=true;document.body.appendChild(menu);}
+    const menuKey=`${state.training?'training':'production'}:${state.profile?.locations?.name||'Main Store'}`;
+    if(menu.dataset.storeMode!==menuKey){menu.innerHTML=storeMenuMarkup();menu.dataset.storeMode=menuKey;}
+    const toggle=document.querySelector('[data-v1-store-menu-toggle]');
+    if(!toggle)return;
+    toggle.setAttribute('aria-controls',menu.id);
+    toggle.setAttribute('aria-expanded',String(wasOpen));
+    toggle.parentElement?.toggleAttribute('data-menu-open',wasOpen);
+    if(wasOpen)requestAnimationFrame(()=>positionStoreMenu(menu,toggle));
+  }
+
   function ensureShell(){
     const main=document.querySelector('.app-shell main');
     const nav=document.querySelector('.sidebar nav');
@@ -214,7 +249,8 @@
     if(!document.getElementById('v1-po-dialog')){const dialog=document.createElement('dialog');dialog.id='v1-po-dialog';dialog.innerHTML='<form id="v1-po-form"><div id="v1-po-content"></div></form>';document.body.appendChild(dialog);}
     const location=document.querySelector('.topbar .location');
     if(location){
-      location.innerHTML=`<button class="v1-store-switch" type="button" data-v1-store-menu-toggle aria-haspopup="menu" aria-expanded="false"><span class="status-dot"></span><strong>${state.training?'Training Store':esc(state.profile?.locations?.name||'Main Store')}</strong></button><div class="v1-store-switch-menu" role="menu" hidden><button class="v1-store-option" type="button" role="menuitem" data-v1-store-option="production" aria-current="${state.training?'false':'true'}"><span class="status-dot"></span><span><strong>${esc(state.profile?.locations?.name||'Main Store')}</strong><small>Live production data</small></span></button><button class="v1-store-option" type="button" role="menuitem" data-v1-store-option="training" aria-current="${state.training?'true':'false'}"><span>◌</span><span><strong>Training Store</strong><small>Sandbox data only</small></span></button></div>`;
+      location.innerHTML=`<button class="v1-store-switch" type="button" data-v1-store-menu-toggle aria-haspopup="menu"><span class="status-dot"></span><strong>${state.training?'Training Store':esc(state.profile?.locations?.name||'Main Store')}</strong></button>`;
+      ensureStoreMenu();
     }
     document.body.classList.toggle('training-store',state.training);
     let banner=document.getElementById('v1-training-banner');
@@ -557,17 +593,17 @@
   document.addEventListener('keydown',event=>{
     if(event.key==='Enter'&&event.target.id==='v1-pickup-scan'){event.preventDefault();const scanned=event.target.value.trim().toUpperCase(),number=scanned.replace(/\D/g,'');const ticket=state.workOrders.find(t=>['repaired','ready_for_pickup'].includes(t.status)&&(String(t.ticket_number)===number||ticketCode(t.ticket_number)===scanned));if(ticket)openWorkOrder(ticket.id);else alert('No ready work order matches that barcode.');event.target.value='';}
     if(event.key==='Escape'){closeDrawer();const results=document.getElementById('v1-line-results');if(results)results.hidden=true;}
-    if(event.key==='Escape'){const toggle=document.querySelector('[data-v1-store-menu-toggle]'),menu=document.querySelector('.v1-store-switch-menu:not([hidden])');if(menu){menu.hidden=true;toggle?.setAttribute('aria-expanded','false');toggle?.parentElement?.removeAttribute('data-menu-open');toggle?.focus();}}
+    if(event.key==='Escape')closeStoreMenu({focus:true});
   });
 
   document.addEventListener('click',async event=>{
     const target=event.target instanceof Element?event.target:null;if(!target)return;
     const menuToggle=target.closest('[data-v1-store-menu-toggle]');
-    if(menuToggle){event.preventDefault();const menu=menuToggle.parentElement?.querySelector('.v1-store-switch-menu');if(menu){menu.hidden=!menu.hidden;menuToggle.setAttribute('aria-expanded',String(!menu.hidden));menuToggle.parentElement?.toggleAttribute('data-menu-open',!menu.hidden);if(!menu.hidden)menu.querySelector('[aria-current="true"]')?.focus();}return;}
+    if(menuToggle){event.preventDefault();const menu=document.getElementById('v1-store-switch-menu');if(menu){const opening=menu.hidden;menu.hidden=!opening;menuToggle.setAttribute('aria-expanded',String(opening));menuToggle.parentElement?.toggleAttribute('data-menu-open',opening);if(opening){positionStoreMenu(menu,menuToggle);menu.querySelector('[aria-current="true"]')?.focus();}}return;}
     const option=target.closest('[data-v1-store-option]');
-    if(option){event.preventDefault();const menu=option.closest('.v1-store-switch-menu');if(menu){menu.hidden=true;menu.previousElementSibling?.setAttribute('aria-expanded','false');menu.parentElement?.removeAttribute('data-menu-open');}await switchStore(option.dataset.v1StoreOption==='training');return;}
+    if(option){event.preventDefault();closeStoreMenu();await switchStore(option.dataset.v1StoreOption==='training');return;}
     if(target.closest('[data-v1-store-switch]')){event.preventDefault();await switchStore();return;}
-    if(!target.closest('.topbar .location')){const menu=document.querySelector('.v1-store-switch-menu:not([hidden])');menu?.setAttribute('hidden','');menu?.parentElement?.removeAttribute('data-menu-open');}
+    if(!target.closest('.topbar .location')&&!target.closest('#v1-store-switch-menu'))closeStoreMenu();
     if(target.closest('[data-v1-reset-training]')){if(confirm('Reset all Training Store sandbox data?')){localStorage.removeItem('gc-training-data-v1');if(state.training){loadTraining();renderAll();}}return;}
     const filter=target.closest('[data-v1-lead-filter]');if(filter){state.leadFilter=filter.dataset.v1LeadFilter;renderLeads();return;}
     const lead=target.closest('[data-v1-lead]');if(lead){openLead(lead.dataset.v1Lead);return;}
@@ -666,3 +702,5 @@
   client.auth.onAuthStateChange(event=>{if(['SIGNED_IN','INITIAL_SESSION'].includes(event))setTimeout(start,900);});
   setTimeout(start,1400);
 })();
+
+
