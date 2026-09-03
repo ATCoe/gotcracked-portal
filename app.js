@@ -74,16 +74,18 @@
       if (!ticketId) return null;
       const host = ensureHost();
       const selector = `[data-gc-maintenance-ticket="${CSS.escape(ticketId)}"]`;
-      let card = host.querySelector(selector);
+      let card = document.querySelector(selector);
       if (!card) {
         card = document.createElement('article');
         card.className = 'gc-diagnostic gc-maintenance-approval';
         card.dataset.gcMaintenanceTicket = ticketId;
         card.innerHTML = `<div class="gc-diagnostic-icon" aria-hidden="true">!</div><div class="gc-diagnostic-copy"><strong></strong><p></p><small></small><div class="gc-diagnostic-actions"><button type="button" class="gc-maintenance-review" data-gc-maintenance-review>Review in Support Desk</button></div></div>`;
-        host.prepend(card);
       }
+      const topActions = document.querySelector('.topbar .top-actions');
+      (topActions || host).prepend(card);
       const code = options.ticketNumber ? `SUP-${String(options.ticketNumber).padStart(4,'0')}` : 'Marlon';
       card.querySelector('strong').textContent = `Action review needed · ${code}`;
+      card.querySelector('[data-gc-maintenance-review]')?.replaceChildren(`Review ${code}`);
       card.querySelector('p').textContent = String(options.title || 'Marlon needs Owner approval before continuing this protected task.');
       const count=Math.max(1,Number(options.pendingCount||1));
       card.querySelector('small').textContent = count>1 ? `${count} items await an Owner decision · Showing oldest · Surface: ${String(options.surface || 'Portal')} · Priority: ${String(options.priority || 'High')}` : `Surface: ${String(options.surface || 'Portal')} · Priority: ${String(options.priority || 'High')} · Open Support Desk to review.`;
@@ -94,7 +96,7 @@
     const clearMaintenanceApproval = ticketId => {
       const id = String(ticketId || '').trim();
       if (!id) return;
-      const card = ensureHost().querySelector(`[data-gc-maintenance-ticket="${CSS.escape(id)}"]`);
+      const card = document.querySelector(`[data-gc-maintenance-ticket="${CSS.escape(id)}"]`);
       if (card) dismiss(card);
     };
     const dismiss = card => { if (!card?.isConnected) return; card.classList.remove('is-visible'); setTimeout(() => card.remove(), 180); };
