@@ -1,11 +1,10 @@
 (() => {
   'use strict';
 
-  // This file intentionally runs synchronously in <head>. It owns two things
-  // that must happen before the browser's first paint:
-  // 1) resolve the saved/system theme;
-  // 2) keep the authenticated app shell hidden until the current Portal runtime
-  //    has hydrated the staff profile and the current view.
+  // This file intentionally runs synchronously in <head>. It resolves the
+  // saved/system theme before first paint and leaves the real Portal shell
+  // visible while authentication and data hydrate. A blank staff screen is a
+  // worse experience than a clearly labelled, non-interactive loading state.
   const root = document.documentElement;
   root.dataset.gcPortalBoot = 'loading';
 
@@ -54,21 +53,18 @@
     window.addEventListener(type, event => markEarlyInput('W-BUB', event), false);
   }
 
-  // This is a synchronous pre-paint guard, not a late visual override. Keeping
-  // it here prevents the legacy static shell from flashing before the 1.0
-  // runtime has finished replacing/hydrating its content.
+  // Keep the first-paint shell non-interactive until its runtime is ready, but
+  // never hide it. The static markup is the same current Portal design and
+  // includes labelled loading content; it is not a legacy overlay.
   const bootStyle = document.createElement('style');
   bootStyle.id = 'gc-portal-boot-style';
   bootStyle.textContent = `
-    html[data-gc-portal-boot="loading"] .app-shell{
-      opacity:0!important;
-      visibility:hidden!important;
-      pointer-events:none!important;
-    }
+    html[data-gc-portal-boot="loading"] .app-shell{ pointer-events:none!important; }
     html[data-gc-portal-boot="ready"] .app-shell,
     html[data-gc-portal-boot="error"] .app-shell{
       opacity:1;
       visibility:visible;
+      pointer-events:auto;
     }
   `;
   document.head.appendChild(bootStyle);
