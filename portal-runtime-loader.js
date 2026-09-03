@@ -9,7 +9,7 @@
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
-    'theme-controller.js','training-shared-sync.js','runtime-stability.js','mobile-runtime-regression-fixes.js','portal-refresh-stability.js','operations-v1-core.js',
+    'theme-controller.js','training-shared-sync.js','runtime-stability.js','mobile-runtime-regression-fixes.js','portal-refresh-stability.js','operations-v1-core.js','rma-flow-labs.js',
     'operator-request-context.js','workstation-mode.js','payment-center.js','portal-current-ui-fixes.js','mobile-dialog-compat.js','action-launchers.js','account-sync.js','time-clock.js','portal-deep-links.js','operations-v1-arrival.js','portal-v1-polish.js','intake-profile-validation-fix.js','portal-mobile-audit.js','portal-v1-final.js','ui-title-case.js','directory-advanced.js','master-directory.js','cross-user-sync.js','sales-ops.js','marlon-reporting-bridge.js','dashboard-rail.js','reporting-bookkeeper.js','reporting-capacity-enhancements.js'
   ];
 
@@ -25,7 +25,8 @@
     customers: ['customers-board.js'],
     reports:['analytics.js','reconciliation-center.js','reporting-bookkeeper.js','reporting-capacity-enhancements.js'],
     shipping:['shipping.js','shipping-integrated.js','shipping-marlon-support.js'],
-    inventory:['inventory-command-center.js','inventory-audit.js','parts-registry.js','shipping-marlon-support.js','rma-flow-labs.js'],
+    inventory:['inventory-command-center.js','inventory-audit.js','parts-registry.js','shipping-marlon-support.js'],
+    'rma-flow-labs':['rma-flow-labs.js'],
     staff:['avatar-presets.js','staff-profiles.js','account-page.js','premium-onboarding-v2.js','workforce-premium.js','timesheets.js'],
     settings:['business-settings.js','google-settings-integration.js','pricing-settings.js','procurement-settings.js','mobilesentrix-integration.js','shipping-integrated.js','shipping-marlon-support.js','reporting-capacity-enhancements.js','workstation-admin.js']
   };
