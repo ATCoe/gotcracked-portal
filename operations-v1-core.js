@@ -196,6 +196,13 @@
     const main=document.querySelector('.app-shell main');
     const nav=document.querySelector('.sidebar nav');
     if(!main||!nav)return;
+    // A previous selector runtime injected a bright contrast style into live sessions.
+    // Remove that stale layer before this module renders the single authoritative control.
+    document.getElementById('gc-store-selector-contrast')?.remove();
+    document.querySelectorAll('style').forEach(style=>{
+      const css=style.textContent||'';
+      if(css.includes('.topbar .location .v1-store-switch')&&css.includes('#f8fbff'))style.remove();
+    });
     const addAfter=(selector,html)=>nav.querySelector(selector)?.insertAdjacentHTML('afterend',html);
     if(!nav.querySelector('[data-view="ready-pickup"]'))addAfter('[data-view="repairs"]','<a class="nav-link" href="#ready-pickup" data-view="ready-pickup"><span>✓</span>Ready for Pickup <b id="ready-count" hidden>0</b></a>');
     if(!nav.querySelector('[data-view="repair-reference"]'))addAfter('[data-view="inventory"]','<a class="nav-link" href="#repair-reference" data-view="repair-reference"><span>⌕</span>Repair Reference</a><a class="nav-link" href="#purchasing" data-view="purchasing"><span>▣</span>Purchasing</a>');
