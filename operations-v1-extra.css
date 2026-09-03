@@ -1,5 +1,7 @@
 /* Portal 1.0 supplemental functional styles. */
-.v1-store-switch{display:inline-flex;align-items:center;gap:8px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;min-height:44px;padding:0 6px;border-radius:8px}
+.v1-store-switch{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(148,163,184,.34);background:rgba(15,29,43,.92);color:inherit;font:inherit;cursor:pointer;min-height:42px;min-width:176px;padding:0 12px;border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.v1-store-switch:hover,.v1-store-switch:focus-visible{border-color:#3b82f6;background:#172b40;outline:2px solid rgba(59,130,246,.35);outline-offset:2px}
+.v1-store-switch strong{font-weight:700}
 .v1-store-switch:hover{background:rgba(61,125,189,.08)}
 .v1-training-banner{position:sticky;top:0;z-index:38;display:flex;align-items:center;gap:12px;min-height:42px;padding:8px 16px;background:#fff4c7;border-bottom:1px solid #e3ca6a;color:#604b00;font-size:.78rem}
 .v1-training-banner strong{font-size:.72rem;letter-spacing:.08em}
