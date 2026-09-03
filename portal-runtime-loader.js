@@ -1,11 +1,11 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260829-launch-security5';
+  const VERSION = '20260902-global-master-data1';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
-  const CUSTOMERS_VERSION = '20260827-production1';
+  const CUSTOMERS_VERSION = '20260902-global-master-data1';
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
