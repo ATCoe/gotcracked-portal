@@ -184,6 +184,7 @@
 
     if (shouldOpen) {
       if (options.trigger instanceof HTMLElement) returnFocus = options.trigger;
+      else if (!returnFocus?.isConnected) returnFocus = document.querySelector('.mobile-menu');
       requestAnimationFrame(() => {
         if (document.documentElement.dataset.gcMobileNavOpen !== 'true') return;
         const current = sidebar();
@@ -195,8 +196,9 @@
         syncButtons(true);
         current.querySelector(`.${CLOSE_CLASS}`)?.focus({preventScroll:true});
       });
-    } else if (options.restoreFocus && returnFocus?.isConnected) {
-      requestAnimationFrame(() => returnFocus?.focus?.({preventScroll:true}));
+    } else if (options.restoreFocus) {
+      const destination=returnFocus?.isConnected?returnFocus:document.querySelector('.mobile-menu');
+      requestAnimationFrame(() => destination?.focus?.({preventScroll:true}));
       returnFocus = null;
     }
   }
@@ -358,3 +360,4 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, {once:true});
   else init();
 })();
+
