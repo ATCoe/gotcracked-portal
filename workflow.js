@@ -44,8 +44,10 @@
     sessionStorage.removeItem('gc-workstation-operator-expiry');
     try{await window.supabaseClient.auth.signOut({scope:'local'});}catch{}
     loginScreen?.classList.remove('hidden');
+    document.dispatchEvent(new CustomEvent('gc-portal-access-revoked'));
     if(message)showLoginError(message);
   }
+  window.GotCrackedPortalAuth={signOut:localSignOut};
 
   async function rejectUntrustedWorkstation(){
     await localSignOut('This shared workstation is not enrolled or has been revoked. Choose “Set up Front Desk Workstation” and authorize it with an owner or manager Discord account.');
@@ -92,10 +94,16 @@
       }
     }
 
+    if(window.GotCrackedMobilePortal?.isInstalled&&!(await window.GotCrackedMobilePortal.checkAccess())){
+      await localSignOut('This installed Portal Companion is no longer authorized. Sign in with an active GotCracked staff account.');
+      return false;
+    }
+
     const staff={id:userId,name:profile.display_name||'Staff',role:profile.role||'Staff',account_type:profile.account_type||'staff'};
     sessionStorage.setItem('gotcracked-staff',JSON.stringify(staff));setStaff(staff);
     window.GotCrackedNeedsDiscordLink=profile.account_type!=='shared_workstation'&&!profile.discord_user_id;
     loginScreen?.classList.add('hidden');
+    document.dispatchEvent(new CustomEvent('gc-portal-authenticated',{detail:staff}));
     if(window.GotCrackedNeedsDiscordLink){
       const message='Link your individual Discord account in Staff access. Discord is the normal human sign-in method; owner password access is recovery-only.';
       sessionStorage.setItem('gc-onboarding-message',message);
@@ -143,7 +151,17 @@
     try{const {error}=await window.supabaseClient.auth.updateUser({password});if(error)throw error;await window.supabaseClient.auth.signOut({scope:'local'});clearRecoveryUrl();recoveryMode=false;newPasswordForm.reset();showAuthPanel(signInPanel);showLoginError('Owner recovery password updated. Sign in with your new password.');loginEmail?.focus();}catch(error){setMessage(message,error?.message||'Unable to save the new password. Request another reset link and try again.',true);}finally{if(button){button.disabled=false;button.textContent='Save new password';}}
   });
 
-  window.supabaseClient?.auth.onAuthStateChange(event=>{if(event==='PASSWORD_RECOVERY')showRecoveryPanel();});
+  window.supabaseClient?.auth.onAuthStateChange(event=>{
+    if(event==='PASSWORD_RECOVERY')showRecoveryPanel();
+    if(event==='SIGNED_OUT'){
+      sessionStorage.removeItem('gotcracked-staff');
+      sessionStorage.removeItem('gc-workstation-operator-token');
+      sessionStorage.removeItem('gc-workstation-operator');
+      sessionStorage.removeItem('gc-workstation-operator-expiry');
+      loginScreen?.classList.remove('hidden');
+      document.dispatchEvent(new CustomEvent('gc-portal-access-revoked'));
+    }
+  });
 
   let loginInProgress=false;
   async function handleLogin(event){
@@ -162,7 +180,8 @@
 
   loginForm?.addEventListener('submit',handleLogin);
   loginForm?.querySelector('button[type="submit"]')?.addEventListener('click',event=>{event.preventDefault();handleLogin(event);});
-  signOutButton?.addEventListener('click',async event=>{event.preventDefault();try{await window.supabaseClient?.auth.signOut({scope:'local'});}catch(error){report(error,'Sign out failed');}sessionStorage.removeItem('gotcracked-staff');sessionStorage.removeItem('gc-workstation-operator-token');sessionStorage.removeItem('gc-workstation-operator');sessionStorage.removeItem('gc-workstation-operator-expiry');window.GotCrackedRepairs=[];loginScreen?.classList.remove('hidden');renderRepairs();});
+  signOutButton?.addEventListener('click',async event=>{event.preventDefault();await localSignOut();window.GotCrackedRepairs=[];renderRepairs();});
 
   loadSession();
 })();
+
