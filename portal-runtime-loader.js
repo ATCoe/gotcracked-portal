@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '20260902-store-selector-ui1';
+  const VERSION = '20260903-boot-recovery1';
   const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
   const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
@@ -36,6 +36,14 @@
   const profileIndependentScripts=new Set(['theme-controller.js','training-shared-sync.js','runtime-stability.js','mobile-runtime-regression-fixes.js','portal-refresh-stability.js','operations-v1-core.js']);
 
   function srcFor(file){const versions={'account-page.js':ACCOUNT_PAGE_VERSION,'sales-ops.js':SALES_OPS_VERSION,'appointments-board.js':APPOINTMENTS_VERSION,'appointments-owner-guard.js':APPOINTMENTS_VERSION,'customers-board.js':CUSTOMERS_VERSION,'operations-v1-core.js':'20260903-store-menu-persistent1','reporting-capacity-enhancements.js':'20260903-subtle-capacity1','portal-mobile-app.js':'20260903-private-download-api1'};return `${file}?v=${versions[file]||VERSION}`;}
+  function showBootRecovery(error){
+    const recovery=document.getElementById('gc-portal-boot-recovery');
+    if(!recovery)return;
+    recovery.hidden=false;
+    recovery.dataset.errorCode=window.GotCrackedDiagnostics?.classify?.(error,'Portal startup')?.code||'GC-RUNTIME-002';
+    recovery.querySelector('[data-gc-portal-retry]')?.focus({preventScroll:true});
+  }
+  function hideBootRecovery(){const recovery=document.getElementById('gc-portal-boot-recovery');if(recovery)recovery.hidden=true;}
   function preload(files){for(const file of files){if(document.querySelector(`link[data-gc-runtime-preload="${file}"]`))continue;const link=document.createElement('link');link.rel='preload';link.as='script';link.href=srcFor(file);link.dataset.gcRuntimePreload=file;document.head.appendChild(link);}}
   function loadScript(file){if(document.querySelector(`script[data-gc-runtime="${file}"]`))return Promise.resolve();if(loading.has(file))return loading.get(file);const promise=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=srcFor(file);script.async=false;script.dataset.gcRuntime=file;script.addEventListener('load',resolve,{once:true});script.addEventListener('error',()=>reject(new Error(`Failed to load ${file}`)),{once:true});document.body.appendChild(script);}).finally(()=>loading.delete(file));loading.set(file,promise);return promise;}
   function protectedRuntimeAllowed(){const login=document.getElementById('login-screen');const companion=window.GotCrackedMobilePortal;return(!login||login.classList.contains('hidden'))&&(!companion||companion.isRuntimeAllowed());}
@@ -46,7 +54,7 @@
   async function waitForAccountSyncBeforeDirectory(){if(accountSyncWaited)return;accountSyncWaited=true;const ready=captureAccountSyncReady();if(ready)await ready;}
   async function loadSequence(files){for(const file of files){if(!profileIndependentScripts.has(file))await waitForOperationsProfile();if(file==='directory-advanced.js'||file==='master-directory.js')await waitForAccountSyncBeforeDirectory();await loadScript(file);if(file==='training-shared-sync.js')captureTrainingSyncReady();if(file==='operations-v1-core.js'){await waitForOperationsProfile();wireTrainingResyncAfterOperations();}if(file==='account-sync.js')captureAccountSyncReady();if(file==='account-page.js'&&window.GotCrackedAccountPage?.ready)await window.GotCrackedAccountPage.ready;}}
   function scheduleDeferredRuntime(){if(deferredScheduled||deferredStarted)return;deferredScheduled=true;const run=()=>{deferredScheduled=false;void startDeferredRuntime()};if('requestIdleCallback'in window)window.requestIdleCallback(run,{timeout:2500});else setTimeout(run,1200);}
-  async function startCriticalRuntime(){if(started||!protectedRuntimeAllowed())return;started=true;document.documentElement.dataset.gcRuntimeState='starting';document.documentElement.dataset.gcPortalBoot='loading';preload(criticalScripts);try{await loadSequence(criticalScripts);const currentView=location.hash.slice(1).split('/')[0]||'dashboard';await ensureViewRuntime(currentView);document.documentElement.dataset.gcRuntimeState='ready';document.documentElement.dataset.gcPortalBoot='ready';document.dispatchEvent(new CustomEvent('gc-portal-runtime-ready',{detail:{profile:profileReady}}));scheduleDeferredRuntime();}catch(error){console.error('Portal critical runtime load failed:',error);document.documentElement.dataset.gcRuntimeState='error';document.documentElement.dataset.gcPortalBoot='error';window.GotCrackedDiagnostics?.error?.(error,{context:'Portal staff profile initialization failed',duration:20000});started=false;}}
+  async function startCriticalRuntime(){if(started||!protectedRuntimeAllowed())return;started=true;document.documentElement.dataset.gcRuntimeState='starting';document.documentElement.dataset.gcPortalBoot='loading';preload(criticalScripts);try{await loadSequence(criticalScripts);const currentView=location.hash.slice(1).split('/')[0]||'dashboard';await ensureViewRuntime(currentView);document.documentElement.dataset.gcRuntimeState='ready';document.documentElement.dataset.gcPortalBoot='ready';hideBootRecovery();document.dispatchEvent(new CustomEvent('gc-portal-runtime-ready',{detail:{profile:profileReady}}));scheduleDeferredRuntime();}catch(error){console.error('Portal critical runtime load failed:',error);document.documentElement.dataset.gcRuntimeState='error';document.documentElement.dataset.gcPortalBoot='error';showBootRecovery(error);window.GotCrackedDiagnostics?.error?.(error,{context:'Portal staff profile initialization failed',duration:20000});started=false;}}
   async function startDeferredRuntime(){if(deferredStarted||!protectedRuntimeAllowed())return;deferredStarted=true;try{await waitForOperationsProfile();await loadSequence(deferredScripts);document.dispatchEvent(new CustomEvent('gc-portal-secondary-runtime-ready'));}catch(error){console.error('Portal deferred runtime load failed:',error);window.GotCrackedDiagnostics?.error?.(error,{context:'A secondary Portal module could not be loaded'});deferredStarted=false;}}
   async function ensureViewRuntime(view){if(!protectedRuntimeAllowed())return;const files=viewDependencies[view]||[];if(!files.length)return;try{await waitForOperationsProfile();await loadSequence(files);}catch(error){console.error(`Portal ${view} runtime load failed:`,error);window.GotCrackedDiagnostics?.error?.(error,{context:`Unable to open ${view}`});}}
   function scheduleCriticalStart(){requestAnimationFrame(()=>requestAnimationFrame(startCriticalRuntime));}
@@ -55,6 +63,7 @@
   document.addEventListener('gc-portal-mobile-access-granted',scheduleCriticalStart);
   window.addEventListener('hashchange',()=>{const view=location.hash.slice(1).split('/')[0];if(view)ensureViewRuntime(view);});
   window.GotCrackedRuntime={ensureView:ensureViewRuntime,startDeferred:startDeferredRuntime,waitForProfile:waitForOperationsProfile,get profile(){return profileReady;}};
+  document.addEventListener('click',event=>{if(event.target.closest('[data-gc-portal-retry]'))location.reload();});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',watchLoginState,{once:true});else watchLoginState();
 })();
 
