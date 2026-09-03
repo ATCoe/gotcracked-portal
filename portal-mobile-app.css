@@ -1,0 +1,37 @@
+/* Private Portal Companion — install card and standalone-safe framing. */
+.gc-portal-companion{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;
+  margin:0 0 20px;padding:15px 17px;border:1px solid #a7d9ff;border-radius:18px;
+  color:#e9f6ff;background:linear-gradient(122deg,#0a2d4d 0%,#0c4873 48%,#08304f 100%);
+  box-shadow:0 14px 32px rgba(4,53,88,.16);
+}
+.gc-portal-companion-mark{
+  display:grid;place-items:center;width:42px;height:42px;border:1px solid rgba(143,223,255,.55);border-radius:13px;
+  color:#6ee7ff;background:rgba(5,20,36,.48);font-size:22px;font-weight:900;
+}
+.gc-portal-companion-copy{min-width:0}
+.gc-portal-companion-copy small{display:block;margin:0 0 2px;color:#a8daf5;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+.gc-portal-companion-copy strong{display:block;color:#fff;font-size:15px;line-height:1.25}
+.gc-portal-companion-copy span{display:block;margin-top:3px;color:#c5e8fb;font-size:12px;line-height:1.35}
+.gc-portal-companion .gc-portal-companion-action{min-height:38px;padding:0 15px;border:1px solid rgba(255,255,255,.2);border-radius:11px;color:#08243c;background:#fff;font:800 12px/1 inherit;cursor:pointer;white-space:nowrap}
+.gc-portal-companion .gc-portal-companion-action:hover,.gc-portal-companion .gc-portal-companion-action:focus-visible{outline:0;transform:translateY(-1px);box-shadow:0 7px 18px rgba(0,0,0,.19)}
+.gc-portal-companion-dialog{width:min(420px,calc(100vw - 32px));padding:0;border:0;border-radius:18px;color:#102033;background:#fff;box-shadow:0 26px 72px rgba(3,13,24,.38)}
+.gc-portal-companion-dialog::backdrop{background:rgba(3,12,22,.64);backdrop-filter:blur(4px)}
+.gc-portal-companion-dialog>div{padding:24px}
+.gc-portal-companion-dialog h2{margin:0 0 8px;font-size:20px;line-height:1.2}
+.gc-portal-companion-dialog p{margin:0;color:#53677c;line-height:1.55}
+.gc-portal-companion-dialog ol{margin:14px 0 19px;padding-left:21px;color:#20384f;line-height:1.6}
+.gc-portal-companion-dialog button{min-height:38px;padding:0 15px;border:0;border-radius:10px;color:#fff;background:#087fc1;font:800 13px/1 inherit;cursor:pointer}
+html[data-theme="dark"] .gc-portal-companion-dialog{color:#edf5fb;background:#111d2a}
+html[data-theme="dark"] .gc-portal-companion-dialog p,html[data-theme="dark"] .gc-portal-companion-dialog ol{color:#b9cada}
+@media(display-mode:standalone){
+  html{background:#081625}
+  body{min-height:100dvh;padding-bottom:max(0px,env(safe-area-inset-bottom));background:var(--page-bg,#f5f8fb)}
+  .topbar{padding-top:max(12px,env(safe-area-inset-top))}
+  .sidebar{padding-bottom:max(12px,env(safe-area-inset-bottom))}
+}
+@media(max-width:600px){
+  .gc-portal-companion{grid-template-columns:auto minmax(0,1fr);gap:12px;padding:14px}
+  .gc-portal-companion .gc-portal-companion-action{grid-column:1/-1;width:100%}
+}
+
