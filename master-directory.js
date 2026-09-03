@@ -118,8 +118,8 @@
     persist(scope); renderShell(scope);
   }
   function clearFilters(scope) { state[scope]=baseState(); persist(scope); renderShell(scope); }
-  function persist(scope) { try { const s=state[scope]; sessionStorage.setItem(`gc-directory-${scope}`,JSON.stringify({...s,types:[...s.types],statuses:[...s.statuses]})); } catch {} }
-  function restore(scope) { try { const raw=sessionStorage.getItem(`gc-directory-${scope}`); if (!raw) return; const saved=JSON.parse(raw), next=baseState(); Object.assign(next,saved); next.types=new Set(Array.isArray(saved.types)?saved.types:[]); next.statuses=new Set(Array.isArray(saved.statuses)?saved.statuses:[]); state[scope]=next; } catch {} }
+  function persist(scope) { try { const s=state[scope],raw=JSON.stringify({...s,types:[...s.types],statuses:[...s.statuses]}); sessionStorage.setItem(`gc-directory-${scope}`,raw); localStorage.setItem(`gc-directory-persistent-${scope}`,raw); } catch {} }
+  function restore(scope) { try { const raw=sessionStorage.getItem(`gc-directory-${scope}`)||localStorage.getItem(`gc-directory-persistent-${scope}`); if (!raw) return; const saved=JSON.parse(raw), next=baseState(); Object.assign(next,saved); next.types=new Set(Array.isArray(saved.types)?saved.types:[]); next.statuses=new Set(Array.isArray(saved.statuses)?saved.statuses:[]); state[scope]=next; persist(scope); } catch {} }
   function handleField(scope,target) { const s=state[scope], field=target.dataset.gcField; if (!field) return; if (field==='includeClosed') s.includeClosed=target.checked; else s[field]=target.value; if (field!=='sort') s.preset='custom'; persist(scope); if (['query','sort'].includes(field)) drawResults(scope); else renderShell(scope); }
   const scopeFor = target => target.closest('#gc-master-directory') ? 'dashboard' : target.closest('#leads') ? 'leads' : null;
 
