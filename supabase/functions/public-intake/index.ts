@@ -146,6 +146,10 @@ Deno.serve(async request => {
     const preferredContact = ['Call','Text','Email'].includes(clean(body.preferredContact, 20)) ? clean(body.preferredContact, 20) : 'No preference';
     const timingNote = clean(body.timing, 240);
     const intakeMethod = body.serviceMode === 'mail_in' ? 'mail_in' : 'walk_in';
+    // Only the same-origin tablet kiosk can opt into this source label. Do not
+    // pass through arbitrary client values into the shared lead directory.
+    const source = clean(body.source, 40) === 'gotcracked-kiosk' ? 'gotcracked-kiosk' : 'gotcracked.co';
+    const sourceLabel = source === 'gotcracked-kiosk' ? 'the GotCracked self-service kiosk' : 'gotcracked.co';
     const preferredDate = intakeMethod === 'walk_in' ? clean(body.date, 10) : '';
     const preferredTime = intakeMethod === 'walk_in' ? clean(body.time, 80) : '';
     const shippingAddress = intakeMethod === 'mail_in' ? { line1: clean(body.address1, 160), line2: clean(body.address2, 160) || null, city: clean(body.city, 100), state: clean(body.state, 40).toUpperCase(), postal_code: clean(body.postalCode, 20) } : null;
@@ -193,11 +197,11 @@ Deno.serve(async request => {
     }
 
     const reference = `GCR-${crypto.randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
-    const externalId = `web-${crypto.randomUUID()}`;
+    const externalId = `${source === 'gotcracked-kiosk' ? 'kiosk' : 'web'}-${crypto.randomUUID()}`;
     const notes = [issue, `Preferred contact: ${preferredContact}`, timingNote ? `Timing/deadline: ${timingNote}` : null].filter(Boolean).join('\n\n');
     const leadRecord = {
       external_id: externalId, public_reference: reference, location_id: locationId,
-      name: `${firstName} ${lastName}`, phone, email, service: issue.slice(0, 180), source: 'gotcracked.co', notes,
+      name: `${firstName} ${lastName}`, phone, email, service: issue.slice(0, 180), source, notes,
       device_type: deviceType, device_model: model, intake_method: intakeMethod, shipping_address: shippingAddress,
       preferred_date: intakeMethod === 'walk_in' ? preferredDate : null,
       preferred_time: intakeMethod === 'walk_in' ? preferredTime : null,
@@ -211,7 +215,7 @@ Deno.serve(async request => {
       const appointmentResult = await admin.from('appointments').insert({
         location_id: locationId, lead_id: leadResult.data.id, device_description: `${deviceType} · ${model}`,
         service_requested: issue, preferred_date: leadRecord.preferred_date, preferred_time: leadRecord.preferred_time,
-        service_mode: 'walk_in', status: 'requested', notes: ['Submitted through gotcracked.co', `Preferred contact: ${preferredContact}`, timingNote ? `Timing/deadline: ${timingNote}` : null].filter(Boolean).join(' · ')
+        service_mode: 'walk_in', status: 'requested', notes: [`Submitted through ${sourceLabel}`, `Preferred contact: ${preferredContact}`, timingNote ? `Timing/deadline: ${timingNote}` : null].filter(Boolean).join(' · ')
       }).select('id').single();
       if (appointmentResult.error) throw appointmentResult.error;
       appointmentId = appointmentResult.data.id;
@@ -251,3 +255,4 @@ Deno.serve(async request => {
     return json(origin, { error:'Unable to submit the repair request. Please contact the shop.' }, 500);
   }
 });
+
