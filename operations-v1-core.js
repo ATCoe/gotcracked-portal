@@ -616,7 +616,7 @@
     if(!(await initProfile()))return;
     ensureShell();await reload();subscribeRealtime();
     if(!state.migrationReady&&!state.training){const heading=document.querySelector('#dashboard .page-heading');if(heading&&!document.querySelector('.v1-migration-warning'))heading.insertAdjacentHTML('afterend','<div class="card v1-migration-warning"><strong>Portal 1.0 database upgrade pending.</strong><p>Apply Supabase migrations 0002 and 0003 before using new production intake, lead, purchasing, reference, and permission features. Training Store remains isolated and safe to use.</p></div>');}
-    window.GotCrackedOperationsV1={reload,openWorkOrder,openIntake,printTicketLabel,printInventoryLabel,state};
+    window.GotCrackedOperationsV1={reload,openWorkOrder,openIntake,printTicketLabel,printInventoryLabel,renderPermissions,state};
   }
 
   client.auth.onAuthStateChange(event=>{if(['SIGNED_IN','INITIAL_SESSION'].includes(event))setTimeout(start,900);});
