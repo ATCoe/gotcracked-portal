@@ -83,20 +83,6 @@
     actions?.querySelector('.help')?.remove();
   }
 
-  function updateStoreLabel(profile = window.GotCrackedRuntimeProfile) {
-    const name = profile?.locations?.name;
-    const location = document.querySelector('.location');
-    if (!name || !location) return;
-    location.replaceChildren();
-    const dot = document.createElement('span');
-    dot.className = 'status-dot';
-    location.append(dot, document.createTextNode(` ${name} `));
-    const chevron = document.createElement('span');
-    chevron.className = 'chevron';
-    chevron.textContent = '⌄';
-    location.append(chevron);
-  }
-
   function bindButton(button) {
     if (!button || button.dataset.gcThemeBound === 'true') return;
     button.dataset.gcThemeBound = 'true';
@@ -124,7 +110,6 @@
 
   function onRuntimeReady(event) {
     ensureButton();
-    updateStoreLabel(event.detail?.profile || window.GotCrackedRuntimeProfile);
   }
 
   media?.addEventListener?.('change', () => {
@@ -144,6 +129,6 @@
     set(preference){ return apply(preference, { persist:true }); },
     reset(){ localStorage.removeItem(KEY); return apply('system'); },
     ensureButton,
-    updateStoreLabel
   };
 })();
+
