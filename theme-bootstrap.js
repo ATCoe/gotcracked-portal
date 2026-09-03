@@ -70,13 +70,6 @@
       opacity:1;
       visibility:visible;
     }
-    html[data-gc-portal-boot="ready"] .app-shell{
-      animation:gcPortalReveal .14s ease-out both;
-    }
-    @keyframes gcPortalReveal{from{opacity:0}to{opacity:1}}
-    @media (prefers-reduced-motion:reduce){
-      html[data-gc-portal-boot="ready"] .app-shell{animation:none}
-    }
   `;
   document.head.appendChild(bootStyle);
 
@@ -99,3 +92,4 @@
     root.dataset.gcThemeBootstrap = 'ready';
   }
 })();
+
