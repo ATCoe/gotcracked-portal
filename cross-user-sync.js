@@ -7,6 +7,7 @@
   const POLL_MS = 10000;
   const RETRY_MS = 5000;
   let lastRevision = null;
+  let lastGlobalRevision = null;
   let locationId = null;
   let pollBusy = false;
   let refreshBusy = false;
@@ -40,6 +41,14 @@
     return Number.isFinite(revision) ? revision : 0;
   }
 
+  async function fetchGlobalRevision() {
+    if (isTraining()) return null;
+    const result = await client.rpc('get_portal_global_sync_revision');
+    if (result.error || !result.data) return null;
+    const revision = Number(result.data.revision || 0);
+    return Number.isFinite(revision) ? revision : 0;
+  }
+
   async function refreshAll(reason = 'revision', revision = lastRevision) {
     if (isTraining()) return;
     if (interactionLocked()) {
@@ -61,6 +70,7 @@
       // modules. Calling ops.reload() here used to create a second full renderer
       // and was responsible for active-view/scroll resets during server sync.
       const jobs = [];
+      if (String(reason).startsWith('global-') && typeof window.GotCrackedOperationsV1?.reload === 'function') jobs.push(Promise.resolve(window.GotCrackedOperationsV1.reload()));
       if (typeof window.GotCrackedStaffProfiles?.load === 'function') jobs.push(Promise.resolve(window.GotCrackedStaffProfiles.load()));
       if (jobs.length) await Promise.allSettled(jobs);
 
@@ -143,6 +153,11 @@
       if (modeChanged || isTraining()) return;
       const revision = await fetchRevision();
       if (revision !== null) acceptRevision(revision, 'revision-poll');
+      const globalRevision = await fetchGlobalRevision();
+      if (globalRevision !== null) {
+        if (lastGlobalRevision === null) lastGlobalRevision = globalRevision;
+        else if (globalRevision !== lastGlobalRevision) { lastGlobalRevision = globalRevision; refreshAll('global-revision-poll', globalRevision); }
+      }
       if (locationId && !realtimeChannel) connectRealtime();
     } finally {
       pollBusy = false;
@@ -164,6 +179,12 @@
         }, payload => {
           const revision = Number(payload.new?.revision ?? payload.old?.revision);
           acceptRevision(revision, 'realtime');
+        })
+        .on('postgres_changes', {event:'*',schema:'public',table:'portal_global_sync_state'}, payload => {
+          const revision = Number(payload.new?.revision ?? payload.old?.revision);
+          if (!Number.isFinite(revision) || revision === lastGlobalRevision) return;
+          lastGlobalRevision = revision;
+          refreshAll('global-realtime', revision);
         })
         .subscribe(status => {
           realtimeStatus = status;
@@ -195,6 +216,7 @@
   client.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
       lastRevision = null;
+      lastGlobalRevision = null;
       locationId = null;
       clearTimeout(retryTimer);
       if (realtimeChannel) client.removeChannel(realtimeChannel).catch(() => {});
@@ -238,11 +260,12 @@
   setTimeout(pollNow, 100);
 
   window.GotCrackedCrossUserSync = {
-    version:'20260827-sync5',
+    version:'20260902-sync-global1',
     pollNow,
     refreshNow:() => refreshAll('manual', lastRevision),
     resumeProduction:handleStoreModeChange,
-    get status(){ return { lastRevision, locationId, realtimeStatus, pollBusy, refreshBusy, deferredForInteraction, training:isTraining() }; },
+    get status(){ return { lastRevision, lastGlobalRevision, locationId, realtimeStatus, pollBusy, refreshBusy, deferredForInteraction, training:isTraining() }; },
     stop(){ clearInterval(interval); clearTimeout(retryTimer); if (realtimeChannel) client.removeChannel(realtimeChannel).catch(() => {}); }
   };
 })();
+
