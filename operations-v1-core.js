@@ -478,7 +478,23 @@
     client.functions.invoke('create-lead',{body:{name,phone:phone||null,email:email||null,service:issue||'Repair inquiry',source:'portal',notes:null}}).then(async({data,error})=>{if(error)return alert(error.message);const id=data?.id||data?.lead?.id;if(id)await client.from('leads').update({pipeline_status:'need_to_contact',customer_issue:issue}).eq('id',id);await reload();});
   }
 
-  async function switchStore(){state.training=!state.training;localStorage.setItem('gc-training-store',state.training?'1':'0');closeDrawer();await reload();window.GotCrackedUI?.activateView?.('dashboard');}
+  let storeSwitchBusy=false;
+  async function switchStore(){
+    if(storeSwitchBusy)return;
+    storeSwitchBusy=true;
+    state.training=!state.training;
+    localStorage.setItem('gc-training-store',state.training?'1':'0');
+    state.currentWorkOrder=null;
+    state.intake=null;
+    closeDrawer();
+    document.querySelectorAll('dialog[open]').forEach(dialog=>{try{dialog.close();}catch{}});
+    document.dispatchEvent(new CustomEvent('gc-store-mode-changed',{detail:{training:state.training}}));
+    try{
+      await reload();
+      window.GotCrackedUI?.activateView?.('dashboard');
+      window.GotCrackedDirectory?.render?.();
+    }finally{storeSwitchBusy=false;}
+  }
 
   document.addEventListener('input',event=>{
     if(['v1-dash-work-search','v1-dash-lead-search'].includes(event.target.id))redrawDashboard();
