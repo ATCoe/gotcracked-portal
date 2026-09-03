@@ -217,27 +217,25 @@ Deno.serve(async request => {
       preferred_time: intakeMethod === 'walk_in' ? preferredTime : null,
       consent_at: new Date().toISOString(), status: 'new'
     };
-    const leadResult = await admin.from('leads').insert(leadRecord).select().single();
-    if (leadResult.error) throw leadResult.error;
-
-    let appointmentId: string | null = null;
-    if (intakeMethod === 'walk_in') {
-      const appointmentResult = await admin.from('appointments').insert({
-        location_id: locationId, lead_id: leadResult.data.id, device_description: `${deviceType} · ${model}`,
-        service_requested: issue, preferred_date: leadRecord.preferred_date, preferred_time: leadRecord.preferred_time,
-        service_mode: 'walk_in', status: 'requested', notes: [`Submitted through ${sourceLabel}`, `Preferred contact: ${preferredContact}`, timingNote ? `Timing/deadline: ${timingNote}` : null].filter(Boolean).join(' · ')
-      }).select('id').single();
-      if (appointmentResult.error) throw appointmentResult.error;
-      appointmentId = appointmentResult.data.id;
-      const leadLink = await admin.from('leads').update({ appointment_id: appointmentId }).eq('id',leadResult.data.id);
-      if (leadLink.error) throw leadLink.error;
-    }
+    const recordResult = await admin.rpc('create_public_intake_records', {
+      p_lead: leadRecord,
+      p_appointment: intakeMethod === 'walk_in' ? {
+        location_id: locationId, device_description: `${deviceType} · ${model}`,
+        service_requested: issue, preferred_date: leadRecord.preferred_date,
+        preferred_time: leadRecord.preferred_time, service_mode: 'walk_in',
+        status: 'requested', notes: [`Submitted through ${sourceLabel}`, `Preferred contact: ${preferredContact}`, timingNote ? `Timing/deadline: ${timingNote}` : null].filter(Boolean).join(' · ')
+      } : null
+    });
+    if (recordResult.error) throw recordResult.error;
+    const leadRow = recordResult.data?.lead;
+    const appointmentId: string | null = recordResult.data?.appointment_id || null;
+    if (!leadRow?.id) throw new Error('The intake record could not be created.');
 
     let bookingMode = clean(settings.public_booking_intelligence_mode, 20) || 'shadow';
     if (intakeMethod === 'walk_in' && bookingRecommendation) {
       try {
         const evaluation = await admin.rpc('record_public_booking_shadow_evaluation', {
-          p_location_id:locationId,p_lead_id:leadResult.data.id,p_appointment_id:appointmentId,p_requested_date:preferredDate,
+          p_location_id:locationId,p_lead_id:leadRow.id,p_appointment_id:appointmentId,p_requested_date:preferredDate,
           p_device_type:deviceType,p_device_model:model,p_service:issue,p_part_mapping:partMapping,p_recommendation:bookingRecommendation
         });
         if (!evaluation.error && evaluation.data?.current_mode) bookingMode = clean(evaluation.data.current_mode,20) || bookingMode;
@@ -246,7 +244,7 @@ Deno.serve(async request => {
     }
     const customerTimingGuidance = bookingMode === 'active' && bookingRecommendation ? clean(bookingRecommendation.customer_message, 500) : '';
 
-    const alertRecord = { ...leadResult.data, appointment_id:appointmentId, customer_issue: issue, preferred_contact:preferredContact, timing_note:timingNote || null };
+    const alertRecord = { ...leadRow, appointment_id:appointmentId, customer_issue: issue, preferred_contact:preferredContact, timing_note:timingNote || null };
     let discordDelivered = false;
     try { discordDelivered = await sendDiscordAlert(alertRecord); } catch (error) { console.error(error); }
     let emailDelivered = false;
