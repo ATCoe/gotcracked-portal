@@ -206,7 +206,10 @@
     if(!document.getElementById('v1-lead-drawer')){const drawer=document.createElement('aside');drawer.id='v1-lead-drawer';drawer.className='v1-right-drawer';drawer.innerHTML='<div id="v1-lead-drawer-content"></div>';document.body.appendChild(drawer);const backdrop=document.createElement('button');backdrop.id='v1-drawer-backdrop';backdrop.className='v1-drawer-backdrop';backdrop.type='button';backdrop.hidden=true;backdrop.setAttribute('aria-label','Close panel');document.body.appendChild(backdrop);}
     if(!document.getElementById('v1-po-dialog')){const dialog=document.createElement('dialog');dialog.id='v1-po-dialog';dialog.innerHTML='<form id="v1-po-form"><div id="v1-po-content"></div></form>';document.body.appendChild(dialog);}
     const location=document.querySelector('.topbar .location');
-    if(location)location.innerHTML=`<button class="v1-store-switch" type="button" data-v1-store-switch><span class="status-dot"></span><strong>${state.training?'Training Store':esc(state.profile?.locations?.name||'Main Store')}</strong><span>⌄</span></button>`;
+    if(location){
+      if(!document.getElementById('v1-store-menu-style')){const style=document.createElement('style');style.id='v1-store-menu-style';style.textContent='.topbar .location{position:relative}.v1-store-switch{display:flex;align-items:center;gap:8px}.v1-store-switch-menu{position:absolute;top:calc(100% + 8px);left:0;z-index:30;min-width:220px;padding:6px;border:1px solid rgba(148,163,184,.28);border-radius:12px;background:#101d2b;box-shadow:0 18px 40px rgba(0,0,0,.3)}.v1-store-switch-menu[hidden]{display:none}.v1-store-option{display:flex;width:100%;align-items:center;gap:9px;padding:10px;border:0;border-radius:8px;background:transparent;color:#e5eef7;text-align:left;cursor:pointer}.v1-store-option:hover,.v1-store-option:focus-visible{background:rgba(59,130,246,.18)}.v1-store-option[aria-current="true"]{background:rgba(45,212,191,.12)}.v1-store-option small{display:block;color:#93a8bb;margin-top:2px}';document.head.appendChild(style);}
+      location.innerHTML=`<button class="v1-store-switch" type="button" data-v1-store-menu-toggle aria-haspopup="menu" aria-expanded="false"><span class="status-dot"></span><strong>${state.training?'Training Store':esc(state.profile?.locations?.name||'Main Store')}</strong><span aria-hidden="true">⌄</span></button><div class="v1-store-switch-menu" role="menu" hidden><button class="v1-store-option" type="button" role="menuitem" data-v1-store-option="production" aria-current="${state.training?'false':'true'}"><span class="status-dot"></span><span><strong>${esc(state.profile?.locations?.name||'Main Store')}</strong><small>Live production data</small></span></button><button class="v1-store-option" type="button" role="menuitem" data-v1-store-option="training" aria-current="${state.training?'true':'false'}"><span>◌</span><span><strong>Training Store</strong><small>Sandbox data only</small></span></button></div>`;
+    }
     document.body.classList.toggle('training-store',state.training);
     let banner=document.getElementById('v1-training-banner');
     if(state.training&&!banner){banner=document.createElement('div');banner.id='v1-training-banner';banner.className='v1-training-banner';banner.innerHTML='<strong>TRAINING STORE</strong><span>Sandbox mode — no production customers, leads, work orders, inventory, POs, or sales are changed.</span><button type="button" data-v1-store-switch>Return to Main Store</button>';main.prepend(banner);}
@@ -479,10 +482,11 @@
   }
 
   let storeSwitchBusy=false;
-  async function switchStore(){
+  async function switchStore(nextTraining=!state.training){
     if(storeSwitchBusy)return;
     storeSwitchBusy=true;
-    state.training=!state.training;
+    if(Boolean(nextTraining)===state.training){storeSwitchBusy=false;return;}
+    state.training=Boolean(nextTraining);
     localStorage.setItem('gc-training-store',state.training?'1':'0');
     state.currentWorkOrder=null;
     state.intake=null;
@@ -511,11 +515,17 @@
   document.addEventListener('keydown',event=>{
     if(event.key==='Enter'&&event.target.id==='v1-pickup-scan'){event.preventDefault();const scanned=event.target.value.trim().toUpperCase(),number=scanned.replace(/\D/g,'');const ticket=state.workOrders.find(t=>['repaired','ready_for_pickup'].includes(t.status)&&(String(t.ticket_number)===number||ticketCode(t.ticket_number)===scanned));if(ticket)openWorkOrder(ticket.id);else alert('No ready work order matches that barcode.');event.target.value='';}
     if(event.key==='Escape'){closeDrawer();const results=document.getElementById('v1-line-results');if(results)results.hidden=true;}
+    if(event.key==='Escape'){const toggle=document.querySelector('[data-v1-store-menu-toggle]'),menu=document.querySelector('.v1-store-switch-menu:not([hidden])');if(menu){menu.hidden=true;toggle?.setAttribute('aria-expanded','false');toggle?.focus();}}
   });
 
   document.addEventListener('click',async event=>{
     const target=event.target instanceof Element?event.target:null;if(!target)return;
+    const menuToggle=target.closest('[data-v1-store-menu-toggle]');
+    if(menuToggle){event.preventDefault();const menu=menuToggle.parentElement?.querySelector('.v1-store-switch-menu');if(menu){menu.hidden=!menu.hidden;menuToggle.setAttribute('aria-expanded',String(!menu.hidden));if(!menu.hidden)menu.querySelector('[aria-current="true"]')?.focus();}return;}
+    const option=target.closest('[data-v1-store-option]');
+    if(option){event.preventDefault();const menu=option.closest('.v1-store-switch-menu');if(menu){menu.hidden=true;menu.previousElementSibling?.setAttribute('aria-expanded','false');}await switchStore(option.dataset.v1StoreOption==='training');return;}
     if(target.closest('[data-v1-store-switch]')){event.preventDefault();await switchStore();return;}
+    if(!target.closest('.topbar .location'))document.querySelector('.v1-store-switch-menu:not([hidden])')?.setAttribute('hidden','');
     if(target.closest('[data-v1-reset-training]')){if(confirm('Reset all Training Store sandbox data?')){localStorage.removeItem('gc-training-data-v1');if(state.training){loadTraining();renderAll();}}return;}
     const filter=target.closest('[data-v1-lead-filter]');if(filter){state.leadFilter=filter.dataset.v1LeadFilter;renderLeads();return;}
     const lead=target.closest('[data-v1-lead]');if(lead){openLead(lead.dataset.v1Lead);return;}
