@@ -135,7 +135,8 @@
     try {
       const {data:{session},error:sessionError}=await client.auth.getSession(); if (sessionError) throw sessionError; if (!session) return;
       let [repairs,leads,customers,devices,parts]=await fetchDirectoryData();
-      if (isAuthFailure(repairs)||isAuthFailure(leads)) { const refreshed=await client.auth.refreshSession(); if (refreshed.error||!refreshed.data?.session) throw refreshed.error||repairs.error||leads.error; [repairs,leads,customers,devices,parts]=await fetchDirectoryData(); }
+      let authFailure=[repairs,leads,customers,devices,parts].find(isAuthFailure);
+      if (authFailure) { const refreshed=await client.auth.refreshSession(); if (refreshed.error||!refreshed.data?.session) throw refreshed.error||authFailure.error||new Error('Your session expired. Sign in again.'); [repairs,leads,customers,devices,parts]=await fetchDirectoryData(); authFailure=[repairs,leads,customers,devices,parts].find(isAuthFailure); if (authFailure) throw authFailure.error||new Error('Authentication refresh did not restore Portal access.'); }
       if (repairs.error) throw repairs.error; if (leads.error) throw leads.error; state.data.repairs=repairs.data||[]; state.data.leads=leads.data||[]; state.data.customers=customers.error?[]:(customers.data||[]); state.data.devices=devices.error?[]:(devices.data||[]); state.data.parts=parts.error?[]:(parts.data||[]);
       const leadBadge=document.querySelector('#lead-count'); if (leadBadge) { const count=state.data.leads.filter(lead=>!LEAD_TERMINAL.has(leadStage(lead))).length; leadBadge.textContent=String(count); leadBadge.hidden=count===0; }
       state.loaded=true;
