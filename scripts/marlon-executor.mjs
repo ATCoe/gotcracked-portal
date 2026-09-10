@@ -130,8 +130,12 @@ function candidateFiles(ticket){
     if(rows.some(r=>r.path===file)||!fs.existsSync(file)) continue;
     rows.push({path:file,content:focusedEvidence(fs.readFileSync(file,'utf8'),ticket,words,14000),score:0});
   }
+  const portalTicket=String(ticket.surface||'')==='portal'||String(ticket.context?.view||'').startsWith('#');
+  const preferred=portalTicket?['portal-live.js','operations-v1-core.js','master-directory.js','portal-runtime-loader.js','app.js','index.html']:[];
+  const preferredSet=new Set(preferred);
+  const ordered=[...preferred.flatMap(file=>{const row=rows.find(item=>item.path===file);return row?[row]:[]}),...rows.filter(row=>!preferredSet.has(row.path))];
   let budget=46000;
-  return rows.slice(0,16).flatMap(({path,content})=>{
+  return ordered.slice(0,16).flatMap(({path,content})=>{
     if(budget<1000)return[];
     const selected=content.slice(0,budget);budget-=selected.length;
     return[{path,content:selected}];
