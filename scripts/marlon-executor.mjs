@@ -80,6 +80,20 @@ function auditIntent(ticket){
   return /\b(audit|production review|source review|hard review|full review)\b/.test(raw);
 }
 
+function focusedEvidence(content,ticket,words,maxChars=12000){
+  const requestPath=String(ticket.context?.requestPath||'').toLowerCase();
+  const endpointTerms=requestPath.split(/[\/?#._:\-]+/).filter(term=>term.length>=4&&!STOP.has(term)&&!['https','supabase','rest','functions'].includes(term)).reverse();
+  const focus=[...new Set([...endpointTerms,...words])];
+  const lower=content.toLowerCase();
+  for(const term of focus){
+    const index=lower.indexOf(term);
+    if(index<0)continue;
+    const start=Math.max(0,index-Math.floor(maxChars*0.42));
+    return content.slice(start,start+maxChars);
+  }
+  return content.slice(0,maxChars);
+}
+
 function candidateFiles(ticket){
   const words=ticketWords(ticket);
   const rows=[];
@@ -104,14 +118,17 @@ function candidateFiles(ticket){
     if(/mobile/.test(words.join(' ')) && /mobile/.test(file)) score+=35;
     if(/dashboard/.test(words.join(' ')) && /dashboard|index/.test(file)) score+=30;
     if(/support|marlon/.test(words.join(' ')) && /marlon|support/.test(file)) score+=30;
+    const portalRuntime=String(ticket.surface||'')==='portal'||String(ticket.context?.view||'').startsWith('#');
+    if(portalRuntime&&!protectedPath(file)&&/\.(js|mjs|ts|tsx|html)$/i.test(file))score+=20;
+    if(portalRuntime&&/portal-live|operations-v1-core|master-directory|portal-runtime-loader|(^|\/)app\.js$|(^|\/)index\.html$/i.test(file))score+=55;
     if(auditIntent(ticket)&&/marlon|support|workflow|supabase|cloudflare|package\.json/.test(file.toLowerCase()))score+=18;
-    if(score>0) rows.push({path:file,content:content.slice(0,12000),score});
+    if(score>0) rows.push({path:file,content:focusedEvidence(content,ticket,words,12000),score});
   }
   rows.sort((a,b)=>b.score-a.score||a.path.localeCompare(b.path));
   const fallback=['index.html','app.js','portal-runtime-loader.js','portal-v1-release.css'];
   for(const file of fallback){
     if(rows.some(r=>r.path===file)||!fs.existsSync(file)) continue;
-    rows.push({path:file,content:fs.readFileSync(file,'utf8').slice(0,14000),score:0});
+    rows.push({path:file,content:focusedEvidence(fs.readFileSync(file,'utf8'),ticket,words,14000),score:0});
   }
   let budget=46000;
   return rows.slice(0,16).flatMap(({path,content})=>{
