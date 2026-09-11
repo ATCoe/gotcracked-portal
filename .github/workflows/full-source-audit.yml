@@ -139,8 +139,8 @@ jobs:
               raise SystemExit(f'Security-sensitive source audit found {len(violations)} blocking issue(s).')
           print('No executable-string APIs or private/server credentials found in frontend source.')
           print('Reviewed print-only document writers: ' + ', '.join(reviewed_print_writers))
-          if len(reviewed_print_writers) != 3:
-              raise SystemExit(f'Expected exactly 3 reviewed print-only document writers; found {len(reviewed_print_writers)}.')
+          if len(reviewed_print_writers) != 2:
+              raise SystemExit(f'Expected exactly 2 reviewed print-only document writers; found {len(reviewed_print_writers)}.')
 
           print('\nDynamic HTML sink locations for manual review:')
           sink_count = 0

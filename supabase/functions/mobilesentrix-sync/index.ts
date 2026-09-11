@@ -728,7 +728,7 @@ async function persistBatch(
     .in("source_url", sourceUrls);
   if (priorResult.error) throw priorResult.error;
 
-  const priorMap = new Map(
+  const priorMap = new Map<string, any>(
     (priorResult.data || []).map((row: any) => [row.source_url, row]),
   );
   let changed = 0;
