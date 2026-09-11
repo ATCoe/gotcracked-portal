@@ -1,0 +1,48 @@
+name: MobileSentrix integration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobilesentrix-integration.js'
+      - 'portal-runtime-loader.js'
+      - 'index.html'
+      - 'supabase/functions/mobilesentrix-sync/**'
+      - 'supabase/migrations/*mobilesentrix*'
+      - 'scripts/test-mobilesentrix-oauth.mjs'
+      - '.github/workflows/mobilesentrix-integration.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mobilesentrix-integration.js'
+      - 'portal-runtime-loader.js'
+      - 'index.html'
+      - 'supabase/functions/mobilesentrix-sync/**'
+      - 'supabase/migrations/*mobilesentrix*'
+      - 'scripts/test-mobilesentrix-oauth.mjs'
+      - '.github/workflows/mobilesentrix-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Browser module syntax
+        run: node --check mobilesentrix-integration.js
+
+      - name: OAuth and catalog unit tests
+        run: node scripts/test-mobilesentrix-oauth.mjs
+
+      - name: Edge function type check
+        run: deno check supabase/functions/mobilesentrix-sync/index.ts

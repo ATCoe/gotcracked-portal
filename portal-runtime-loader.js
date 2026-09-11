@@ -12,6 +12,9 @@
     'theme-controller.js','training-shared-sync.js','runtime-stability.js','mobile-runtime-regression-fixes.js','portal-refresh-stability.js','operations-v1-core.js','rma-flow-labs.js',
     'operator-request-context.js','workstation-mode.js','payment-center.js','portal-current-ui-fixes.js','mobile-dialog-compat.js','action-launchers.js','account-sync.js','time-clock.js','portal-deep-links.js','operations-v1-arrival.js','portal-v1-polish.js','intake-profile-validation-fix.js','portal-mobile-audit.js','portal-v1-final.js','ui-title-case.js','directory-advanced.js','master-directory.js','cross-user-sync.js','sales-ops.js','marlon-reporting-bridge.js','dashboard-rail.js','reporting-bookkeeper.js','reporting-capacity-enhancements.js'
   ];
+  if(new URLSearchParams(location.search).get('mobilesentrix_oauth')==='callback'){
+    criticalScripts.push('mobilesentrix-integration.js');
+  }
 
   const deferredScripts = [
     'workforce-premium.js','timesheets.js','avatar-presets.js','staff-profiles.js','account-page.js','premium-onboarding-v2.js','training-store-guard.js','pc-builds.js','checkout-receipts.js','schedule-board.js','schedule-print.js','analytics.js','shipping.js','inventory-audit.js'
@@ -35,7 +38,7 @@
   const loading=new Map(),delay=ms=>new Promise(resolve=>setTimeout(resolve,ms)),isTraining=()=>localStorage.getItem('gc-training-store')==='1';
   const profileIndependentScripts=new Set(['theme-controller.js','training-shared-sync.js','runtime-stability.js','mobile-runtime-regression-fixes.js','portal-refresh-stability.js','operations-v1-core.js']);
 
-  function srcFor(file){const versions={'account-page.js':ACCOUNT_PAGE_VERSION,'sales-ops.js':SALES_OPS_VERSION,'appointments-board.js':APPOINTMENTS_VERSION,'appointments-owner-guard.js':APPOINTMENTS_VERSION,'customers-board.js':CUSTOMERS_VERSION,'operations-v1-core.js':'20260903-store-menu-persistent1','reporting-capacity-enhancements.js':'20260903-subtle-capacity1','portal-mobile-app.js':'20260903-private-download-api1'};return `${file}?v=${versions[file]||VERSION}`;}
+  function srcFor(file){const versions={'account-page.js':ACCOUNT_PAGE_VERSION,'sales-ops.js':SALES_OPS_VERSION,'appointments-board.js':APPOINTMENTS_VERSION,'appointments-owner-guard.js':APPOINTMENTS_VERSION,'customers-board.js':CUSTOMERS_VERSION,'operations-v1-core.js':'20260903-store-menu-persistent1','reporting-capacity-enhancements.js':'20260903-subtle-capacity1','portal-mobile-app.js':'20260903-private-download-api1','mobilesentrix-integration.js':'20260903-official-oauth1'};return `${file}?v=${versions[file]||VERSION}`;}
   function showBootRecovery(error){
     const recovery=document.getElementById('gc-portal-boot-recovery');
     if(!recovery)return;
