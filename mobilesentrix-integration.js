@@ -140,8 +140,8 @@
     const status=state.status||{};
     const config=status.config||{};
     const counts=status.counts||{};
-    const ready=Boolean(status.apiReady);
-    const hasConsumer=Boolean(status.hasConsumerCredentials);
+    const ready=Boolean(status.apiReady??status.hasCredentials);
+    const hasConsumer=Boolean(status.hasConsumerCredentials??status.hasCredentials);
     const account=state.account||{};
     const accountName=account.account_label||account.account_email||account.account_number||'Not linked';
     const request=requestState(config);
@@ -295,12 +295,12 @@
       token_secret:data.get('token_secret')
     });
 
-    if(saved.oauthAuthorizationRequired){
+    if(saved.oauthAuthorizationRequired===true){
       await load();
       setMessage('gc-ms-api-form','Consumer credentials saved. Authorize the MobileSentrix account to finish OAuth.');
       return;
     }
-    if(!saved.apiReady){
+    if(!(saved.apiReady??saved.hasCredentials)){
       await load();
       setMessage('gc-ms-api-form','API defaults saved. Credential entry is waiting for MobileSentrix approval.');
       return;
@@ -420,7 +420,7 @@
     }finally{
       state.busy=false;
       const current=document.querySelector('[data-ms-sync]');
-      if(current)current.disabled=!state.status?.apiReady;
+      if(current)current.disabled=!(state.status?.apiReady??state.status?.hasCredentials);
     }
   }
 
