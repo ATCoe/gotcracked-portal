@@ -408,19 +408,16 @@ async function oauth1Authorization(
   method: string,
   url: URL,
   secret: any,
+  extraOAuth: Record<string,string> = {},
+  tokenOverride: string | null = null,
+  tokenSecretOverride: string | null = null,
 ) {
   const consumerKey = clean(secret?.consumer_key ?? secret?.consumerKey);
   const consumerSecret = clean(
     secret?.consumer_secret ?? secret?.consumerSecret,
   );
-  const accessToken = clean(
-    secret?.access_token ?? secret?.token ?? secret?.accessToken,
-  );
-  const tokenSecret = clean(
-    secret?.access_token_secret ??
-      secret?.token_secret ??
-      secret?.tokenSecret,
-  );
+  const accessToken = clean(tokenOverride ?? secret?.access_token ?? secret?.token ?? secret?.accessToken);
+  const tokenSecret = clean(tokenSecretOverride ?? secret?.access_token_secret ?? secret?.token_secret ?? secret?.tokenSecret);
 
   if (!consumerKey || !consumerSecret) {
     throw new Error(
@@ -441,6 +438,7 @@ async function oauth1Authorization(
     oauth_version: "1.0",
   };
   if (accessToken) oauth.oauth_token = accessToken;
+  for (const [key,value] of Object.entries(extraOAuth || {})) { if (key.startsWith("oauth_") && value) oauth[key]=String(value); }
 
   const parameters = [
     ...Array.from(url.searchParams.entries()),
@@ -499,13 +497,14 @@ function normalizedAuthScheme(value: unknown) {
   return scheme;
 }
 
+function hasConsumerCredentials(secret: any) {
+  return Boolean(clean(secret?.consumer_key ?? secret?.consumerKey) && clean(secret?.consumer_secret ?? secret?.consumerSecret));
+}
+
 function credentialReady(scheme: string, secret: any) {
   if (!secret || typeof secret !== "object") return false;
   if (scheme === "oauth1") {
-    return Boolean(
-      clean(secret.consumer_key ?? secret.consumerKey) &&
-        clean(secret.consumer_secret ?? secret.consumerSecret),
-    );
+    return Boolean(hasConsumerCredentials(secret) && clean(secret.access_token ?? secret.token ?? secret.accessToken) && clean(secret.access_token_secret ?? secret.token_secret ?? secret.tokenSecret));
   }
   if (scheme === "basic") {
     return Boolean(clean(secret.username) && clean(secret.password));
@@ -898,7 +897,7 @@ Deno.serve(async (request) => {
         changedListings: source.changed_listings,
         hasCredentials,
         apiReady: hasCredentials,
-        hasConsumerCredentials: scheme === "oauth1" && hasCredentials,
+        hasConsumerCredentials: scheme === "oauth1" && hasConsumerCredentials(savedSecret),
         authScheme: scheme,
         nextPage: source.last_cursor,
         counts: { activeSupplierListings: listingsCount.count || 0, registryParts: registryCount.count || 0, activeInventoryItems: inventoryCount.count || 0 },
@@ -970,7 +969,61 @@ Deno.serve(async (request) => {
       last_status: ready ? "idle" : "not_configured",
       last_error: null,
     });
-    return response({ ok: true, hasCredentials: ready, apiReady: ready, oauthAuthorizationRequired: false, config: nextConfig });
+    const consumerReady = requestedScheme === "oauth1" && hasConsumerCredentials(merged.merged);
+    return response({ ok: true, hasCredentials: ready, apiReady: ready, hasConsumerCredentials: consumerReady, oauthAuthorizationRequired: consumerReady && !ready, config: nextConfig });
+  }
+
+  if (action === "oauth_start") {
+    const savedSecret = await readSavedSecret(admin, source.secret_id);
+    if (!hasConsumerCredentials(savedSecret)) return response({ok:false,error:"Save the MobileSentrix consumer key and secret first."},400);
+    const base=safeApiBase(config.api_base_url||DEFAULT_API_BASE);
+    const callback=clean(config.oauth_callback_url||PORTAL_ORIGIN+"/?mobilesentrix_oauth=callback");
+    const initiateUrl=new URL(clean(config.oauth_initiate_path||"/oauth/initiate"), base+"/");
+    const authorization=await oauth1Authorization("POST",initiateUrl,savedSecret,{oauth_callback:callback},"","");
+    const vendor=await fetch(initiateUrl,{method:"POST",headers:{Authorization:authorization,Accept:"application/x-www-form-urlencoded"}});
+    const text=await vendor.text();
+    if(!vendor.ok) return response({ok:false,error:safeApiError(vendor.status,vendor.headers.get("content-type")||"",text)},502);
+    const params=new URLSearchParams(text);
+    const requestToken=clean(params.get("oauth_token"));
+    const requestSecret=clean(params.get("oauth_token_secret"));
+    if(!requestToken||!requestSecret) return response({ok:false,error:"MobileSentrix did not return an OAuth request token."},502);
+    const staged={...savedSecret,request_token:requestToken,request_token_secret:requestSecret};
+    const stored=await admin.rpc("server_store_vendor_secret",{p_source_name:SOURCE_NAME,p_secret:JSON.stringify(staged)});
+    if(stored.error) throw stored.error;
+    const authorizeUrl=new URL(clean(config.oauth_authorize_path||"/oauth/authorize"),base+"/");
+    authorizeUrl.searchParams.set("oauth_token",requestToken);
+    return response({ok:true,authorizeUrl:authorizeUrl.toString()});
+  }
+
+  if (action === "oauth_complete") {
+    const savedSecret=await readSavedSecret(admin,source.secret_id);
+    const requestToken=clean(savedSecret?.request_token);
+    const requestSecret=clean(savedSecret?.request_token_secret);
+    const returnedToken=clean(body.oauth_token);
+    const verifier=clean(body.oauth_verifier);
+    if(!requestToken||!requestSecret||returnedToken!==requestToken||!verifier) return response({ok:false,error:"MobileSentrix OAuth callback could not be verified."},400);
+    const base=safeApiBase(config.api_base_url||DEFAULT_API_BASE);
+    const tokenUrl=new URL(clean(config.oauth_token_path||"/oauth/token"),base+"/");
+    const authorization=await oauth1Authorization("POST",tokenUrl,savedSecret,{oauth_verifier:verifier},requestToken,requestSecret);
+    const vendor=await fetch(tokenUrl,{method:"POST",headers:{Authorization:authorization,Accept:"application/x-www-form-urlencoded"}});
+    const text=await vendor.text();
+    if(!vendor.ok) return response({ok:false,error:safeApiError(vendor.status,vendor.headers.get("content-type")||"",text)},502);
+    const params=new URLSearchParams(text);
+    const accessToken=clean(params.get("oauth_token"));
+    const accessSecret=clean(params.get("oauth_token_secret"));
+    if(!accessToken||!accessSecret) return response({ok:false,error:"MobileSentrix did not return an OAuth access token."},502);
+    const finalized={...savedSecret,access_token:accessToken,access_token_secret:accessSecret};
+    delete finalized.request_token; delete finalized.request_token_secret;
+    const stored=await admin.rpc("server_store_vendor_secret",{p_source_name:SOURCE_NAME,p_secret:JSON.stringify(finalized)});
+    if(stored.error) throw stored.error;
+    await markSource(admin,{secret_id:stored.data,last_status:"idle",last_error:null});
+    return response({ok:true,apiReady:true});
+  }
+
+  if (action === "oauth_cancel") {
+    const savedSecret=await readSavedSecret(admin,source.secret_id);
+    if(savedSecret){ delete savedSecret.request_token; delete savedSecret.request_token_secret; const stored=await admin.rpc("server_store_vendor_secret",{p_source_name:SOURCE_NAME,p_secret:JSON.stringify(savedSecret)}); if(stored.error) throw stored.error; }
+    return response({ok:true});
   }
 
   if (action === "reset_sync") {
