@@ -990,6 +990,7 @@ Deno.serve(async (request) => {
     const staged={...savedSecret,request_token:requestToken,request_token_secret:requestSecret};
     const stored=await admin.rpc("server_store_vendor_secret",{p_source_name:SOURCE_NAME,p_secret:JSON.stringify(staged)});
     if(stored.error) throw stored.error;
+    await markSource(admin,{secret_id:stored.data,last_status:"authorizing",last_error:null});
     const authorizeUrl=new URL(clean(config.oauth_authorize_path||"/oauth/authorize"),base+"/");
     authorizeUrl.searchParams.set("oauth_token",requestToken);
     return response({ok:true,authorizeUrl:authorizeUrl.toString()});
@@ -1022,7 +1023,13 @@ Deno.serve(async (request) => {
 
   if (action === "oauth_cancel") {
     const savedSecret=await readSavedSecret(admin,source.secret_id);
-    if(savedSecret){ delete savedSecret.request_token; delete savedSecret.request_token_secret; const stored=await admin.rpc("server_store_vendor_secret",{p_source_name:SOURCE_NAME,p_secret:JSON.stringify(savedSecret)}); if(stored.error) throw stored.error; }
+    if(savedSecret){
+      delete savedSecret.request_token;
+      delete savedSecret.request_token_secret;
+      const stored=await admin.rpc("server_store_vendor_secret",{p_source_name:SOURCE_NAME,p_secret:JSON.stringify(savedSecret)});
+      if(stored.error) throw stored.error;
+      await markSource(admin,{secret_id:stored.data,last_status:"not_configured",last_error:null});
+    }
     return response({ok:true});
   }
 
