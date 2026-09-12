@@ -324,10 +324,25 @@
     if(state.busy)return;
     state.busy=true;
     button.disabled=true;
-    const popup=window.open('about:blank','gc-ms-oauth','popup,width=760,height=860');
+    const mobile=matchMedia('(max-width: 760px)').matches||/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    let popup=null;
+    if(!mobile){
+      popup=window.open('about:blank','gc-ms-oauth','popup,width=760,height=860');
+      if(popup&&!popup.closed){
+        try{
+          popup.document.title='Connecting to MobileSentrix…';
+          popup.document.body.innerHTML='<p style="font:16px system-ui;padding:24px">Connecting to MobileSentrix…</p>';
+        }catch{}
+      }
+    }
     try{
       setMessage('gc-ms-api-form','Starting secure MobileSentrix authorization…');
       const data=await invoke('oauth_start');
+      if(!data?.authorizeUrl)throw new Error('MobileSentrix did not return an authorization URL.');
+      if(mobile){
+        location.assign(data.authorizeUrl);
+        return;
+      }
       if(popup&&!popup.closed){
         popup.location.replace(data.authorizeUrl);
         popup.focus();
@@ -337,7 +352,9 @@
       setMessage('gc-ms-api-form','MobileSentrix authorization opened. Approve GotCracked in that window.');
     }catch(error){
       try{popup?.close();}catch{}
-      setMessage('gc-ms-api-form',error.message||'Unable to start MobileSentrix authorization.');
+      const message=error?.message||'Unable to start MobileSentrix authorization.';
+      console.error('MobileSentrix OAuth start failed',error);
+      setMessage('gc-ms-api-form',message);
     }finally{
       state.busy=false;
       const current=document.querySelector('[data-ms-oauth-start]');
