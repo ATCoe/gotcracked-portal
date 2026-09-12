@@ -48,8 +48,17 @@
   }
 
   async function invoke(action,body={}){
-    const result=await client.functions.invoke('mobilesentrix-sync',{body:{action,...body}});
-    if(result.error)throw new Error(result.data?.error||result.error.message||'MobileSentrix request failed.');
+    const functionName=String(action).startsWith('oauth_')?'mobilesentrix-oauth':'mobilesentrix-sync';
+    const result=await client.functions.invoke(functionName,{body:{action,...body}});
+    if(result.error){
+      let detail=result.data?.error||'';
+      const response=result.error?.context;
+      if(!detail&&response&&typeof response.clone==='function'){
+        try{detail=(await response.clone().json())?.error||'';}catch{}
+        if(!detail){try{detail=(await response.clone().text())?.trim()||'';}catch{}}
+      }
+      throw new Error(detail||result.error.message||'MobileSentrix request failed.');
+    }
     if(result.data?.ok===false)throw new Error(result.data?.error||'MobileSentrix request failed.');
     return result.data;
   }
