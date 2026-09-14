@@ -3,7 +3,7 @@
  * must always pass through the live Portal authorization layer, while Portal's
  * normal deployment headers keep the application code current.
  */
-const PORTAL_COMPANION_RELEASE = '20260903-private-app1';
+const PORTAL_COMPANION_RELEASE = '20260914-session-guard1';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());

@@ -95,8 +95,12 @@
     }
 
     if(window.GotCrackedMobilePortal?.isInstalled&&!(await window.GotCrackedMobilePortal.checkAccess())){
-      await localSignOut('This installed Portal Companion is no longer authorized. Sign in with an active GotCracked staff account.');
-      return false;
+      // A Companion network/refresh interruption is not an authorization verdict.
+      // Only the access RPC's confirmed denial revokes the local Portal session.
+      if(window.GotCrackedMobilePortal.isAccessDenied?.()){
+        await localSignOut('This installed Portal Companion no longer has staff access. Sign in with an active GotCracked staff account.');
+        return false;
+      }
     }
 
     const staff={id:userId,name:profile.display_name||'Staff',role:profile.role||'Staff',account_type:profile.account_type||'staff'};

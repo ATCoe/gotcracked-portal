@@ -33,9 +33,23 @@
       const client = window.supabaseClient;
       if (!client) return false;
       const { data:sessionData, error:sessionError } = await client.auth.getSession();
-      if (sessionError || !sessionData?.session?.access_token) return false;
+      if (sessionError || !sessionData?.session?.access_token) {
+        // A token refresh can briefly be unavailable while the app resumes.
+        // Do not convert that transient state into a local logout.
+        accessState = 'pending';
+        return false;
+      }
       const { data, error } = await client.rpc('portal_mobile_access_status');
-      if (error || data?.allowed !== true) return false;
+      if (error) {
+        // Network and Edge/RPC errors are retried by the regular access probe.
+        // A signed-in staff session stays local until access is conclusively denied.
+        accessState = 'pending';
+        return false;
+      }
+      if (data?.allowed !== true) {
+        accessState = 'denied';
+        return false;
+      }
       accessState = 'allowed';
       notifyAccessGranted();
       subscribeToAccessChanges(sessionData.session.user?.id);
@@ -48,8 +62,7 @@
   async function enforceAccess() {
     if (!isStandalone || !staff) return;
     const allowed = await checkAccess();
-    if (allowed) return;
-    accessState = 'denied';
+    if (allowed || accessState !== 'denied') return;
     await window.GotCrackedPortalAuth?.signOut?.('This installed Portal Companion no longer has staff access.');
   }
 
@@ -248,6 +261,7 @@
   window.GotCrackedMobilePortal = {
     isInstalled: Boolean(isStandalone),
     isRuntimeAllowed: hasAccess,
+    isAccessDenied: () => isStandalone && accessState === 'denied',
     checkAccess,
     install
   };
