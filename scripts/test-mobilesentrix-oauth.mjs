@@ -123,7 +123,7 @@ assert.match(
 );
 assert.match(
   portalIndex,
-  /portal-runtime-loader\.js\?v=20260903-mobilesentrix-oauth1/,
+  /portal-runtime-loader\.js\?v=20260914-runtime-clean2/,
   'The runtime-loader cache key must change with the OAuth callback bootstrap.',
 );
 
