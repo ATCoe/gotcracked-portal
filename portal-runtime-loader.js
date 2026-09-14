@@ -9,16 +9,16 @@
   const PROFILE_READY_TIMEOUT_MS = 15000;
 
   const criticalScripts = [
-    'theme-controller.js','training-shared-sync.js','runtime-stability.js','mobile-runtime-regression-fixes.js','portal-refresh-stability.js','operations-v1-core.js','rma-flow-labs.js',
+    'theme-controller.js','training-shared-sync.js','runtime-stability.js','mobile-runtime-regression-fixes.js','portal-refresh-stability.js','operations-v1-core.js',
     'operator-request-context.js','workstation-mode.js','payment-center.js','portal-current-ui-fixes.js','mobile-dialog-compat.js','action-launchers.js','account-sync.js','time-clock.js','portal-deep-links.js','operations-v1-arrival.js','portal-v1-polish.js','intake-profile-validation-fix.js','portal-mobile-audit.js','portal-v1-final.js','ui-title-case.js','directory-advanced.js','master-directory.js','cross-user-sync.js','sales-ops.js','marlon-reporting-bridge.js','dashboard-rail.js','reporting-bookkeeper.js','reporting-capacity-enhancements.js'
   ];
   if(new URLSearchParams(location.search).get('mobilesentrix_oauth')==='callback'){
     criticalScripts.push('mobilesentrix-integration.js');
   }
 
-  const deferredScripts = [
-    'workforce-premium.js','timesheets.js','avatar-presets.js','staff-profiles.js','account-page.js','premium-onboarding-v2.js','training-store-guard.js','pc-builds.js','checkout-receipts.js','schedule-board.js','schedule-print.js','analytics.js','shipping.js','inventory-audit.js'
-  ];
+  // View-owned modules load only when their surface is opened. This prevents
+  // a second startup wave from stacking handlers and observers behind the shell.
+  const deferredScripts = ['training-store-guard.js','pc-builds.js'];
 
   const viewDependencies = {
     repairs:['checkout-receipts.js','part-availability-workflow.js'],
