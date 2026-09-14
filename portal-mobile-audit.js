@@ -56,9 +56,11 @@
     await loadScript(`marlon-releases.js?v=${version}`, 'gcMarlonReleases');
     await loadScript(`marlon-monitor.js?v=${version}`, 'gcMarlonMonitor');
     await loadScript(`marlon-activity.js?v=${version}`, 'gcMarlonActivity');
-    await loadScript(`parts-registry.js?v=${version}`, 'gcPartsRegistry');
-    await loadScript(`mobilesentrix-integration.js?v=${version}`, 'gcMobileSentrixIntegration');
-    await loadScript(`pc-build-policy-settings.js?v=${version}`, 'gcPcBuildPolicy');
+    // Inventory, supplier OAuth, and PC policy are view-scoped in the
+    // authoritative runtime loader. Loading them here created a second stale
+    // MobileSentrix client and competing settings handlers.
+    // Keep this bootstrap limited to the Marlon staff-support shell.
+
     const profile = window.GotCrackedRuntimeProfile || window.GotCrackedOperationsV1?.state?.profile || null;
     if (profile) window.dispatchEvent(new CustomEvent('gotcracked:staff-ready', { detail:profile }));
   }
