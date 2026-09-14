@@ -49,6 +49,14 @@
 
   async function invoke(action,body={}){
     const functionName=String(action).startsWith('oauth_')?'mobilesentrix-oauth':'mobilesentrix-sync';
+    if(functionName==='mobilesentrix-oauth'){
+      // OAuth actions must use a freshly rotated Portal token. A remembered
+      // access token may have expired while the app was backgrounded.
+      const { data, error } = await client.auth.refreshSession();
+      if(error || !data?.session?.access_token){
+        throw new Error('Your Portal session has expired. Sign in with Discord once, then retry MobileSentrix.');
+      }
+    }
     const result=await client.functions.invoke(functionName,{body:{action,...body}});
     if(result.error){
       let detail=result.data?.error||'';

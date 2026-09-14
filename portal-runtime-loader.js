@@ -38,7 +38,7 @@
   const loading=new Map(),delay=ms=>new Promise(resolve=>setTimeout(resolve,ms)),isTraining=()=>localStorage.getItem('gc-training-store')==='1';
   const profileIndependentScripts=new Set(['theme-controller.js','training-shared-sync.js','runtime-stability.js','mobile-runtime-regression-fixes.js','portal-refresh-stability.js','operations-v1-core.js']);
 
-  function srcFor(file){const versions={'account-page.js':ACCOUNT_PAGE_VERSION,'sales-ops.js':SALES_OPS_VERSION,'appointments-board.js':APPOINTMENTS_VERSION,'appointments-owner-guard.js':APPOINTMENTS_VERSION,'customers-board.js':CUSTOMERS_VERSION,'operations-v1-core.js':'20260903-store-menu-persistent1','reporting-capacity-enhancements.js':'20260903-subtle-capacity1','portal-mobile-app.js':'20260903-private-download-api1','mobilesentrix-integration.js':'20260903-official-oauth1'};return `${file}?v=${versions[file]||VERSION}`;}
+  function srcFor(file){const versions={'account-page.js':ACCOUNT_PAGE_VERSION,'sales-ops.js':SALES_OPS_VERSION,'appointments-board.js':APPOINTMENTS_VERSION,'appointments-owner-guard.js':APPOINTMENTS_VERSION,'customers-board.js':CUSTOMERS_VERSION,'operations-v1-core.js':'20260903-store-menu-persistent1','reporting-capacity-enhancements.js':'20260903-subtle-capacity1','portal-mobile-app.js':'20260903-private-download-api1','mobilesentrix-integration.js':'20260914-session-refresh1'};return `${file}?v=${versions[file]||VERSION}`;}
   function showBootRecovery(error){
     const recovery=document.getElementById('gc-portal-boot-recovery');
     if(!recovery)return;
