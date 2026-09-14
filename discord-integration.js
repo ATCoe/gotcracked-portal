@@ -41,7 +41,9 @@
     redirect.hash = approval ? '#support-tickets' : '';
     const { error } = await client.auth.signInWithOAuth({
       provider: 'discord',
-      options: { redirectTo: redirect.toString(), queryParams: { prompt: 'consent' } }
+      // Do not force a new Discord consent screen for an already signed-in user.
+      // Supabase still creates and validates a fresh OAuth state for each explicit login.
+      options: { redirectTo: redirect.toString() }
     });
     if (error) throw error;
   }

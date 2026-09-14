@@ -25,7 +25,16 @@ function gotCrackedFetch(input, init = {}) {
 window.supabaseClient = supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
-  { global: { fetch: gotCrackedFetch } }
+  {
+    global: { fetch: gotCrackedFetch },
+    auth: {
+      storage: window.localStorage,
+      storageKey: GC_AUTH_STORAGE_KEY,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  }
 );
 
 /*
