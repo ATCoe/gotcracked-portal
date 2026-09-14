@@ -572,3 +572,8 @@ dialog[open] {
     transition: none !important;
   }
 }
+
+/* Accessibility contrast remediation for Portal dashboard surfaces. */
+.gc-rail-section-head .eyebrow,.gc-dashboard-clock-copy small,.gc-dashboard-clock-copy span{color:#46596d!important}
+.gc-rail-section-head a{color:#0759b7!important}
+#dashboard .primary-button[data-open-ticket]{background:#075fc5!important;color:#fff!important}
