@@ -11,6 +11,7 @@ const PORTAL_ORIGIN = "https://portal.gotcracked.co";
 const SOURCE_NAME = "mobilesentrix";
 const DEFAULT_API_BASE = "https://www.mobilesentrix.com";
 const DEFAULT_CATALOG_PATH = "/api/rest/products";
+const AURORA_RELAY = "https://auroraserver.tail317407.ts.net/internal/mobilesentrix-relay";
 const MAX_CSV_BYTES = 8_000_000;
 const MAX_CSV_ROWS = 25_000;
 
@@ -552,6 +553,36 @@ async function authHeaders(
   }
 
   return headers;
+}
+
+async function relayVendorRequest(
+  portalAuthorization: string,
+  url: URL,
+  vendorHeaders: Record<string, string>,
+) {
+  const relay = await fetch(AURORA_RELAY, {
+    method: "POST",
+    headers: {
+      Authorization: portalAuthorization,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      method: "GET",
+      path: `${url.pathname}${url.search}`,
+      vendorHeaders,
+      body: "",
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const payload = await relay.json().catch(() => null);
+  if (!payload || !Number.isFinite(Number(payload.status))) {
+    throw new Error(payload?.error || `AuroraServer MobileSentrix relay failed (HTTP ${relay.status}).`);
+  }
+  return new Response(String(payload.text || ""), {
+    status: Number(payload.status),
+    headers: { "Content-Type": String(payload.contentType || "") },
+  });
 }
 
 function apiUrl(
@@ -1177,11 +1208,11 @@ Deno.serve(async (request) => {
       try {
         const url = apiUrl(base, path, config, 1, pageSize);
         const headers = await authHeaders(config, savedSecret, "GET", url);
-        const vendorResponse = await fetch(url.toString(), {
-          method: "GET",
+        const vendorResponse = await relayVendorRequest(
+          authorization,
+          url,
           headers,
-          redirect: "follow",
-        });
+        );
         const text = await vendorResponse.text();
         if (!vendorResponse.ok) {
           throw new Error(
@@ -1291,11 +1322,11 @@ Deno.serve(async (request) => {
       ) {
         const url = apiUrl(base, path, config, page, pageSize);
         const headers = await authHeaders(config, savedSecret, "GET", url);
-        const vendorResponse = await fetch(url.toString(), {
-          method: "GET",
+        const vendorResponse = await relayVendorRequest(
+          authorization,
+          url,
           headers,
-          redirect: "follow",
-        });
+        );
         const text = await vendorResponse.text();
         if (!vendorResponse.ok) {
           throw new Error(
