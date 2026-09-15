@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - 'mobilesentrix-integration.js'
+      - 'parts-registry-images.js'
       - 'portal-runtime-loader.js'
       - 'index.html'
       - 'supabase/functions/mobilesentrix-sync/**'
+      - 'supabase/functions/mobilesentrix-image-cache/**'
       - 'supabase/migrations/*mobilesentrix*'
       - 'scripts/test-mobilesentrix-oauth.mjs'
       - '.github/workflows/mobilesentrix-integration.yml'
@@ -15,9 +17,11 @@ on:
     branches: [main]
     paths:
       - 'mobilesentrix-integration.js'
+      - 'parts-registry-images.js'
       - 'portal-runtime-loader.js'
       - 'index.html'
       - 'supabase/functions/mobilesentrix-sync/**'
+      - 'supabase/functions/mobilesentrix-image-cache/**'
       - 'supabase/migrations/*mobilesentrix*'
       - 'scripts/test-mobilesentrix-oauth.mjs'
       - '.github/workflows/mobilesentrix-integration.yml'
@@ -39,10 +43,10 @@ jobs:
           deno-version: v2.x
 
       - name: Browser module syntax
-        run: node --check mobilesentrix-integration.js
+        run: node --check mobilesentrix-integration.js && node --check parts-registry-images.js
 
       - name: OAuth and catalog unit tests
         run: node scripts/test-mobilesentrix-oauth.mjs
 
       - name: Edge function type check
-        run: deno check supabase/functions/mobilesentrix-sync/index.ts
+        run: deno check supabase/functions/mobilesentrix-sync/index.ts supabase/functions/mobilesentrix-image-cache/index.ts
