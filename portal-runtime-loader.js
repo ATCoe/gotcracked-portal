@@ -28,7 +28,7 @@
     customers: ['customers-board.js'],
     reports:['analytics.js','reconciliation-center.js','reporting-bookkeeper.js','reporting-capacity-enhancements.js'],
     shipping:['shipping.js','shipping-integrated.js','shipping-marlon-support.js'],
-    inventory:['inventory-command-center.js','inventory-audit.js','parts-registry.js','shipping-marlon-support.js'],
+    inventory:['inventory-command-center.js','inventory-audit.js','parts-registry.js','parts-registry-images.js','shipping-marlon-support.js'],
     'rma-flow-labs':['rma-flow-labs.js'],
     staff:['avatar-presets.js','staff-profiles.js','account-page.js','premium-onboarding-v2.js','workforce-premium.js','timesheets.js'],
     settings:['business-settings.js','google-settings-integration.js','pricing-settings.js','procurement-settings.js','mobilesentrix-integration.js','pc-build-policy-settings.js','shipping-integrated.js','shipping-marlon-support.js','reporting-capacity-enhancements.js','workstation-admin.js']
@@ -38,7 +38,7 @@
   const loading=new Map(),delay=ms=>new Promise(resolve=>setTimeout(resolve,ms)),isTraining=()=>localStorage.getItem('gc-training-store')==='1';
   const profileIndependentScripts=new Set(['theme-controller.js','training-shared-sync.js','runtime-stability.js','mobile-runtime-regression-fixes.js','portal-refresh-stability.js','operations-v1-core.js']);
 
-  function srcFor(file){const versions={'account-page.js':ACCOUNT_PAGE_VERSION,'sales-ops.js':SALES_OPS_VERSION,'appointments-board.js':APPOINTMENTS_VERSION,'appointments-owner-guard.js':APPOINTMENTS_VERSION,'customers-board.js':CUSTOMERS_VERSION,'operations-v1-core.js':'20260903-store-menu-persistent1','reporting-capacity-enhancements.js':'20260903-subtle-capacity1','portal-mobile-app.js':'20260903-private-download-api1','portal-mobile-audit.js':'20260914-runtime-clean1','mobilesentrix-integration.js':'20260915-sync-recovery1'};return `${file}?v=${versions[file]||VERSION}`;}
+  function srcFor(file){const versions={'account-page.js':ACCOUNT_PAGE_VERSION,'sales-ops.js':SALES_OPS_VERSION,'appointments-board.js':APPOINTMENTS_VERSION,'appointments-owner-guard.js':APPOINTMENTS_VERSION,'customers-board.js':CUSTOMERS_VERSION,'operations-v1-core.js':'20260903-store-menu-persistent1','reporting-capacity-enhancements.js':'20260903-subtle-capacity1','portal-mobile-app.js':'20260903-private-download-api1','portal-mobile-audit.js':'20260914-runtime-clean1','mobilesentrix-integration.js':'20260915-sync-recovery1','parts-registry-images.js':'20260915-lazy-images1'};return `${file}?v=${versions[file]||VERSION}`;}
   function showBootRecovery(error){
     const recovery=document.getElementById('gc-portal-boot-recovery');
     if(!recovery)return;
