@@ -134,6 +134,11 @@ assert.match(
   'Catalog test and sync traffic must use the AuroraServer relay so MobileSentrix sees the allowlisted egress.',
 );
 assert.match(
+  syncSource,
+  /Number\.isFinite\(number\) && number > 0/,
+  'A bogus zero catalog total must be ignored when MobileSentrix still returns product rows.',
+);
+assert.match(
   statusMigration,
   /'authorizing'::text/,
   'The sync-source status constraint must allow the OAuth authorizing state.',

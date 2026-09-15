@@ -370,7 +370,7 @@ function totalCount(json: any, headers: Headers, fallback: number | null) {
   ];
   for (const value of candidates) {
     const number = Number(value);
-    if (Number.isFinite(number) && number >= 0) return number;
+    if (Number.isFinite(number) && number > 0) return number;
   }
   return fallback;
 }
