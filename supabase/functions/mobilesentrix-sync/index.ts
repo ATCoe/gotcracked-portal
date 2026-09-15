@@ -685,6 +685,26 @@ function withoutSyncRun(config: any) {
   return next;
 }
 
+function inFilterChunks(values: string[], maxEncodedChars = 2_800, maxItems = 25) {
+  const chunks: string[][] = [];
+  let chunk: string[] = [];
+  let encodedChars = 0;
+  for (const value of values) {
+    const text = clean(value);
+    if (!text) continue;
+    const cost = encodeURIComponent(text).length + 3;
+    if (chunk.length && (chunk.length >= maxItems || encodedChars + cost > maxEncodedChars)) {
+      chunks.push(chunk);
+      chunk = [];
+      encodedChars = 0;
+    }
+    chunk.push(text);
+    encodedChars += cost;
+  }
+  if (chunk.length) chunks.push(chunk);
+  return chunks;
+}
+
 async function persistBatch(
   admin: any,
   normalized: any[],
@@ -709,14 +729,18 @@ async function persistBatch(
   }
 
   const keys = deduped.map((item) => item.canonicalKey);
-  const existingResult = await admin
-    .from("parts_registry")
-    .select("id,canonical_key")
-    .in("canonical_key", keys);
-  if (existingResult.error) throw existingResult.error;
+  const existingRows: any[] = [];
+  for (const keyChunk of inFilterChunks(keys, 2_800, 40)) {
+    const existingResult = await admin
+      .from("parts_registry")
+      .select("id,canonical_key")
+      .in("canonical_key", keyChunk);
+    if (existingResult.error) throw existingResult.error;
+    existingRows.push(...(existingResult.data || []));
+  }
 
   const existing = new Map(
-    (existingResult.data || []).map((row: any) => [row.canonical_key, row.id]),
+    existingRows.map((row: any) => [row.canonical_key, row.id]),
   );
   const partRows = deduped.map((item) => ({
     canonical_key: item.canonicalKey,
@@ -778,15 +802,19 @@ async function persistBatch(
   }));
 
   const sourceUrls = listingRows.map((row) => row.source_url);
-  const priorResult = await admin
-    .from("part_source_listings")
-    .select("id,source_url,price_cents,availability")
-    .eq("source_name", SOURCE_NAME)
-    .in("source_url", sourceUrls);
-  if (priorResult.error) throw priorResult.error;
+  const priorRows: any[] = [];
+  for (const urlChunk of inFilterChunks(sourceUrls, 2_800, 20)) {
+    const priorResult = await admin
+      .from("part_source_listings")
+      .select("id,source_url,price_cents,availability")
+      .eq("source_name", SOURCE_NAME)
+      .in("source_url", urlChunk);
+    if (priorResult.error) throw priorResult.error;
+    priorRows.push(...(priorResult.data || []));
+  }
 
   const priorMap = new Map<string, any>(
-    (priorResult.data || []).map((row: any) => [row.source_url, row]),
+    priorRows.map((row: any) => [row.source_url, row]),
   );
   let changed = 0;
   for (const row of listingRows) {
