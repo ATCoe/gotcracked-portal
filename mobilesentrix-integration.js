@@ -422,6 +422,38 @@
     }
   }
 
+  const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+
+  function isTransientSyncTransportError(error){
+    const message=String(error?.message||error||'');
+    return /Failed to send a request to the Edge Function|Failed to fetch|network request failed|networkerror/i.test(message);
+  }
+
+  async function recoverSyncCheckpoint(originalError){
+    let checkpoint=null;
+    for(let attempt=0;attempt<10;attempt+=1){
+      if(attempt>0)await pause(1800);
+      try{
+        const probe=await invoke('status');
+        checkpoint=probe?.status||null;
+      }catch(probeError){
+        if(!isTransientSyncTransportError(probeError)||attempt===9)throw originalError;
+        continue;
+      }
+      if(checkpoint?.lastStatus!=='running')break;
+    }
+    if(!checkpoint||checkpoint.lastStatus==='running')throw originalError;
+    if(checkpoint.lastStatus==='error')throw new Error(checkpoint.lastError||originalError?.message||'MobileSentrix sync failed.');
+    const config=checkpoint.config||{};
+    return {
+      hasMore:Boolean(checkpoint.nextPage),
+      nextPage:checkpoint.nextPage||null,
+      totalItemsSeen:Number(config.sync_run_items_seen||checkpoint.itemsSeen||0),
+      totalNewPartsFound:Number(config.sync_run_new_parts||checkpoint.newPartsFound||0),
+      totalChangedListings:Number(config.sync_run_changed_listings||checkpoint.changedListings||0)
+    };
+  }
+
   async function sync(button){
     if(state.busy)return;
     state.busy=true;
@@ -429,16 +461,19 @@
     try{
       let cycle=0;
       let more=true;
-      let runId=null;
       let latest={};
-      while(more&&cycle<40){
+      while(more&&cycle<80){
         cycle+=1;
         setMessage('gc-ms-api-form',`Syncing MobileSentrix catalog… pass ${cycle}`);
-        latest=await invoke('sync',{max_pages:6,run_id:runId});
-        runId=latest.runId||runId;
+        try{
+          latest=await invoke('sync',{max_pages:4});
+        }catch(error){
+          if(!isTransientSyncTransportError(error))throw error;
+          setMessage('gc-ms-api-form',`Sync pass ${cycle} finished on the server. Verifying saved checkpoint…`);
+          latest=await recoverSyncCheckpoint(error);
+        }
         more=latest.hasMore===true;
       }
-
       const total=Number(latest.totalItemsSeen??latest.itemsSeen??0);
       const newParts=Number(latest.totalNewPartsFound??latest.newPartsFound??0);
       const changed=Number(latest.totalChangedListings??latest.changedListings??0);
@@ -449,7 +484,7 @@
       setMessage('gc-ms-api-form',message);
       await window.GotCrackedPartsRegistry?.load?.();
     }catch(error){
-      await load();
+      await load().catch(()=>{});
       setMessage('gc-ms-api-form',error.message||'MobileSentrix sync failed.');
     }finally{
       state.busy=false;

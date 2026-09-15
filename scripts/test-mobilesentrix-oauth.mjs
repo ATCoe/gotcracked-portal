@@ -125,13 +125,28 @@ assert.match(
 );
 assert.match(
   portalIndex,
-  /portal-runtime-loader\.js\?v=20260914-runtime-clean2/,
+  /portal-runtime-loader\.js\?v=20260915-ms-sync-recovery1/,
   'The runtime-loader cache key must change with the OAuth callback bootstrap.',
 );
 assert.match(
   syncSource,
   /relayVendorRequest\([\s\S]{0,180}AURORA_RELAY/,
   'Catalog test and sync traffic must use the AuroraServer relay so MobileSentrix sees the allowlisted egress.',
+);
+assert.match(
+  runtimeLoader,
+  /mobilesentrix-integration\.js':'20260915-sync-recovery1'/,
+  'The MobileSentrix runtime must be cache-busted when sync recovery changes.',
+);
+assert.match(
+  portalModule,
+  /invoke\('sync',\{max_pages:4\}\)/,
+  'Catalog passes must stay below the browser request timeout.',
+);
+assert.match(
+  portalModule,
+  /recoverSyncCheckpoint\(error\)/,
+  'A lost Edge Function response must recover from the server checkpoint automatically.',
 );
 assert.match(
   syncSource,
