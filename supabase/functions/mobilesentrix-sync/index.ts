@@ -38,10 +38,30 @@ const slug = (value: unknown) =>
 
 const cents = (value: unknown) => {
   const number = Number(String(value ?? "").replace(/[$,]/g, ""));
-  return Number.isFinite(number) && number >= 0
-    ? Math.round(number * 100)
+  if (!Number.isFinite(number) || number < 0) return null;
+  const rounded = Math.round(number * 100);
+  return Number.isSafeInteger(rounded) && rounded <= 2_147_483_647
+    ? rounded
     : null;
 };
+
+function diagnosticError(error: unknown, fallback: string) {
+  const values: unknown[] = [];
+  if (error instanceof Error) values.push(error.message);
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    values.push(record.message, record.details, record.hint, record.code);
+  } else {
+    values.push(error);
+  }
+  const message = values
+    .map((value) => clean(value))
+    .filter((value) => value && value !== "[object Object]")
+    .join(" · ")
+    .replace(/(authorization|token|secret|key)\s*[:=]\s*["']?[^"',\s}]+/gi, "$1=[REDACTED]")
+    .slice(0, 600);
+  return message || fallback;
+}
 
 function textValue(value: unknown): string {
   if (value == null) return "";
@@ -670,13 +690,20 @@ async function persistBatch(
   normalized: any[],
   syncStarted: string,
 ) {
-  const deduped = [
+  const canonicalDeduped = [
     ...new Map(
       normalized
         .filter((item) => item.canonicalKey && item.name && item.sourceUrl)
         .map((item) => [item.canonicalKey, item]),
     ).values(),
   ];
+  const seenSourceUrls = new Set<string>();
+  const deduped = canonicalDeduped.filter((item) => {
+    const sourceUrl = clean(item.sourceUrl);
+    if (!sourceUrl || seenSourceUrls.has(sourceUrl)) return false;
+    seenSourceUrls.add(sourceUrl);
+    return true;
+  });
   if (!deduped.length) {
     return { seen: 0, newParts: 0, changed: 0, priceObservations: 0 };
   }
@@ -868,21 +895,6 @@ Deno.serve(async (request) => {
     return response({ ok: false, error: "Active staff profile required" }, 403);
   }
 
-  const [inventoryPermission, settingsPermission] = await Promise.all([
-    userClient.rpc("has_permission", { permission_key: "inventory.manage" }),
-    userClient.rpc("has_permission", { permission_key: "settings.manage" }),
-  ]);
-  if (
-    inventoryPermission.data !== true &&
-    settingsPermission.data !== true &&
-    profile.role !== "owner"
-  ) {
-    return response(
-      { ok: false, error: "Inventory management permission required" },
-      403,
-    );
-  }
-
   let body: any = {};
   try {
     body = await request.json();
@@ -891,6 +903,23 @@ Deno.serve(async (request) => {
   }
 
   const action = clean(body.action || "status");
+  const automationSyncAllowed =
+    profile.role === "automation" && ["status", "test", "sync"].includes(action);
+  const [inventoryPermission, settingsPermission] = await Promise.all([
+    userClient.rpc("has_permission", { permission_key: "inventory.manage" }),
+    userClient.rpc("has_permission", { permission_key: "settings.manage" }),
+  ]);
+  if (
+    inventoryPermission.data !== true &&
+    settingsPermission.data !== true &&
+    profile.role !== "owner" &&
+    !automationSyncAllowed
+  ) {
+    return response(
+      { ok: false, error: "Inventory management permission required" },
+      403,
+    );
+  }
   const sourceResult = await admin
     .from("part_registry_sync_sources")
     .select("*")
@@ -1163,8 +1192,7 @@ Deno.serve(async (request) => {
         authoritative,
       });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "CSV import failed";
+      const message = diagnosticError(error, "CSV import failed");
       await markSource(admin, {
         last_status: "error",
         last_completed_at: new Date().toISOString(),
@@ -1250,10 +1278,7 @@ Deno.serve(async (request) => {
             .map(({ raw, ...rest }: any) => rest),
         });
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "MobileSentrix API test failed";
+        const message = diagnosticError(error, "MobileSentrix API test failed");
         await markSource(admin, {
           last_status: "error",
           last_completed_at: new Date().toISOString(),
@@ -1452,10 +1477,7 @@ Deno.serve(async (request) => {
         emptyCatalogProtected,
       });
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "MobileSentrix API sync failed";
+      const message = diagnosticError(error, "MobileSentrix API sync failed");
       const errorConfig = {
         ...config,
         sync_run_started_at: runStarted,
