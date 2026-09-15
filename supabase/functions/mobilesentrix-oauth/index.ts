@@ -1,4 +1,4 @@
-﻿import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL=Deno.env.get("SUPABASE_URL")!;
@@ -7,6 +7,7 @@ const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||Deno.env.get("SUPAB
 const PORTAL_ORIGIN="https://portal.gotcracked.co";
 const SOURCE_NAME="mobilesentrix";
 const DEFAULT_BASE="https://www.mobilesentrix.com";
+const AURORA_RELAY="https://auroraserver.tail317407.ts.net/internal/mobilesentrix-relay";
 const cors={"Access-Control-Allow-Origin":PORTAL_ORIGIN,"Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json"};
 const clean=(v:unknown)=>String(v??"").trim();
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:cors});
@@ -35,6 +36,18 @@ async function storeSecret(admin:any,secret:any){const r=await admin.rpc("server
 async function mark(admin:any,patch:Record<string,unknown>){const r=await admin.from("part_registry_sync_sources").update({...patch,updated_at:new Date().toISOString()}).eq("source_name",SOURCE_NAME);if(r.error)throw r.error;}
 function oauthError(stage:string,status:number,ctype:string,text:string){const compact=text.replace(/\s+/g," ").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim().slice(0,220);return `MobileSentrix ${stage} failed (HTTP ${status})${compact?`: ${compact}`:""}`;}
 
+async function relayOauth(portalAuthorization:string,path:string,vendorAuthorization:string,body="") {
+  const relay=await fetch(AURORA_RELAY,{
+    method:"POST",
+    headers:{Authorization:portalAuthorization,"Content-Type":"application/json",Accept:"application/json"},
+    body:JSON.stringify({path,vendorAuthorization,body}),
+    signal:AbortSignal.timeout(30000)
+  });
+  const payload=await relay.json().catch(()=>null);
+  if(!relay.ok||!payload)throw new Error(payload?.error||`AuroraServer OAuth relay failed (HTTP ${relay.status}).`);
+  return payload;
+}
+
 Deno.serve(async req=>{
   if(req.method==="OPTIONS")return new Response("ok",{headers:cors});
   if(req.method!=="POST")return reply({ok:false,error:"Method not allowed"},405);
@@ -60,9 +73,9 @@ Deno.serve(async req=>{
       const base=safeBase(config.api_base_url||DEFAULT_BASE), callback=clean(config.oauth_callback_url||`${PORTAL_ORIGIN}/?mobilesentrix_oauth=callback`);
       const initiate=new URL(clean(config.oauth_initiate_path||"/oauth/initiate"),base+"/");
       const auth=await oauthHeader("POST",initiate,saved,{oauth_callback:callback});
-      const vendor=await fetch(initiate,{method:"POST",headers:{Authorization:auth,Accept:"application/x-www-form-urlencoded","Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","User-Agent":"GotCracked-MobileSentrix-OAuth/1.0"},body:""});
-      const text=await vendor.text();
-      if(!vendor.ok)return reply({ok:false,error:oauthError("OAuth request-token exchange",vendor.status,vendor.headers.get("content-type")||"",text)},502);
+      const vendor=await relayOauth(authorization,initiate.pathname,auth,"");
+      const text=String(vendor.text||"");
+      if(!vendor.ok)return reply({ok:false,error:oauthError("OAuth request-token exchange",Number(vendor.status||502),String(vendor.contentType||""),text)},502);
       const q=new URLSearchParams(text), requestToken=clean(q.get("oauth_token")), requestSecret=clean(q.get("oauth_token_secret"));
       if(!requestToken||!requestSecret)return reply({ok:false,error:"MobileSentrix did not return an OAuth request token."},502);
       const secretId=await storeSecret(admin,{...saved,request_token:requestToken,request_token_secret:requestSecret});
@@ -75,9 +88,9 @@ Deno.serve(async req=>{
       if(!requestToken||!requestSecret||returned!==requestToken||!verifier)return reply({ok:false,error:"MobileSentrix OAuth callback could not be verified."},400);
       const base=safeBase(config.api_base_url||DEFAULT_BASE), tokenUrl=new URL(clean(config.oauth_token_path||"/oauth/token"),base+"/");
       const auth=await oauthHeader("POST",tokenUrl,saved,{oauth_verifier:verifier},requestToken,requestSecret);
-      const vendor=await fetch(tokenUrl,{method:"POST",headers:{Authorization:auth,Accept:"application/x-www-form-urlencoded","Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","User-Agent":"GotCracked-MobileSentrix-OAuth/1.0"},body:""});
-      const text=await vendor.text();
-      if(!vendor.ok)return reply({ok:false,error:oauthError("OAuth access-token exchange",vendor.status,vendor.headers.get("content-type")||"",text)},502);
+      const vendor=await relayOauth(authorization,tokenUrl.pathname,auth,"");
+      const text=String(vendor.text||"");
+      if(!vendor.ok)return reply({ok:false,error:oauthError("OAuth access-token exchange",Number(vendor.status||502),String(vendor.contentType||""),text)},502);
       const q=new URLSearchParams(text),access=clean(q.get("oauth_token")),accessSecret=clean(q.get("oauth_token_secret"));
       if(!access||!accessSecret)return reply({ok:false,error:"MobileSentrix did not return an OAuth access token."},502);
       const final={...saved,access_token:access,access_token_secret:accessSecret};delete final.request_token;delete final.request_token_secret;
