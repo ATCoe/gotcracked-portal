@@ -29,6 +29,7 @@
     reports:['analytics.js','reconciliation-center.js','reporting-bookkeeper.js','reporting-capacity-enhancements.js'],
     shipping:['shipping.js','shipping-integrated.js','shipping-marlon-support.js'],
     inventory:['inventory-command-center.js','inventory-audit.js','parts-registry.js','parts-registry-images.js','shipping-marlon-support.js'],
+    'price-book':['price-book.js'],
     'rma-flow-labs':['rma-flow-labs.js'],
     staff:['avatar-presets.js','staff-profiles.js','account-page.js','premium-onboarding-v2.js','workforce-premium.js','timesheets.js'],
     settings:['business-settings.js','google-settings-integration.js','pricing-settings.js','procurement-settings.js','mobilesentrix-integration.js','pc-build-policy-settings.js','shipping-integrated.js','shipping-marlon-support.js','reporting-capacity-enhancements.js','workstation-admin.js']

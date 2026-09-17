@@ -113,9 +113,14 @@ Deno.serve(async (request: Request) => {
         p_suggestion_type: proposal.suggestionType ?? 'workflow_improvement',
         p_evidence: {
           evidence_summary: proposal.evidenceSummary ?? null,
+          capability_required: proposal.capabilityRequired === true,
+          capability_name: proposal.capabilityName ?? null,
+          capability_reason: proposal.capabilityReason ?? null,
+          capability_install: proposal.capabilityInstall ?? null,
+          capability_cost: proposal.capabilityCost ?? 'none',
           github_run_id: claims.run_id || null,
           github_sha: claims.sha || null,
-          scout_source: 'portal-and-website'
+          scout_source: 'portal-and-website-benchmarks'
         }
       });
       if (error) throw error;
