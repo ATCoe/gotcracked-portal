@@ -17,6 +17,7 @@ const cors = {
   'Access-Control-Allow-Origin': portalOrigin,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Content-Type': 'application/json',
+  'Cache-Control': 'no-store',
   'Vary': 'Origin'
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: cors });
@@ -30,7 +31,12 @@ async function actor(request: Request) {
   if (user.error || !user.data.user) return null;
   const result = await admin().from('profiles').select('id,location_id,role,active').eq('id',user.data.user.id).maybeSingle();
   if (result.error || !result.data?.active || !result.data.location_id || !['owner','manager'].includes(result.data.role)) return null;
-  return result.data;
+  const permission=await userClient.rpc("has_permission",{permission_key:"settings.manage"});
+  if(permission.error||permission.data!==true)return null;
+  let sessionId='';
+  try { sessionId=JSON.parse(atob(authorization.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).session_id||''; } catch {}
+  if(!sessionId)return null;
+  return {...result.data,auth_session_id:sessionId};
 }
 
 function oauthConfigured() {
@@ -125,7 +131,8 @@ async function callback(request: Request) {
     return Response.redirect(`${portalUrl}/?google=error&reason=callback_validation#settings`,302);
   }
 
-  await db.from('google_oauth_states').delete().eq('state',state);
+  const consumed=await db.rpc('server_consume_google_oauth_state',{p_state:state}).maybeSingle();
+  if(consumed.error||!consumed.data)return Response.redirect(`${portalUrl}/?google=error&reason=callback_validation#settings`,302);
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:new URLSearchParams({
@@ -181,7 +188,7 @@ async function startAuthorization(staff:any, requestedScopes:string[]) {
   const db = admin();
   await db.from('google_oauth_states').delete().lt('expires_at',new Date().toISOString());
   const state = crypto.randomUUID();
-  const inserted = await db.from('google_oauth_states').insert({state,location_id:staff.location_id,requested_by:staff.id});
+  const inserted = await db.from('google_oauth_states').insert({state,location_id:staff.location_id,requested_by:staff.id,auth_session_id:staff.auth_session_id});
   if (inserted.error) throw inserted.error;
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   authUrl.search = new URLSearchParams({

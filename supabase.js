@@ -52,7 +52,13 @@ window.supabaseClient = supabase.createClient(
   let sessionPromise = null;
   let lastSessionResult = null;
   let restoreCooldownUntil = 0;
+  let sessionGeneration = 0;
   const SESSION_RESTORE_DEADLINE_MS = 11000;
+
+  function usableSession(session) {
+    return Boolean(session?.access_token && session?.user?.id &&
+      Number(session.expires_at) * 1000 > Date.now() + 60000);
+  }
 
   function readPersistedSession() {
     try {
@@ -86,11 +92,13 @@ window.supabaseClient = supabase.createClient(
         lastSessionResult = result;
         return result;
       }
-      if (lastSessionResult?.session) return lastSessionResult;
+      if (usableSession(lastSessionResult?.session)) return lastSessionResult;
       if (sessionPromise) return sessionPromise;
       if (Date.now() < restoreCooldownUntil) return timeoutResult();
     }
 
+    if (sessionPromise) return sessionPromise;
+    const generation = sessionGeneration;
     const underlying = originalGetSession()
       .then(({ data, error }) => ({ session:data?.session || null, error:error || null, source:'supabase' }))
       .catch(error => ({ session:null, error, source:'supabase' }));
@@ -102,15 +110,16 @@ window.supabaseClient = supabase.createClient(
       underlying,
       new Promise(resolve => setTimeout(() => resolve(timeoutResult()), SESSION_RESTORE_DEADLINE_MS))
     ]).then(result => {
-      if (result.session) lastSessionResult = result;
+      if (generation !== sessionGeneration) return { session:null, error:null, source:'session-changed' };
+      if (usableSession(result.session)) lastSessionResult = result;
       if (result.source === 'timeout') restoreCooldownUntil = Date.now() + 15000;
       return result;
-    }).finally(() => { sessionPromise = null; });
+    }).finally(() => { if (generation === sessionGeneration) sessionPromise = null; });
 
     // A late successful restore is still useful for the next operation, even if
     // the UI already fell back to the login screen.
     underlying.then(result => {
-      if (result?.session) {
+      if (generation === sessionGeneration && usableSession(result?.session)) {
         lastSessionResult = result;
         restoreCooldownUntil = 0;
       }
@@ -120,6 +129,7 @@ window.supabaseClient = supabase.createClient(
   }
 
   function clear() {
+    sessionGeneration += 1;
     lastSessionResult = null;
     sessionPromise = null;
     restoreCooldownUntil = 0;
@@ -132,6 +142,7 @@ window.supabaseClient = supabase.createClient(
 
   client.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') return clear();
+    if (event === 'SIGNED_IN' && lastSessionResult?.session?.user?.id !== session?.user?.id) clear();
     if (session && ['INITIAL_SESSION','SIGNED_IN','TOKEN_REFRESHED','USER_UPDATED'].includes(event)) {
       client.realtime.setAuth(session.access_token).catch(error =>
         console.warn('Portal realtime token update failed:', error)
@@ -142,6 +153,9 @@ window.supabaseClient = supabase.createClient(
   });
 
   window.GotCrackedAuth = { restoreSession, readPersistedSession, clear };
+  window.addEventListener('storage', event => {
+    if (event.key === GC_AUTH_STORAGE_KEY || event.key === null) clear();
+  });
 })();
 
 /*
@@ -160,6 +174,7 @@ window.supabaseClient = supabase.createClient(
   let userCache = null;
   let userCacheAt = 0;
   const USER_TTL_MS = 3000;
+  let cacheGeneration = 0;
 
   client.auth.getUser = (...args) => {
     if (args.length) return originalGetUser(...args);
@@ -167,15 +182,17 @@ window.supabaseClient = supabase.createClient(
     if (userCache && now - userCacheAt < USER_TTL_MS) return Promise.resolve(userCache);
     if (userInFlight) return userInFlight;
 
+    const generation = cacheGeneration;
     userInFlight = originalGetUser()
       .then(result => {
+        if (generation !== cacheGeneration) return { data:{user:null}, error:null };
         if (!result?.error && result?.data?.user) {
           userCache = result;
           userCacheAt = Date.now();
         }
         return result;
       })
-      .finally(() => { userInFlight = null; });
+      .finally(() => { if (generation === cacheGeneration) userInFlight = null; });
 
     return userInFlight;
   };
@@ -201,28 +218,37 @@ window.supabaseClient = supabase.createClient(
     if (staffListCache && now - staffListCacheAt < STAFF_LIST_TTL_MS) return Promise.resolve(staffListCache);
     if (staffListInFlight) return staffListInFlight;
 
+    const generation = cacheGeneration;
     staffListInFlight = originalInvoke(functionName, options)
       .then(result => {
+        if (generation !== cacheGeneration) return {data:null,error:new Error('Portal session changed. Retry the request.')};
         if (!result?.error) {
           staffListCache = result;
           staffListCacheAt = Date.now();
         }
         return result;
       })
-      .finally(() => { staffListInFlight = null; });
+      .finally(() => { if (generation === cacheGeneration) staffListInFlight = null; });
 
     return staffListInFlight;
   };
 
-  client.auth.onAuthStateChange(event => {
-    if (['SIGNED_OUT','TOKEN_REFRESHED','USER_UPDATED'].includes(event)) {
+  function clearCaches() {
+      cacheGeneration += 1;
       userCache = null;
       userCacheAt = 0;
-    }
-    if (event === 'SIGNED_OUT') {
+      userInFlight = null;
       staffListCache = null;
       staffListCacheAt = 0;
+      staffListInFlight = null;
+  }
+  client.auth.onAuthStateChange(event => {
+    if (['SIGNED_OUT','SIGNED_IN','TOKEN_REFRESHED','USER_UPDATED'].includes(event)) {
+      clearCaches();
     }
+  });
+  window.addEventListener('storage', event => {
+    if (event.key === GC_AUTH_STORAGE_KEY || event.key === null) clearCaches();
   });
 })();
 

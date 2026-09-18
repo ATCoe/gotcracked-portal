@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const allowedOrigins = new Set(['https://portal.gotcracked.co']);
 const cors = (origin: string | null) => ({
   'Access-Control-Allow-Origin': allowedOrigins.has(origin || '') ? origin! : 'https://portal.gotcracked.co',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-gc-operator-token',
   'Content-Type': 'application/json',
   'Vary': 'Origin'
 });
@@ -22,11 +22,13 @@ Deno.serve(async request => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const userClient = createClient(supabaseUrl, anonKey, { global:{ headers:{ Authorization:authHeader } } });
+    const userClient = createClient(supabaseUrl, anonKey, { global:{ headers:{ Authorization:authHeader, ['x-gc-operator-token']:request.headers.get('x-gc-operator-token')||'' } } });
     const admin = createClient(supabaseUrl, serviceKey);
     const { data:{ user } } = await userClient.auth.getUser();
     if (!user) return json(origin, { error:'Sign in required.' }, 401);
 
+    const permission=await userClient.rpc('has_permission',{permission_key:'ready_pickup.checkout'});
+    if(permission.error||permission.data!==true)return json(origin,{error:'Checkout permission required.'},403);
     const body = await request.json();
     const receiptId = String(body?.receiptId || '').trim();
     if (!receiptId) return json(origin, { error:'Receipt is required.' }, 400);

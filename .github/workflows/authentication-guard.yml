@@ -1,0 +1,24 @@
+name: Authentication guard
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  authentication:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: node scripts/test-authentication.mjs
+      - run: node scripts/test-mobilesentrix-oauth.mjs
+      - name: Check changed authentication services
+        run: |
+          deno check supabase/functions/mobilesentrix-oauth/index.ts supabase/functions/discord-verify/index.ts supabase/functions/customer-account/index.ts supabase/functions/create-lead/index.ts supabase/functions/google-integrations/index.ts supabase/functions/marlon-knowledge-context/index.ts supabase/functions/device-catalog-search/index.ts supabase/functions/send-receipt/index.ts supabase/functions/sync-media/index.ts supabase/functions/shipping-provider/index.ts

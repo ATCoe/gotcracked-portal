@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const allowedOrigins = new Set(['https://portal.gotcracked.co']);
-const headers = (origin: string | null) => ({ 'Access-Control-Allow-Origin': allowedOrigins.has(origin || '') ? origin! : 'https://portal.gotcracked.co', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Content-Type': 'application/json', 'Vary': 'Origin' });
+const headers = (origin: string | null) => ({ 'Access-Control-Allow-Origin': allowedOrigins.has(origin || '') ? origin! : 'https://portal.gotcracked.co', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-gc-operator-token', 'Content-Type': 'application/json', 'Vary': 'Origin' });
 const json = (origin: string | null, body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: headers(origin) });
 const clean = (value: unknown, max = 500) => String(value || '').trim().slice(0, max);
 
@@ -52,12 +52,14 @@ Deno.serve(async request => {
   if (!allowedOrigins.has(origin || '')) return json(origin, { error: 'Origin not allowed.' }, 403);
   try {
     const authorization = request.headers.get('Authorization') || '';
-    const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authorization } } });
+    const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authorization, ['x-gc-operator-token']:request.headers.get('x-gc-operator-token')||'' } } });
     const userResult = await userClient.auth.getUser();
     if (userResult.error || !userResult.data.user) return json(origin, { error: 'Sign in required.' }, 401);
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const profile = await admin.from('profiles').select('id,location_id,active').eq('id', userResult.data.user.id).single();
     if (profile.error || !profile.data.active || !profile.data.location_id) return json(origin, { error: 'Active staff access is required.' }, 403);
+    const permission=await userClient.rpc('has_permission',{permission_key:'leads.manage'});
+    if(permission.error||permission.data!==true)return json(origin,{error:'Lead management permission required.'},403);
     const body = await request.json();
     const name = clean(body.name, 160), service = clean(body.service, 180);
     if (!name || !service) return json(origin, { error: 'Customer name and requested service are required.' }, 400);

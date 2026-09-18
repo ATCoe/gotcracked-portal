@@ -25,6 +25,9 @@ Deno.serve(async request=>{
     if(userError||!user)return reply(origin,{authorized:false,error:'Sign in required.'},401);
     const claims:any=jwtPayload(authorization),sessionId=String(claims?.session_id||'');
     if(!/^[0-9a-f-]{36}$/i.test(sessionId))return reply(origin,{authorized:false,error:'This Portal session cannot be verified. Sign in again.'},401);
+    const active=await userClient.rpc('portal_auth_session_active');
+    if(active.error||active.data!==true)return reply(origin,{authorized:false,error:'This sign-in has expired. Continue with Discord again.'},401);
+    if(!Array.isArray(claims.amr)||!claims.amr.some((entry:any)=>entry.method==='oauth'))return reply(origin,{authorized:false,error:'Continue with Discord to verify this session.'},403);
     const discordIdentity=user.identities?.find(identity=>identity.provider==='discord');
     const discordId=String(discordIdentity?.identity_data?.provider_id||discordIdentity?.identity_data?.sub||discordIdentity?.id||'');
     if(!discordId)return reply(origin,{authorized:false,error:'No Discord identity was found.'},403);
@@ -45,15 +48,15 @@ Deno.serve(async request=>{
       if(!invite||(invite.discord_user_id&&invite.discord_user_id!==discordId))return reply(origin,{authorized:false,error:'This staff invitation is invalid, expired, or belongs to another Discord account.'},403);
       if(invite.discord_username&&String(invite.discord_username).toLowerCase()!==currentUsername)return reply(origin,{authorized:false,error:`This onboarding package was issued for @${invite.discord_username}. Sign in with that Discord account or ask management to reissue it.`},403);
       const displayName=invite.display_name||member.nick||identity.full_name||identity.name||identity.user_name||'Staff';
+      const used=await admin.from('staff_invitations').update({used_at:new Date().toISOString(),used_by:user.id,discord_user_id:discordId}).eq('id',invite.id).is('used_at',null).is('cancelled_at',null).gt('expires_at',new Date().toISOString()).select('id').maybeSingle();
+      if(used.error||!used.data)throw used.error||new Error('This onboarding package was already used.');
       const created=await admin.from('profiles').insert({id:user.id,location_id:invite.location_id,display_name:displayName,role:invite.role,active:true,account_type:'staff',discord_user_id:discordId,discord_username:currentUsername||null,discord_avatar_url:identity.avatar_url||null,discord_verified_at:new Date().toISOString(),last_portal_login_at:new Date().toISOString(),recovery_email:invite.recovery_email||null,portal_email:invite.portal_email||null,job_title:invite.job_title||null,must_change_password:false,onboarding_complete:false,onboarding_status:'onboarding',discord_invite_expires_at:invite.expires_at,updated_at:new Date().toISOString()}).select().single();
       if(created.error)throw created.error;profile=created.data;consumedInvite=invite;
-      const used=await admin.from('staff_invitations').update({used_at:new Date().toISOString(),used_by:user.id,discord_user_id:discordId}).eq('id',invite.id).is('used_at',null).select('id').maybeSingle();
-      if(used.error||!used.data)throw used.error||new Error('This onboarding package was already used.');
       const progress=await admin.from('staff_onboarding_progress').upsert({profile_id:user.id,location_id:invite.location_id,invitation_id:invite.id,status:'in_progress',welcome_payload:invite.welcome_payload||{}},{onConflict:'profile_id'});if(progress.error)throw progress.error;
       await admin.from('staff_account_events').insert({location_id:invite.location_id,invitation_id:invite.id,actor_user_id:user.id,target_user_id:user.id,event_type:'discord_invitation_accepted',details:{discord_user_id:discordId,discord_username:currentUsername}});
     }
     if(!profile?.active)return reply(origin,{authorized:false,error:'Your GotCracked staff account is not active.'},403);
-    if(profile.account_type==='shared_workstation')return reply(origin,{authorized:false,error:'Shared workstations use device enrollment, not Discord authentication.'},403);
+    if(profile.account_type!=='staff')return reply(origin,{authorized:false,error:'Shared workstations use device enrollment, not Discord authentication.'},403);
     if(profile.discord_user_id&&String(profile.discord_user_id)!==discordId)return reply(origin,{authorized:false,error:'This Portal profile is already linked to a different Discord identity. Contact an owner.'},403);
 
     const updated=await admin.from('profiles').update({discord_user_id:discordId,discord_username:currentUsername||profile.discord_username,discord_avatar_url:identity.avatar_url||null,discord_verified_at:new Date().toISOString(),last_portal_login_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',user.id);if(updated.error)throw updated.error;

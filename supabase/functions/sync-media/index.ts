@@ -14,6 +14,8 @@ Deno.serve(async request => {
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const profile = await admin.from('profiles').select('location_id,role,active').eq('id', user.data.user.id).single();
     if (profile.error || !profile.data.active || !['owner','manager'].includes(profile.data.role)) return reply({ error: 'Management access is required.' }, 403);
+    const permission=await userClient.rpc('has_permission',{permission_key:'settings.manage'});
+    if(permission.error||permission.data!==true)return reply({error:'Settings management permission required.'},403);
     const body = await request.json();
     const platform = String(body.platform || '').toLowerCase();
     const settings = await admin.from('business_settings').select('*').eq('location_id', profile.data.location_id).single();

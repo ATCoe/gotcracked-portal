@@ -11,7 +11,6 @@ const PORTAL_ORIGIN = "https://portal.gotcracked.co";
 const SOURCE_NAME = "mobilesentrix";
 const DEFAULT_API_BASE = "https://www.mobilesentrix.com";
 const DEFAULT_CATALOG_PATH = "/api/rest/products";
-const AURORA_RELAY = "https://auroraserver.tail317407.ts.net/internal/mobilesentrix-relay";
 const MAX_CSV_BYTES = 8_000_000;
 const MAX_CSV_ROWS = 25_000;
 
@@ -38,30 +37,10 @@ const slug = (value: unknown) =>
 
 const cents = (value: unknown) => {
   const number = Number(String(value ?? "").replace(/[$,]/g, ""));
-  if (!Number.isFinite(number) || number < 0) return null;
-  const rounded = Math.round(number * 100);
-  return Number.isSafeInteger(rounded) && rounded <= 2_147_483_647
-    ? rounded
+  return Number.isFinite(number) && number >= 0
+    ? Math.round(number * 100)
     : null;
 };
-
-function diagnosticError(error: unknown, fallback: string) {
-  const values: unknown[] = [];
-  if (error instanceof Error) values.push(error.message);
-  if (error && typeof error === "object") {
-    const record = error as Record<string, unknown>;
-    values.push(record.message, record.details, record.hint, record.code);
-  } else {
-    values.push(error);
-  }
-  const message = values
-    .map((value) => clean(value))
-    .filter((value) => value && value !== "[object Object]")
-    .join(" · ")
-    .replace(/(authorization|token|secret|key)\s*[:=]\s*["']?[^"',\s}]+/gi, "$1=[REDACTED]")
-    .slice(0, 600);
-  return message || fallback;
-}
 
 function textValue(value: unknown): string {
   if (value == null) return "";
@@ -390,7 +369,7 @@ function totalCount(json: any, headers: Headers, fallback: number | null) {
   ];
   for (const value of candidates) {
     const number = Number(value);
-    if (Number.isFinite(number) && number > 0) return number;
+    if (Number.isFinite(number) && number >= 0) return number;
   }
   return fallback;
 }
@@ -467,7 +446,7 @@ async function oauth1Authorization(
   ]
     .map(([key, value]) => [percentEncode(key), percentEncode(value)] as const)
     .sort(([keyA, valueA], [keyB, valueB]) =>
-      keyA === keyB ? valueA.localeCompare(valueB) : keyA.localeCompare(keyB)
+      keyA === keyB ? (valueA<valueB?-1:valueA>valueB?1:0) : (keyA<keyB?-1:keyA>keyB?1:0)
     );
 
   const normalized = parameters
@@ -487,7 +466,7 @@ async function oauth1Authorization(
   return (
     "OAuth " +
     Object.entries(oauth)
-      .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+      .sort(([keyA], [keyB]) => (keyA<keyB?-1:keyA>keyB?1:0))
       .map(([key, value]) => `${percentEncode(key)}="${percentEncode(value)}"`)
       .join(", ")
   );
@@ -575,36 +554,6 @@ async function authHeaders(
   return headers;
 }
 
-async function relayVendorRequest(
-  portalAuthorization: string,
-  url: URL,
-  vendorHeaders: Record<string, string>,
-) {
-  const relay = await fetch(AURORA_RELAY, {
-    method: "POST",
-    headers: {
-      Authorization: portalAuthorization,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      method: "GET",
-      path: `${url.pathname}${url.search}`,
-      vendorHeaders,
-      body: "",
-    }),
-    signal: AbortSignal.timeout(30000),
-  });
-  const payload = await relay.json().catch(() => null);
-  if (!payload || !Number.isFinite(Number(payload.status))) {
-    throw new Error(payload?.error || `AuroraServer MobileSentrix relay failed (HTTP ${relay.status}).`);
-  }
-  return new Response(String(payload.text || ""), {
-    status: Number(payload.status),
-    headers: { "Content-Type": String(payload.contentType || "") },
-  });
-}
-
 function apiUrl(
   base: string,
   path: string,
@@ -685,62 +634,31 @@ function withoutSyncRun(config: any) {
   return next;
 }
 
-function inFilterChunks(values: string[], maxEncodedChars = 2_800, maxItems = 25) {
-  const chunks: string[][] = [];
-  let chunk: string[] = [];
-  let encodedChars = 0;
-  for (const value of values) {
-    const text = clean(value);
-    if (!text) continue;
-    const cost = encodeURIComponent(text).length + 3;
-    if (chunk.length && (chunk.length >= maxItems || encodedChars + cost > maxEncodedChars)) {
-      chunks.push(chunk);
-      chunk = [];
-      encodedChars = 0;
-    }
-    chunk.push(text);
-    encodedChars += cost;
-  }
-  if (chunk.length) chunks.push(chunk);
-  return chunks;
-}
-
 async function persistBatch(
   admin: any,
   normalized: any[],
   syncStarted: string,
 ) {
-  const canonicalDeduped = [
+  const deduped = [
     ...new Map(
       normalized
         .filter((item) => item.canonicalKey && item.name && item.sourceUrl)
         .map((item) => [item.canonicalKey, item]),
     ).values(),
   ];
-  const seenSourceUrls = new Set<string>();
-  const deduped = canonicalDeduped.filter((item) => {
-    const sourceUrl = clean(item.sourceUrl);
-    if (!sourceUrl || seenSourceUrls.has(sourceUrl)) return false;
-    seenSourceUrls.add(sourceUrl);
-    return true;
-  });
   if (!deduped.length) {
     return { seen: 0, newParts: 0, changed: 0, priceObservations: 0 };
   }
 
   const keys = deduped.map((item) => item.canonicalKey);
-  const existingRows: any[] = [];
-  for (const keyChunk of inFilterChunks(keys, 2_800, 40)) {
-    const existingResult = await admin
-      .from("parts_registry")
-      .select("id,canonical_key")
-      .in("canonical_key", keyChunk);
-    if (existingResult.error) throw existingResult.error;
-    existingRows.push(...(existingResult.data || []));
-  }
+  const existingResult = await admin
+    .from("parts_registry")
+    .select("id,canonical_key")
+    .in("canonical_key", keys);
+  if (existingResult.error) throw existingResult.error;
 
   const existing = new Map(
-    existingRows.map((row: any) => [row.canonical_key, row.id]),
+    (existingResult.data || []).map((row: any) => [row.canonical_key, row.id]),
   );
   const partRows = deduped.map((item) => ({
     canonical_key: item.canonicalKey,
@@ -802,19 +720,15 @@ async function persistBatch(
   }));
 
   const sourceUrls = listingRows.map((row) => row.source_url);
-  const priorRows: any[] = [];
-  for (const urlChunk of inFilterChunks(sourceUrls, 2_800, 20)) {
-    const priorResult = await admin
-      .from("part_source_listings")
-      .select("id,source_url,price_cents,availability")
-      .eq("source_name", SOURCE_NAME)
-      .in("source_url", urlChunk);
-    if (priorResult.error) throw priorResult.error;
-    priorRows.push(...(priorResult.data || []));
-  }
+  const priorResult = await admin
+    .from("part_source_listings")
+    .select("id,source_url,price_cents,availability")
+    .eq("source_name", SOURCE_NAME)
+    .in("source_url", sourceUrls);
+  if (priorResult.error) throw priorResult.error;
 
   const priorMap = new Map<string, any>(
-    priorRows.map((row: any) => [row.source_url, row]),
+    (priorResult.data || []).map((row: any) => [row.source_url, row]),
   );
   let changed = 0;
   for (const row of listingRows) {
@@ -923,6 +837,20 @@ Deno.serve(async (request) => {
     return response({ ok: false, error: "Active staff profile required" }, 403);
   }
 
+  const [inventoryPermission, settingsPermission] = await Promise.all([
+    userClient.rpc("has_permission", { permission_key: "inventory.manage" }),
+    userClient.rpc("has_permission", { permission_key: "settings.manage" }),
+  ]);
+  if (
+    inventoryPermission.data !== true &&
+    settingsPermission.data !== true
+  ) {
+    return response(
+      { ok: false, error: "Inventory management permission required" },
+      403,
+    );
+  }
+
   let body: any = {};
   try {
     body = await request.json();
@@ -931,23 +859,6 @@ Deno.serve(async (request) => {
   }
 
   const action = clean(body.action || "status");
-  const automationSyncAllowed =
-    profile.role === "automation" && ["status", "test", "sync"].includes(action);
-  const [inventoryPermission, settingsPermission] = await Promise.all([
-    userClient.rpc("has_permission", { permission_key: "inventory.manage" }),
-    userClient.rpc("has_permission", { permission_key: "settings.manage" }),
-  ]);
-  if (
-    inventoryPermission.data !== true &&
-    settingsPermission.data !== true &&
-    profile.role !== "owner" &&
-    !automationSyncAllowed
-  ) {
-    return response(
-      { ok: false, error: "Inventory management permission required" },
-      403,
-    );
-  }
   const sourceResult = await admin
     .from("part_registry_sync_sources")
     .select("*")
@@ -1061,65 +972,7 @@ Deno.serve(async (request) => {
     return response({ ok: true, hasCredentials: ready, apiReady: ready, hasConsumerCredentials: consumerReady, oauthAuthorizationRequired: consumerReady && !ready, config: nextConfig });
   }
 
-  if (action === "oauth_start") {
-    const savedSecret = await readSavedSecret(admin, source.secret_id);
-    if (!hasConsumerCredentials(savedSecret)) return response({ok:false,error:"Save the MobileSentrix consumer key and secret first."},400);
-    const base=safeApiBase(config.api_base_url||DEFAULT_API_BASE);
-    const callback=clean(config.oauth_callback_url||PORTAL_ORIGIN+"/?mobilesentrix_oauth=callback");
-    const initiateUrl=new URL(clean(config.oauth_initiate_path||"/oauth/initiate"), base+"/");
-    const authorization=await oauth1Authorization("POST",initiateUrl,savedSecret,{oauth_callback:callback},"","");
-    const vendor=await fetch(initiateUrl,{method:"POST",headers:{Authorization:authorization,Accept:"application/x-www-form-urlencoded"}});
-    const text=await vendor.text();
-    if(!vendor.ok) return response({ok:false,error:safeApiError(vendor.status,vendor.headers.get("content-type")||"",text)},502);
-    const params=new URLSearchParams(text);
-    const requestToken=clean(params.get("oauth_token"));
-    const requestSecret=clean(params.get("oauth_token_secret"));
-    if(!requestToken||!requestSecret) return response({ok:false,error:"MobileSentrix did not return an OAuth request token."},502);
-    const staged={...savedSecret,request_token:requestToken,request_token_secret:requestSecret};
-    const stored=await admin.rpc("server_store_vendor_secret",{p_source_name:SOURCE_NAME,p_secret:JSON.stringify(staged)});
-    if(stored.error) throw stored.error;
-    await markSource(admin,{secret_id:stored.data,last_status:"authorizing",last_error:null});
-    const authorizeUrl=new URL(clean(config.oauth_authorize_path||"/oauth/authorize"),base+"/");
-    authorizeUrl.searchParams.set("oauth_token",requestToken);
-    return response({ok:true,authorizeUrl:authorizeUrl.toString()});
-  }
-
-  if (action === "oauth_complete") {
-    const savedSecret=await readSavedSecret(admin,source.secret_id);
-    const requestToken=clean(savedSecret?.request_token);
-    const requestSecret=clean(savedSecret?.request_token_secret);
-    const returnedToken=clean(body.oauth_token);
-    const verifier=clean(body.oauth_verifier);
-    if(!requestToken||!requestSecret||returnedToken!==requestToken||!verifier) return response({ok:false,error:"MobileSentrix OAuth callback could not be verified."},400);
-    const base=safeApiBase(config.api_base_url||DEFAULT_API_BASE);
-    const tokenUrl=new URL(clean(config.oauth_token_path||"/oauth/token"),base+"/");
-    const authorization=await oauth1Authorization("POST",tokenUrl,savedSecret,{oauth_verifier:verifier},requestToken,requestSecret);
-    const vendor=await fetch(tokenUrl,{method:"POST",headers:{Authorization:authorization,Accept:"application/x-www-form-urlencoded"}});
-    const text=await vendor.text();
-    if(!vendor.ok) return response({ok:false,error:safeApiError(vendor.status,vendor.headers.get("content-type")||"",text)},502);
-    const params=new URLSearchParams(text);
-    const accessToken=clean(params.get("oauth_token"));
-    const accessSecret=clean(params.get("oauth_token_secret"));
-    if(!accessToken||!accessSecret) return response({ok:false,error:"MobileSentrix did not return an OAuth access token."},502);
-    const finalized={...savedSecret,access_token:accessToken,access_token_secret:accessSecret};
-    delete finalized.request_token; delete finalized.request_token_secret;
-    const stored=await admin.rpc("server_store_vendor_secret",{p_source_name:SOURCE_NAME,p_secret:JSON.stringify(finalized)});
-    if(stored.error) throw stored.error;
-    await markSource(admin,{secret_id:stored.data,last_status:"idle",last_error:null});
-    return response({ok:true,apiReady:true});
-  }
-
-  if (action === "oauth_cancel") {
-    const savedSecret=await readSavedSecret(admin,source.secret_id);
-    if(savedSecret){
-      delete savedSecret.request_token;
-      delete savedSecret.request_token_secret;
-      const stored=await admin.rpc("server_store_vendor_secret",{p_source_name:SOURCE_NAME,p_secret:JSON.stringify(savedSecret)});
-      if(stored.error) throw stored.error;
-      await markSource(admin,{secret_id:stored.data,last_status:"not_configured",last_error:null});
-    }
-    return response({ok:true});
-  }
+  if (action.startsWith("oauth_")) return response({ok:false,error:"Use the dedicated MobileSentrix OAuth service."},400);
 
   if (action === "reset_sync") {
     await markSource(admin, { last_cursor: null, config: withoutSyncRun(config), last_status: "idle", last_error: null });
@@ -1220,7 +1073,8 @@ Deno.serve(async (request) => {
         authoritative,
       });
     } catch (error) {
-      const message = diagnosticError(error, "CSV import failed");
+      const message =
+        error instanceof Error ? error.message : "CSV import failed";
       await markSource(admin, {
         last_status: "error",
         last_completed_at: new Date().toISOString(),
@@ -1264,11 +1118,11 @@ Deno.serve(async (request) => {
       try {
         const url = apiUrl(base, path, config, 1, pageSize);
         const headers = await authHeaders(config, savedSecret, "GET", url);
-        const vendorResponse = await relayVendorRequest(
-          authorization,
-          url,
+        const vendorResponse = await fetch(url.toString(), {
+          method: "GET",
           headers,
-        );
+          redirect: "follow",
+        });
         const text = await vendorResponse.text();
         if (!vendorResponse.ok) {
           throw new Error(
@@ -1306,7 +1160,10 @@ Deno.serve(async (request) => {
             .map(({ raw, ...rest }: any) => rest),
         });
       } catch (error) {
-        const message = diagnosticError(error, "MobileSentrix API test failed");
+        const message =
+          error instanceof Error
+            ? error.message
+            : "MobileSentrix API test failed";
         await markSource(admin, {
           last_status: "error",
           last_completed_at: new Date().toISOString(),
@@ -1375,11 +1232,11 @@ Deno.serve(async (request) => {
       ) {
         const url = apiUrl(base, path, config, page, pageSize);
         const headers = await authHeaders(config, savedSecret, "GET", url);
-        const vendorResponse = await relayVendorRequest(
-          authorization,
-          url,
+        const vendorResponse = await fetch(url.toString(), {
+          method: "GET",
           headers,
-        );
+          redirect: "follow",
+        });
         const text = await vendorResponse.text();
         if (!vendorResponse.ok) {
           throw new Error(
@@ -1505,7 +1362,10 @@ Deno.serve(async (request) => {
         emptyCatalogProtected,
       });
     } catch (error) {
-      const message = diagnosticError(error, "MobileSentrix API sync failed");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "MobileSentrix API sync failed";
       const errorConfig = {
         ...config,
         sync_run_started_at: runStarted,

@@ -18,7 +18,7 @@ declare
   has_google boolean:=false;
 begin
   if auth.uid() is null then return false; end if;
-  if not public.portal_auth_session_active() then return false; end if;
+  if not exists(select 1 from auth.sessions s where s.id=nullif(auth.jwt()->>'session_id','')::uuid and s.user_id=auth.uid() and s.not_after > now()) then return false; end if;
   select * into p from public.profiles where id=auth.uid() and active=true;
   if p.id is null or coalesce(p.account_type,'staff')<>'staff' then return false; end if;
   select exists(select 1 from auth.identities i where i.user_id=auth.uid() and i.provider='google') into has_google;
@@ -42,7 +42,7 @@ grant execute on function public.register_google_human_session() to authenticate
 
 create or replace function public.portal_session_authorized()
 returns boolean language sql stable security definer set search_path to 'public' as $function$
-  select public.portal_auth_session_active() and coalesce((
+  select exists(select 1 from auth.sessions s where s.id=nullif(auth.jwt()->>'session_id','')::uuid and s.user_id=auth.uid() and s.not_after > now()) and coalesce((
     select case
       when coalesce(p.account_type,'staff')='shared_workstation' then exists(select 1 from public.trusted_workstations tw where tw.workstation_profile_id=p.id and tw.location_id=p.location_id and tw.auth_session_id=nullif(auth.jwt()->>'session_id','')::uuid and tw.revoked_at is null)
       when coalesce(p.account_type,'staff')='automation' then p.role='automation'::public.staff_role and coalesce(auth.jwt()->'app_metadata'->>'portal_automation','false')='true'

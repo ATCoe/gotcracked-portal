@@ -13,7 +13,12 @@
     try{return typeof input==='string'?input:String(input?.url||input||'');}catch{return '';}
   }
   function shouldAttach(url){
-    return Boolean(url&&url.startsWith(`${PROJECT_ORIGIN}/rest/v1/`));
+    if (!url) return false;
+    try {
+      const parsed=new URL(url);
+      return parsed.origin===PROJECT_ORIGIN && (parsed.pathname.startsWith('/rest/v1/') ||
+        /^\/functions\/v1\/(create-lead|send-receipt|shipping-provider)$/.test(parsed.pathname));
+    } catch { return false; }
   }
 
   window.fetch=(input,init={})=>{

@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const allowedOrigins = new Set(['https://gotcracked.co','https://www.gotcracked.co','http://localhost:8788','http://127.0.0.1:8788']);
-const cors = (origin:string|null) => ({'Access-Control-Allow-Origin':allowedOrigins.has(origin||'')?origin!:'https://gotcracked.co','Access-Control-Allow-Headers':'authorization,x-client-info,apikey,content-type,x-customer-session','Access-Control-Allow-Methods':'POST,OPTIONS','Content-Type':'application/json','Vary':'Origin'});
+const cors = (origin:string|null) => ({'Access-Control-Allow-Origin':allowedOrigins.has(origin||'')?origin!:'https://gotcracked.co','Access-Control-Allow-Headers':'authorization,x-client-info,apikey,content-type,x-customer-session','Access-Control-Allow-Methods':'POST,OPTIONS','Content-Type':'application/json','Vary':'Origin','Cache-Control':'no-store'});
 const reply = (origin:string|null, body:unknown, status=200) => new Response(JSON.stringify(body),{status,headers:cors(origin)});
 const digits = (v:unknown) => String(v||'').replace(/\D/g,'');
 const normalizeEmail = (v:unknown) => String(v||'').trim().toLowerCase();
@@ -134,7 +134,10 @@ Deno.serve(async request => {
       const expected=await hmac(`${challengeId}|${code}`);
       if(expected!==challenge.code_hash){await admin.from('customer_access_challenges').update({attempts:Number(challenge.attempts||0)+1}).eq('id',challengeId);return reply(origin,{error:'That code is invalid or expired. Request a new code.'},401);}
       if(String(challenge.destination_email).endsWith('@invalid.local'))return reply(origin,{error:'That code is invalid or expired. Request a new code.'},401);
-      const now=new Date().toISOString();await admin.from('customer_access_challenges').update({consumed_at:now}).eq('id',challengeId).is('consumed_at',null);
+      const now=new Date().toISOString();
+      const consumed=await admin.from('customer_access_challenges').update({consumed_at:now}).eq('id',challengeId).is('consumed_at',null).gt('expires_at',now).lt('attempts',6).select('id').maybeSingle();
+      if(consumed.error)throw consumed.error;
+      if(!consumed.data)return reply(origin,{error:'That code is invalid or expired. Request a new code.'},401);
       const token=randomToken();const tokenHash=await sha(token);const expiresAt=new Date(Date.now()+7*24*60*60*1000).toISOString();
       const save=await admin.from('customer_access_sessions').insert({token_hash:tokenHash,customer_ids:challenge.customer_ids,verified_email:normalizeEmail(challenge.destination_email),lookup_kind:challenge.lookup_kind,expires_at:expiresAt}).select('id').single();
       if(save.error)throw save.error;

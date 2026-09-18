@@ -8,7 +8,7 @@ const EASYPOST_BASE = 'https://api.easypost.com/v2';
 
 const cors = {
   'Access-Control-Allow-Origin': PORTAL_ORIGIN,
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-gc-operator-token',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Content-Type': 'application/json'
 };
@@ -59,12 +59,14 @@ Deno.serve(async request => {
   if(!SERVICE_KEY) return response({ok:false,error:'Shipping service is not configured on the server.'},500);
 
   const authorization=request.headers.get('Authorization')||'';
-  const userClient=createClient(SUPABASE_URL,ANON_KEY,{global:{headers:{Authorization:authorization}},auth:{persistSession:false,autoRefreshToken:false}});
+  const userClient=createClient(SUPABASE_URL,ANON_KEY,{global:{headers:{Authorization:authorization, ['x-gc-operator-token']:request.headers.get('x-gc-operator-token')||''}},auth:{persistSession:false,autoRefreshToken:false}});
   const admin=createClient(SUPABASE_URL,SERVICE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
   const {data:{user},error:userError}=await userClient.auth.getUser();
   if(userError||!user) return response({ok:false,error:'Invalid Portal session.'},401);
-  const {data:profile}=await admin.from('profiles').select('id,location_id,role,active').eq('id',user.id).maybeSingle();
+  const {data:profile}=await admin.from('profiles').select('id,location_id,role,active,account_type').eq('id',user.id).maybeSingle();
   if(!profile?.active||!profile.location_id) return response({ok:false,error:'Active staff profile required.'},403);
+  const sessionCheck=await userClient.rpc('portal_session_authorized');
+  if(sessionCheck.error||sessionCheck.data!==true)return response({ok:false,error:'Verified Portal session required.'},403);
 
   let body:any={}; try{body=await request.json()}catch{return response({ok:false,error:'Invalid request.'},400)}
   const action=clean(body.action||'status',40).toLowerCase();
@@ -73,8 +75,8 @@ Deno.serve(async request => {
     userClient.rpc('has_permission',{permission_key:'repairs.intake'}),
     userClient.rpc('has_permission',{permission_key:'settings.manage'})
   ]);
-  const canShip=workflowPerm.data===true||intakePerm.data===true||profile.role==='owner'||profile.role==='manager';
-  const canSettings=settingsPerm.data===true||profile.role==='owner';
+  const canShip=profile.account_type!=='automation'&&(workflowPerm.data===true||intakePerm.data===true);
+  const canSettings=settingsPerm.data===true;
 
   const settingsResult=await admin.from('business_settings').select('location_id,shipping_provider,shipping_provider_secret_id,shipping_provider_mode,shipping_default_parcel,shipping_require_label_confirmation,shipping_return_address,default_shipping_carrier,device_shipping_preference').eq('location_id',profile.location_id).maybeSingle();
   if(settingsResult.error) return response({ok:false,error:settingsResult.error.message},500);
