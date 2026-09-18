@@ -191,17 +191,17 @@ Minimum pass criteria:
 
 ## 10. Final 1.0 visual/CSS pass
 
-Test desktop and mobile at minimum:
+Desktop is the release-blocking surface for the current Portal release:
 
-- 360–390 px phone
-- 750 px breakpoint
-- tablet / small laptop
 - 1366×768 desktop
+- 1440×900 desktop
 - 1920×1080 desktop
 
-Review:
+Mobile/Android validation is a separate post-release QA lane and does not block a desktop-ready release unless it exposes a shared authentication, authorization, data-integrity, or security defect, or the Owner explicitly scopes a mobile issue into the release.
 
-- sidebar and mobile drawer
+Review desktop first:
+
+- desktop sidebar/navigation and active-state routing
 - no blur/filter regression
 - table horizontal behavior
 - intake wizard

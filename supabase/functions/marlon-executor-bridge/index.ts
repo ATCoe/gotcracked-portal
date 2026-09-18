@@ -77,6 +77,10 @@ Deno.serve(async (request: Request) => {
     const executor = `github-actions:${claims.repository || 'unknown'}:${claims.run_id || 'unknown'}:${claims.run_attempt || '1'}`;
 
     if (action === 'claim') {
+      const recovered = await admin.rpc('marlon_execution_recover_stale');
+      if (recovered.error) throw recovered.error;
+      const released = await admin.rpc('marlon_execution_release_due_retries');
+      if (released.error) throw released.error;
       const { data, error } = await admin.rpc('claim_next_marlon_execution', { p_executor: executor, p_repository: claims.repository });
       if (error) throw error;
       let history: any[] = [];
@@ -85,7 +89,7 @@ Deno.serve(async (request: Request) => {
         if (prior.error) console.error('Marlon execution history lookup failed', prior.error);
         else if (Array.isArray(prior.data)) history = prior.data;
       }
-      return json({ ok: true, executor, ...data, history });
+      return json({ ok: true, executor, recovered_stale_runs: recovered.data || 0, released_retries: released.data || 0, ...data, history });
     }
 
     if (action === 'proposal_context') {
@@ -113,9 +117,14 @@ Deno.serve(async (request: Request) => {
         p_suggestion_type: proposal.suggestionType ?? 'workflow_improvement',
         p_evidence: {
           evidence_summary: proposal.evidenceSummary ?? null,
+          capability_required: proposal.capabilityRequired === true,
+          capability_name: proposal.capabilityName ?? null,
+          capability_reason: proposal.capabilityReason ?? null,
+          capability_install: proposal.capabilityInstall ?? null,
+          capability_cost: proposal.capabilityCost ?? 'none',
           github_run_id: claims.run_id || null,
           github_sha: claims.sha || null,
-          scout_source: 'portal-and-website'
+          scout_source: 'portal-and-website-benchmarks'
         }
       });
       if (error) throw error;

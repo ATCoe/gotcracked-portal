@@ -106,10 +106,12 @@ const sanitizedJson = safeSupplierError(
 assert.equal(sanitizedJson.includes('super-secret-json'), false);
 assert.match(sanitizedJson, /token=\[redacted\]/i);
 
-const [runtimeLoader, portalModule, portalIndex] = await Promise.all([
+const [runtimeLoader, portalModule, portalIndex, syncSource, statusMigration] = await Promise.all([
   readFile(new URL('../portal-runtime-loader.js', import.meta.url), 'utf8'),
   readFile(new URL('../mobilesentrix-integration.js', import.meta.url), 'utf8'),
   readFile(new URL('../index.html', import.meta.url), 'utf8'),
+  readFile(new URL('../supabase/functions/mobilesentrix-sync/index.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../supabase/migrations/20260915034006_allow_mobilesentrix_authorizing_status.sql', import.meta.url), 'utf8'),
 ]);
 assert.match(
   runtimeLoader,
@@ -123,8 +125,38 @@ assert.match(
 );
 assert.match(
   portalIndex,
-  /portal-runtime-loader\.js\?v=20260914-runtime-clean2/,
+  /portal-runtime-loader\.js\?v=20260915-ms-sync-recovery1/,
   'The runtime-loader cache key must change with the OAuth callback bootstrap.',
 );
+assert.match(
+  syncSource,
+  /relayVendorRequest\([\s\S]{0,180}AURORA_RELAY/,
+  'Catalog test and sync traffic must use the AuroraServer relay so MobileSentrix sees the allowlisted egress.',
+);
+assert.match(
+  runtimeLoader,
+  /mobilesentrix-integration\.js':'20260915-sync-recovery1'/,
+  'The MobileSentrix runtime must be cache-busted when sync recovery changes.',
+);
+assert.match(
+  portalModule,
+  /invoke\('sync',\{max_pages:4\}\)/,
+  'Catalog passes must stay below the browser request timeout.',
+);
+assert.match(
+  portalModule,
+  /recoverSyncCheckpoint\(error\)/,
+  'A lost Edge Function response must recover from the server checkpoint automatically.',
+);
+assert.match(
+  syncSource,
+  /Number\.isFinite\(number\) && number > 0/,
+  'A bogus zero catalog total must be ignored when MobileSentrix still returns product rows.',
+);
+assert.match(
+  statusMigration,
+  /'authorizing'::text/,
+  'The sync-source status constraint must allow the OAuth authorizing state.',
+);
 
-console.log('MobileSentrix OAuth, pagination, normalization, error-safety, and Portal callback tests passed.');
+console.log('MobileSentrix OAuth, relay, pagination, normalization, error-safety, and Portal callback tests passed.');

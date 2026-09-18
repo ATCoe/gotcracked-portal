@@ -1,0 +1,6 @@
+# Generated dependency trees and local Supabase CLI state
+node_modules/
+supabase/.temp/
+
+# Local recovery/source backup snapshots
+*.pre-v*-sync

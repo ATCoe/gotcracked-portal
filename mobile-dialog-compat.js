@@ -56,6 +56,23 @@
     delete dialog.dataset.gcMobileDialogCompat;
   }
 
+  function dismissCompetingUi(dialog) {
+    document.querySelectorAll('dialog[open]').forEach(open => {
+      if (open === dialog) return;
+      try { open.close(); } catch { open.removeAttribute('open'); }
+    });
+    window.GotCrackedMarlon?.close?.();
+    const drawerBackdrop=document.getElementById('v1-drawer-backdrop');
+    if(drawerBackdrop&&!drawerBackdrop.hidden) drawerBackdrop.click();
+    if(document.documentElement.dataset.gcMobileNavOpen==='true') window.GotCrackedMobileNav?.setOpen?.(false,{restoreFocus:false});
+    const storeMenu=document.getElementById('v1-store-switch-menu');
+    if(storeMenu&&!storeMenu.hidden){
+      storeMenu.hidden=true;
+      document.querySelector('[data-v1-store-menu-toggle]')?.setAttribute('aria-expanded','false');
+      document.querySelector('.topbar .location')?.removeAttribute('data-menu-open');
+    }
+  }
+
   function prepare(dialog) {
     dialog.dataset.gcMobileDialogCompat = 'true';
     dialog.style.setProperty('position', 'fixed', 'important');
@@ -74,11 +91,12 @@
   }
 
   proto.showModal = function patchedShowModal() {
+    if (this.open) return;
+    dismissCompetingUi(this);
     if (!mobile.matches || !TARGET_IDS.has(this.id)) {
       return nativeShowModal.call(this);
     }
 
-    if (this.open) return;
     if(document.activeElement instanceof HTMLElement)returnFocusByDialog.set(this,document.activeElement);
     prepare(this);
 

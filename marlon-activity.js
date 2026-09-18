@@ -4,6 +4,7 @@
   const client=window.supabaseClient;if(!client)return;
   const ACTIVE_TICKET=new Set(['open','in_progress','waiting','waiting_window']);
   const ACTIVE_RUN=new Set(['claimed','diagnosing','patching','testing','deploying','verifying']);
+  const LIVE_EVENT=new Set(['agent_started','agent_inspecting','agent_browser_qa','agent_reasoning','agent_working','agent_mobile_followup','execution_claimed','execution_diagnosing','execution_patching','execution_testing','execution_deploying','execution_verifying']);
   const RECENT_COMPLETE_MS=10*60*1000;
   let profile=null,channel=null,pollTimer=null,refreshTimer=null,lastModel=null;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -15,6 +16,13 @@
     const m=Math.floor(s/60);if(m<60)return `${m}m ago`;return `${Math.floor(m/60)}h ago`;
   };
   const stageLabel=value=>({claimed:'Starting',diagnosing:'Diagnosing',patching:'Applying patch',testing:'Testing',waiting_window:'Waiting for window',deploying:'Deploying',verifying:'Verifying',completed:'Complete',blocked:'Blocked',failed:'Failed'}[value]||'Queued');
+  const eventLabel=value=>({
+    agent_started:'Started',agent_inspecting:'Inspecting',agent_browser_qa:'Browser / DevTools QA',agent_reasoning:'Analyzing evidence',
+    agent_working:'Still working',agent_mobile_followup:'Mobile follow-up',agent_completed:'Completed',agent_failed:'Failed',
+    execution_claimed:'Started',execution_diagnosing:'Diagnosing',execution_patching:'Applying patch',execution_testing:'Testing',
+    execution_waiting_window:'Waiting for release window',execution_deploying:'Deploying',execution_verifying:'Verifying',
+    execution_completed:'Completed',execution_blocked:'Blocked',execution_failed:'Failed',owner_approval_requested:'Needs Owner approval'
+  }[value]||String(value||'Update').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()));
   function ensureUi(){
     const marlon=document.querySelector('.gc-marlon');if(!marlon)return null;
     let host=marlon.querySelector('.gc-marlon-activity');if(host)return host;
@@ -37,8 +45,10 @@
     }
     return latest;
   }
-  function modelStatus(task,children,runs){
+  function modelStatus(task,children,runs,events=[]){
     if(!task)return {key:'idle',label:'Idle'};
+    const latestEvent=events[0]||null;
+    if(latestEvent&&LIVE_EVENT.has(String(latestEvent.event_type))&&Date.now()-Date.parse(latestEvent.created_at||0)<10*60*1000)return {key:'working',label:'Working'};
     if(task.approval_status==='pending')return {key:'approval',label:'Needs approval'};
     const targets=children.length?children:[task];
     if(targets.length&&targets.every(t=>['resolved','closed'].includes(String(t.status))))return {key:'complete',label:'Complete'};
@@ -58,17 +68,19 @@
     const stage=resolved?'completed':run?.status||'queued';
     const heartbeat=resolved?(ticket.resolved_at||ticket.updated_at||null):(run?.heartbeat_at||run?.started_at||null);
     const activityLabel=heartbeat?`${resolved?'updated':'heartbeat'} ${age(heartbeat)}`:'awaiting worker pickup';
-    return `<div class="gc-marlon-activity-target" data-stage="${esc(stage)}"><span class="gc-marlon-target-dot"></span><div><strong>${esc(ticket.surface==='website'?'Website':ticket.surface==='portal'?'Portal':ticket.surface||'Task')} · ${esc(code(ticket.ticket_number))}</strong><small>${esc(stageLabel(stage))} · ${esc(activityLabel)}</small></div></div>`;
+    const current=resolved?'Completed':String(run?.patch_summary||run?.metadata?.current_action||'').trim();
+    return `<div class="gc-marlon-activity-target" data-stage="${esc(stage)}"><span class="gc-marlon-target-dot"></span><div><strong>${esc(ticket.surface==='website'?'Website':ticket.surface==='portal'?'Portal':ticket.surface||'Task')} · ${esc(code(ticket.ticket_number))}</strong><small>${esc(stageLabel(stage))} · ${esc(activityLabel)}</small>${current?`<em>Now: ${esc(current)}</em>`:''}</div></div>`;
   }
   function render(model){
     lastModel=model;const host=ensureUi();if(!host)return;
-    const {task,children,runs,status}=model;host.dataset.state=status.key;
+    const {task,children,runs,events=[],status}=model;host.dataset.state=status.key;
     host.querySelector('.gc-marlon-activity-label').textContent=`Marlon · ${status.label}`;
     const panel=host.querySelector('.gc-marlon-activity-panel');
     if(!task){panel.innerHTML='<strong>Marlon activity</strong><p>No active Marlon task right now.</p>';return}
     const targets=children.length?children:[task];
     const lastHeartbeat=runs.map(r=>r.heartbeat_at||r.started_at).filter(Boolean).sort().at(-1)||null;
-    panel.innerHTML=`<header><span><b>Marlon activity</b><small>${esc(status.label)}</small></span><b>${esc(code(task.ticket_number))}</b></header><p class="gc-marlon-activity-task">${esc(short(task.context?.requested_scope||task.title))}</p><div class="gc-marlon-activity-targets">${targets.map(t=>targetRow(t,runs)).join('')}</div><footer>${status.key==='complete'?'Task completed successfully.':lastHeartbeat?`Last worker heartbeat ${esc(age(lastHeartbeat))}`:status.key==='queued'?'Approved and queued. Waiting for an execution worker to claim it.':'Live status updates automatically.'}</footer>`;
+    const log=events.slice(0,12).map(e=>`<div class="gc-marlon-log-row"><time>${esc(age(e.created_at))}</time><div><strong>${esc(eventLabel(e.event_type))}</strong><p>${esc(e.message||'Marlon updated this task.')}</p></div></div>`).join('');
+    panel.innerHTML=`<header><span><b>Marlon activity</b><small>${esc(status.label)}</small></span><b>${esc(code(task.ticket_number))}</b></header><p class="gc-marlon-activity-task">${esc(short(task.context?.requested_scope||task.title))}</p><div class="gc-marlon-activity-targets">${targets.map(t=>targetRow(t,runs)).join('')}</div><section class="gc-marlon-live-log"><div class="gc-marlon-live-log-head"><strong>Live changelog</strong><small>${events.length?esc(age(events[0].created_at)):'No entries yet'}</small></div>${log||'<p class="gc-marlon-log-empty">Waiting for Marlon to record work.</p>'}</section><footer>${status.key==='complete'?'Task completed successfully.':lastHeartbeat?`Last worker heartbeat ${esc(age(lastHeartbeat))}`:status.key==='queued'?'Approved and queued. Waiting for an execution worker to claim it.':'Live status updates automatically.'}</footer>`;
   }
   async function refresh(force=false){
     if(!profile?.id)return;
@@ -81,11 +93,17 @@
       if(!task){render({task:null,children:[],runs:[],status:{key:'idle',label:'Idle'}});return}
       const children=rows.filter(t=>t.parent_ticket_id===task.id);
       const ids=[task.id,...children.map(t=>t.id)];
-      const {data:runData,error:runError}=await client.from('marlon_execution_runs')
-        .select('id,ticket_id,repository,status,executor,started_at,heartbeat_at,finished_at,branch,commit_sha,diagnosis,patch_summary,error,metadata')
-        .in('ticket_id',ids);
-      if(runError)throw runError;
-      const runs=Array.isArray(runData)?runData:[];render({task,children,runs,status:modelStatus(task,children,runs)});
+      const [{data:runData,error:runError},{data:eventData,error:eventError}]=await Promise.all([
+        client.from('marlon_execution_runs')
+          .select('id,ticket_id,repository,status,executor,started_at,heartbeat_at,finished_at,branch,commit_sha,diagnosis,patch_summary,error,metadata')
+          .in('ticket_id',ids),
+        client.from('support_ticket_events')
+          .select('id,ticket_id,actor,event_type,message,created_at')
+          .in('ticket_id',ids).eq('actor','marlon').order('created_at',{ascending:false}).limit(40)
+      ]);
+      if(runError)throw runError;if(eventError)throw eventError;
+      const runs=Array.isArray(runData)?runData:[],events=Array.isArray(eventData)?eventData:[];
+      render({task,children,runs,events,status:modelStatus(task,children,runs,events)});
     }catch(error){
       console.warn('Marlon activity refresh failed:',error);
       const host=ensureUi();if(host){host.dataset.state='unknown';host.querySelector('.gc-marlon-activity-label').textContent='Marlon · Status unavailable'}
@@ -97,6 +115,7 @@
     channel=client.channel(`marlon-activity-${profile?.id||'staff'}`)
       .on('postgres_changes',{event:'*',schema:'public',table:'marlon_execution_runs'},()=>scheduleRefresh(50))
       .on('postgres_changes',{event:'*',schema:'public',table:'support_tickets'},()=>scheduleRefresh(80))
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'support_ticket_events'},()=>scheduleRefresh(40))
       .subscribe();
     clearInterval(pollTimer);pollTimer=setInterval(()=>void refresh(),15000);
   }

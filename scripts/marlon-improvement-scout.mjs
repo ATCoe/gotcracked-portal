@@ -60,7 +60,14 @@ async function main(){
   const [portalLive,websiteLive]=await Promise.all([liveSnapshot(PORTAL_URL),liveSnapshot(WEBSITE_URL)]);
   const evidence={
     reviewedAt:new Date().toISOString(),
-    architecturePolicy:'Improve or extend existing architecture only. Never regress or remove working capability.',
+    architecturePolicy:'Improve or extend the canonical architecture only. Never regress, remove working capability, clone competitors, or stack shadow implementations.',
+    autonomyPolicy:'Routine low/medium standard, workflow, and reliability gaps are executable work. Premium, protected, high-complexity, commercial, or missing-capability work remains owner-gated.',
+    functionalBenchmarks:[
+      {name:'RepairShopr',url:'https://www.repairshopr.com/',focus:['tickets','crm','estimates','inventory','parts ordering','customer portal','POS','intake']},
+      {name:'Fixably',url:'https://www.fixably.com/',focus:['repair workflow','stock control','serialized parts','logistics','part requests','check-in']},
+      {name:'Orderry',url:'https://orderry.com/',focus:['work orders','mobile execution','KPI dashboards','reporting','inventory']},
+      {name:'RepairDesk',url:'https://www.repairdesk.co/',focus:['repair POS','tickets','inventory','customers','reporting']}
+    ],
     existingMarlonProposals:(existing.proposals||[]).slice(0,100),
     portal:{repository:'ATCoe/gotcracked-portal',live:portalLive,files:portalFiles},
     website:{repository:'ATCoe/gotcracked-site',live:websiteLive,files:siteFiles}

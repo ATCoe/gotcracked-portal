@@ -1,0 +1,5 @@
+-- Migration ledger alignment only.
+-- Production recorded a second idempotent application of workstation_cross_device_approval
+-- during the 2026-09-18 recovery. The schema change itself is fully represented by
+-- 20260918035510_workstation_cross_device_approval.sql, so this recorded follow-up is
+-- intentionally a no-op for reproducible local/production migration ordering.
