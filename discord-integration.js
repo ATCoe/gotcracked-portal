@@ -48,6 +48,16 @@
     if (error) throw error;
   }
 
+  async function signInWithGoogle() {
+    sessionStorage.setItem('gc-google-auth-started','1');
+    const redirect = new URL(window.location.href);
+    const { error } = await client.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: redirect.toString(), scopes: 'openid email profile', queryParams: { access_type:'offline', prompt:'select_account' } }
+    });
+    if (error) throw error;
+  }
+
   async function verifyDiscordSession({ force = false } = {}) {
     if (!client) return { authorized:false, reason:'client-unavailable', transient:true };
     const restored = window.GotCrackedAuth?.restoreSession
@@ -58,8 +68,10 @@
 
     const hasDiscord = session.user.identities?.some(identity => identity.provider === 'discord');
     if (!hasDiscord) return { authorized:true, skipped:true };
-    const verifiedUser = sessionStorage.getItem('gc-discord-verified-user');
-    if (!force && verifiedUser === session.user.id) return { authorized:true, cached:true };
+    // A cached user id does not prove this particular login was verified.
+    // Ask the database, which also checks revocation and the current session id.
+    const verified = await client.rpc('portal_session_authorized');
+    if (!force && !verified.error && verified.data === true) return { authorized:true, cached:true };
 
     const inviteToken = sessionStorage.getItem('gc-staff-invite');
     const { data, error } = await client.functions.invoke('discord-verify', { body: { inviteToken: inviteToken || null } });
@@ -271,6 +283,11 @@
 
   function wireUi() {
     injectWorkstationEnrollmentUi();
+    document.querySelector('#google-login')?.addEventListener('click', async event => {
+      const button=event.currentTarget; button.disabled=true; button.textContent='Connecting to Google…';
+      try { await signInWithGoogle(); }
+      catch (error) { authMessage(error.message,true); button.disabled=false; button.textContent='Continue with Google Workspace'; }
+    });
     document.querySelector('#discord-login')?.addEventListener('click', async event => {
       const button=event.currentTarget; button.disabled=true; button.textContent='Connecting to Discord…';
       try { await signInWithDiscord(); }

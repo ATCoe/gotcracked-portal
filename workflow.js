@@ -55,12 +55,20 @@
 
   async function prepareHumanSession(session){
     if(!session)return false;
-    const hasDiscord=session.user?.identities?.some(identity=>identity.provider==='discord');
+    const providers=(session.user?.identities||[]).map(identity=>identity.provider);
+    const hasDiscord=providers.includes('discord');
+    const hasGoogle=providers.includes('google');
     if(hasDiscord){
       const verified=await window.GotCrackedVerifyDiscord?.({force:true});
       if(!verified?.authorized){
         if(!verified?.transient)await localSignOut(verified?.reason||'Discord access could not be verified.');
         else showLoginError('Discord verification is temporarily unavailable. Please retry in a moment.');
+        return false;
+      }
+    }else if(hasGoogle){
+      const authorized=await window.supabaseClient.rpc('portal_session_authorized');
+      if(authorized.error||authorized.data!==true){
+        await localSignOut('This Google Workspace account is not an active GotCracked staff account. Contact an owner or manager.');
         return false;
       }
     }
@@ -78,10 +86,11 @@
       if(trusted.error||!trusted.data?.trusted){await rejectUntrustedWorkstation();return false;}
     }else{
       const activeSession=session||(await window.supabaseClient.auth.getSession()).data?.session||null;
-      const viaDiscord=activeSession?.user?.identities?.some(identity=>identity.provider==='discord');
-      if(!viaDiscord){
+      const providers=(activeSession?.user?.identities||[]).map(identity=>identity.provider);
+      const viaHumanProvider=providers.includes('discord')||providers.includes('google');
+      if(!viaHumanProvider){
         if(profile.role!=='owner'){
-          await localSignOut('Human staff access requires Discord authentication. Use “Continue with Discord” to sign in.');
+          await localSignOut('Human staff access requires Google Workspace or Discord authentication.');
           return false;
         }
         const registered=await window.supabaseClient.rpc('register_owner_recovery_session');
@@ -132,7 +141,8 @@
       const {data,error}=await window.supabaseClient.auth.getSession();
       if(error){report(error,'Portal session could not be restored');return;}
       const session=data?.session;if(!session)return;
-      const isWorkstationSession=!session.user?.identities?.some(identity=>identity.provider==='discord');
+      const providers=(session.user?.identities||[]).map(identity=>identity.provider);
+      const isWorkstationSession=!providers.includes('discord')&&!providers.includes('google');
       if(!isWorkstationSession&&!(await prepareHumanSession(session)))return;
       if(await loadProfile(session.user.id,session))await loadRepairs();
     }catch(error){report(error,'Portal session could not be restored');showLoginError(error?.message||'Portal sign-in could not be completed.');}

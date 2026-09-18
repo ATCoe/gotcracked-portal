@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="styles.css?v=20260826-release34" />
     <link rel="stylesheet" href="workflow.css?v=20260826-release34" />
     <link rel="stylesheet" href="complete.css?v=20260826-release34" />
-    <link rel="stylesheet" href="auth-modern.css?v=20260826-release34" />
+    <link rel="stylesheet" href="auth-modern.css?v=20260918-google-workspace1" />
     <link rel="stylesheet" href="workforce.css?v=20260826-release34" />
     <link rel="stylesheet" href="hardening.css?v=20260826-release34" />
     <link rel="stylesheet" href="operations-v1.css?v=20260903-record-lifecycle1" />
@@ -52,13 +52,14 @@
       <div class="login-panel">
         <img class="login-logo" src="assets/gotcracked-portal-logo.png" alt="GotCracked" />
         <div id="sign-in-panel">
-          <p class="eyebrow">Staff portal</p><h1>Welcome back.</h1><p class="subtle">Use your approved GotCracked Discord account.</p>
+          <p class="eyebrow">Staff portal</p><h1>Welcome back.</h1><p class="subtle">Sign in with your approved Google Workspace account.</p>
+          <button id="google-login" class="google-button" type="button"><span>G</span> Continue with Google Workspace</button>
           <button id="discord-login" class="discord-button" type="button"><span>◈</span> Continue with Discord</button>
           <details class="owner-recovery"><summary>Owner recovery sign-in</summary>
           <form id="login-form"><label>Work email<input id="login-email" type="email" required autocomplete="email" placeholder="name@gotcracked.co"></label><label>Password<input id="login-password" type="password" required autocomplete="current-password" placeholder="Password"></label><button class="primary-button" type="submit">Sign in to portal</button></form>
           <button id="forgot-password" class="text-button" type="button">Forgot password?</button></details>
           <p id="login-error" class="error-message" role="alert"></p>
-          <p class="access-note">Invite-only. You must also belong to the GotCracked staff Discord.</p>
+          <p class="access-note">Invite-only. Your Google Workspace account must already have an active GotCracked staff profile.</p>
         </div>
         <div id="forgot-password-panel" class="auth-panel hidden" aria-hidden="true">
           <p class="eyebrow">Account recovery</p><h1>Reset your password</h1><p class="subtle">Enter your work email and we’ll send a secure reset link.</p>
@@ -169,8 +170,8 @@
     <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js" integrity="sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC" crossorigin="anonymous"></script>
     <script defer src="supabase.js?v=20260914-auth-persistence1"></script>
     <script defer src="portal-mobile-app.js?v=20260914-session-guard1"></script>
-    <script defer src="discord-integration.js?v=20260914-auth-persistence1"></script>
-    <script defer src="workflow.js?v=20260914-session-guard1"></script>
+    <script defer src="discord-integration.js?v=20260918-google-workspace1"></script>
+    <script defer src="workflow.js?v=20260918-google-workspace1"></script>
     <script defer src="app.js?v=20260903-topbar-review2"></script>
     <script defer src="mobile-nav-safe.js?v=20260826-release34"></script>
     <script defer src="portal-runtime-loader.js?v=20260914-runtime-clean2"></script>
