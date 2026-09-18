@@ -77,8 +77,7 @@
       }
     }else if(provider==='google'){
       const inviteToken=sessionStorage.getItem('gc-staff-invite');
-      const providerToken=window.GotCrackedAuth?.providerToken?.(session)||session.provider_token||'';
-      const {data,error}=await window.supabaseClient.functions.invoke('workspace-verify',{body:{inviteToken:inviteToken||null,providerToken}});
+      const {data,error}=await window.supabaseClient.rpc('register_workspace_human_session',{invite_token:inviteToken||null});
       if(error||!data?.authorized){
         await localSignOut(data?.error||error?.message||'This Google Workspace account is not authorized for the GotCracked Portal.');
         return false;
@@ -87,7 +86,6 @@
       sessionStorage.removeItem('gc-google-auth-started');
       sessionStorage.removeItem('gc-oauth-provider');
       sessionStorage.removeItem('gc-auth-error');
-      window.GotCrackedAuth?.clearProviderProof?.();
       const url=new URL(location.href);
       if(url.searchParams.has('invite')){url.searchParams.delete('invite');history.replaceState({},document.title,url.pathname+(url.searchParams.size?`?${url.searchParams}`:'')+url.hash);}
     }else{

@@ -1,7 +1,6 @@
 const SUPABASE_URL = "https://uvpmmbioerejeyybfntb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_CmcUD2ze8lhj4HvlMfoYiQ_DGG_xabb";
 const GC_AUTH_STORAGE_KEY = "sb-uvpmmbioerejeyybfntb-auth-token";
-const GC_OAUTH_PROVIDER_TOKEN_KEY = "gc-oauth-provider-token";
 
 /*
  * Never let a stalled auth refresh freeze the Portal for minutes. Normal REST
@@ -129,26 +128,11 @@ window.supabaseClient = supabase.createClient(
     return sessionPromise;
   }
 
-  function providerToken(session) {
-    try { return session?.provider_token || sessionStorage.getItem(GC_OAUTH_PROVIDER_TOKEN_KEY) || ''; }
-    catch { return session?.provider_token || ''; }
-  }
-
-  function clearProviderProof() {
-    try { sessionStorage.removeItem(GC_OAUTH_PROVIDER_TOKEN_KEY); } catch {}
-  }
-
-  function rememberProviderProof(session) {
-    if (!session?.provider_token) return;
-    try { sessionStorage.setItem(GC_OAUTH_PROVIDER_TOKEN_KEY, session.provider_token); } catch {}
-  }
-
   function clear() {
     sessionGeneration += 1;
     lastSessionResult = null;
     sessionPromise = null;
     restoreCooldownUntil = 0;
-    clearProviderProof();
   }
 
   client.auth.getSession = async () => {
@@ -160,7 +144,6 @@ window.supabaseClient = supabase.createClient(
     if (event === 'SIGNED_OUT') return clear();
     if (event === 'SIGNED_IN' && lastSessionResult?.session?.user?.id !== session?.user?.id) clear();
     if (session && ['INITIAL_SESSION','SIGNED_IN','TOKEN_REFRESHED','USER_UPDATED'].includes(event)) {
-      rememberProviderProof(session);
       client.realtime.setAuth(session.access_token).catch(error =>
         console.warn('Portal realtime token update failed:', error)
       );
@@ -177,7 +160,7 @@ window.supabaseClient = supabase.createClient(
       return Array.isArray(claims.amr)&&claims.amr.some(item=>item.method==='oauth');
     } catch { return false; }
   }
-  window.GotCrackedAuth = { restoreSession, readPersistedSession, clear, isOAuthSession, providerToken, clearProviderProof };
+  window.GotCrackedAuth = { restoreSession, readPersistedSession, clear, isOAuthSession };
   window.addEventListener('storage', event => {
     if (event.key === GC_AUTH_STORAGE_KEY || event.key === null) clear();
   });

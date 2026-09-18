@@ -27,10 +27,11 @@ jobs:
         run: |
           set -euo pipefail
           if grep -q "Set up this shop device" discord-integration.js; then echo 'Retired device setup returned to the login page.'; exit 1; fi
-          grep -q "workspace-verify" workflow.js
-          grep -q "providerToken" workflow.js
+          grep -q "register_workspace_human_session" workflow.js
           grep -q "isOAuthSession" supabase.js
-          grep -q "gc-oauth-provider-token" supabase.js
+          grep -q "auth_session_oauth_provider" supabase/migrations/20260918152100_bind_human_sessions_to_oauth_provider.sql
+          grep -q "portal_human_sessions_provider_guard" supabase/migrations/20260918152100_bind_human_sessions_to_oauth_provider.sql
+          grep -q "sync_discord_fallback_identity" supabase/migrations/20260918152100_bind_human_sessions_to_oauth_provider.sql
           grep -q "workstation-enroll" discord-integration.js
           grep -q "verifyOtp" discord-integration.js
           grep -q "complete_workstation_enrollment" discord-integration.js
@@ -47,14 +48,12 @@ jobs:
           grep -q "welcomeEmailBody" supabase/functions/staff-invite/index.ts
           grep -q "staff_onboarding_progress" supabase/functions/discord-verify/index.ts
           grep -q "discord_username" supabase/functions/discord-verify/index.ts
-          grep -q "discord_fallback_linked" supabase/functions/discord-verify/index.ts
           grep -q "cancelled_at" supabase/functions/discord-verify/index.ts
-          grep -q "openidconnect.googleapis.com/v1/userinfo" supabase/functions/workspace-verify/index.ts
-          grep -q "workspace_invitation_accepted" supabase/functions/workspace-verify/index.ts
+          grep -q "discord_fallback_linked" supabase/migrations/20260918152100_bind_human_sessions_to_oauth_provider.sql
+          grep -q "portal_email" supabase/functions/staff-invite/index.ts
           if grep -q "auth.admin.createUser" supabase/functions/staff-invite/index.ts; then echo 'Temporary-password user creation returned to staff onboarding.'; exit 1; fi
           if grep -q "temporaryPassword" supabase/functions/staff-invite/index.ts; then echo 'Temporary password returned to staff onboarding.'; exit 1; fi
           if grep -q "Access-Control-Allow-Origin.*\*" supabase/functions/discord-verify/index.ts; then echo 'Wildcard CORS returned to Discord verification.'; exit 1; fi
-          if grep -q "Access-Control-Allow-Origin.*\*" supabase/functions/workspace-verify/index.ts; then echo 'Wildcard CORS returned to Workspace verification.'; exit 1; fi
       - name: Guard trusted device and human operator database boundary
         shell: bash
         run: |

@@ -76,8 +76,7 @@
     if(!hasDiscord)return {authorized:false,reason:'No Discord identity is linked to this account.',transient:false};
 
     const inviteToken=sessionStorage.getItem('gc-staff-invite');
-    const providerToken=window.GotCrackedAuth?.providerToken?.(session)||session.provider_token||'';
-    const {data,error}=await client.functions.invoke('discord-verify',{body:{inviteToken:inviteToken||null,providerToken}});
+    const {data,error}=await client.functions.invoke('discord-verify',{body:{inviteToken:inviteToken||null}});
     if (error) {
       console.warn('Discord verification deferred:', error.message);
       return { authorized:false, transient:true, reason:error.message || 'verification-unavailable' };
@@ -95,7 +94,6 @@
     sessionStorage.removeItem('gc-discord-auth-started');
     sessionStorage.removeItem('gc-oauth-provider');
     sessionStorage.removeItem('gc-auth-error');
-    window.GotCrackedAuth?.clearProviderProof?.();
     if (params.has('invite')) {
       params.delete('invite');
       history.replaceState({}, document.title, `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`);
@@ -129,12 +127,9 @@
     const restored=window.GotCrackedAuth?.restoreSession?await window.GotCrackedAuth.restoreSession({force:true}):null;
     const session=restored?.session;
     if(!session)return false;
-    const providerToken=window.GotCrackedAuth?.providerToken?.(session)||session.provider_token||'';
-    if(!providerToken)return false;
-    const {data,error}=await client.functions.invoke('discord-verify',{body:{providerToken,linkOnly:true}});
+    const {data,error}=await client.rpc('sync_discord_fallback_identity');
     if(error||!data?.authorized||!data?.fallbackLinked)throw new Error(data?.error||error?.message||'Discord fallback could not be linked.');
     sessionStorage.removeItem('gc-discord-link-started');
-    window.GotCrackedAuth?.clearProviderProof?.();
     document.dispatchEvent(new CustomEvent('gc-discord-fallback-linked',{detail:{discordUserId:data.discordUserId}}));
     return true;
   }

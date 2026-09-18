@@ -28,24 +28,19 @@ Deno.serve(async request=>{
     const active=await userClient.rpc('portal_auth_session_active');
     if(active.error||active.data!==true)return reply(origin,{authorized:false,error:'This sign-in has expired. Continue with Discord again.'},401);
     if(!Array.isArray(claims.amr)||!claims.amr.some((entry:any)=>entry.method==='oauth'))return reply(origin,{authorized:false,error:'Continue with Discord to verify this session.'},403);
-    const body=await request.json().catch(()=>({})),inviteToken=String(body?.inviteToken||'').trim(),providerToken=String(body?.providerToken||'').trim(),linkOnly=body?.linkOnly===true;
     const discordIdentity=user.identities?.find(identity=>identity.provider==='discord');
     const discordId=String(discordIdentity?.identity_data?.provider_id||discordIdentity?.identity_data?.sub||discordIdentity?.id||'');
     if(!discordIdentity||!discordId)return reply(origin,{authorized:false,error:'No Discord identity was found.'},403);
-    if(!providerToken)return reply(origin,{authorized:false,error:'Discord provider proof is missing. Sign in again.'},403);
-    const providerResponse=await fetch('https://discord.com/api/v10/users/@me',{headers:{Authorization:`Bearer ${providerToken}`,Accept:'application/json'}});
-    if(!providerResponse.ok)return reply(origin,{authorized:false,providerMismatch:true,error:'This OAuth session is not a valid Discord sign-in.'},403);
-    const providerUser:any=await providerResponse.json();
-    if(String(providerUser.id||'')!==discordId)return reply(origin,{authorized:false,error:'The current Discord identity does not match the linked Portal account.'},403);
 
     const guildId=Deno.env.get('DISCORD_GUILD_ID')!,botToken=Deno.env.get('DISCORD_BOT_TOKEN')!;
     if(!guildId||!botToken)throw new Error('Discord verification is not configured.');
     const memberResponse=await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`,{headers:{Authorization:`Bot ${botToken}`}});
     if(!memberResponse.ok)return reply(origin,{authorized:false,error:'Join the GotCracked staff Discord before accessing the Portal.'},403);
     const member=await memberResponse.json(),identity:any=discordIdentity.identity_data||{};
-    const currentUsername=String(providerUser.username||identity.user_name||identity.preferred_username||member.user?.username||'').toLowerCase();
+    const currentUsername=String(identity.user_name||identity.preferred_username||member.user?.username||'').toLowerCase();
 
     let {data:profile}=await admin.from('profiles').select('*').eq('id',user.id).maybeSingle();
+    const body=await request.json().catch(()=>({})),inviteToken=String(body?.inviteToken||'').trim();
     let consumedInvite:any=null;
     if(!profile&&inviteToken){
       const tokenHash=await sha256(inviteToken);
@@ -63,13 +58,8 @@ Deno.serve(async request=>{
     if(!profile?.active)return reply(origin,{authorized:false,error:'Your GotCracked staff account is not active.'},403);
     if(profile.account_type!=='staff')return reply(origin,{authorized:false,error:'Shared workstations use device enrollment, not Discord authentication.'},403);
     if(profile.discord_user_id&&String(profile.discord_user_id)!==discordId)return reply(origin,{authorized:false,error:'This Portal profile is already linked to a different Discord identity. Contact an owner.'},403);
-    if(!profile.discord_user_id&&profile.discord_username&&String(profile.discord_username).toLowerCase()!==currentUsername)return reply(origin,{authorized:false,error:`This Portal profile expects Discord @${profile.discord_username}. Use that account or ask management to reissue onboarding.`},403);
 
     const updated=await admin.from('profiles').update({discord_user_id:discordId,discord_username:currentUsername||profile.discord_username,discord_avatar_url:identity.avatar_url||null,discord_verified_at:new Date().toISOString(),last_portal_login_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',user.id);if(updated.error)throw updated.error;
-    if(linkOnly){
-      await admin.from('staff_account_events').insert({location_id:profile.location_id,actor_user_id:user.id,target_user_id:user.id,event_type:'discord_fallback_linked',details:{discord_user_id:discordId,discord_username:currentUsername}});
-      return reply(origin,{authorized:true,role:profile.role,discordUserId:discordId,fallbackLinked:true,sessionVerified:true});
-    }
     const registered=await admin.from('portal_human_sessions').upsert({auth_session_id:sessionId,profile_id:user.id,location_id:profile.location_id,verification_method:'discord',verified_at:new Date().toISOString(),last_seen_at:new Date().toISOString()},{onConflict:'auth_session_id'});
     if(registered.error)throw registered.error;
     return reply(origin,{authorized:true,role:profile.role,discordUserId:discordId,onboardingRequired:!profile.onboarding_complete,invitationAccepted:Boolean(consumedInvite),sessionVerified:true});
