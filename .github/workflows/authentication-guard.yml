@@ -18,6 +18,7 @@ jobs:
         with:
           deno-version: v2.x
       - run: node scripts/test-authentication.mjs
+      - run: node scripts/test-discord-session-verification.mjs
       - run: node scripts/test-mobilesentrix-oauth.mjs
       - name: Check changed authentication services
         run: |
