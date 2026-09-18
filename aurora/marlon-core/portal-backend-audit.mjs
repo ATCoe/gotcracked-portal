@@ -36,7 +36,10 @@ async function supabase(path){
 const report={checkedAt:now(),surface:'Portal backend',checks:{},findings:[]};
 try{report.checks.portal=await request(`${portalUrl}/`);}catch(error){report.checks.portal={ok:false,error:String(error?.message||error)};}
 try{report.checks.authSettings=await request(`${supabaseUrl}/auth/v1/settings`,{headers:{apikey:serviceKey}});}catch(error){report.checks.authSettings={ok:false,error:String(error?.message||error)};}
-try{report.checks.outboxFunction=await request(`${supabaseUrl}/functions/v1/discord-outbox-delivery`,{method:'POST',headers:{'content-type':'application/json'},body:'{}'});}catch(error){report.checks.outboxFunction={ok:false,error:String(error?.message||error)};}
+try{
+  const unsigned=await request(`${supabaseUrl}/functions/v1/discord-outbox-delivery`,{method:'POST',headers:{'content-type':'application/json'},body:'{}'});
+  report.checks.outboxFunction={...unsigned,ok:unsigned.status===401,expectedUnauthenticatedStatus:401};
+}catch(error){report.checks.outboxFunction={ok:false,error:String(error?.message||error)};}
 
 const profiles=await supabase('/rest/v1/profiles?select=id&active=eq.true&limit=2');
 report.checks.activeProfileAccess={ok:profiles.available,status:profiles.status};
