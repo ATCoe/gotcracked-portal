@@ -89,6 +89,7 @@
     if(profile.account_type==='shared_workstation'){
       const trusted=await window.supabaseClient.rpc('get_my_trusted_workstation_status');
       if(trusted.error||!trusted.data?.trusted){await rejectUntrustedWorkstation();return false;}
+      document.dispatchEvent(new CustomEvent('gc-shared-workstation-authenticated',{detail:{deviceLabel:trusted.data.device_label||'Blacksburg Front Desk'}}));
     }else if(profile.account_type==='automation'){
       const authorized=await window.supabaseClient.rpc('portal_session_authorized');
       if(authorized.error||authorized.data!==true){
