@@ -16,10 +16,13 @@ Deno.serve(async request=>{
     const url=Deno.env.get('SUPABASE_URL')!,anon=Deno.env.get('SUPABASE_ANON_KEY')!,service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,authorization=request.headers.get('Authorization')||'';
     const userClient=createClient(url,anon,{global:{headers:{Authorization:authorization}}}),admin=createClient(url,service);
     const {data:{user},error:userError}=await userClient.auth.getUser();
-    if(userError||!user)return reply(origin,{error:'Sign in with Discord before enrolling a workstation.'},401);
-    if(!user.identities?.some(identity=>identity.provider==='discord'))return reply(origin,{error:'Workstation enrollment requires a fresh human Discord sign-in.'},403);
-    const {data:actor,error:actorError}=await admin.from('profiles').select('id,location_id,role,active,account_type,discord_user_id,display_name').eq('id',user.id).single();
-    if(actorError||!actor?.active||actor.account_type!=='staff'||!['owner','manager'].includes(actor.role)||!actor.discord_user_id)return reply(origin,{error:'Only a Discord-authenticated owner or manager can enroll a workstation.'},403);
+    if(userError||!user)return reply(origin,{error:'Sign in before enrolling a workstation.'},401);
+    const authorized=await userClient.rpc('portal_session_authorized');
+    if(authorized.error||authorized.data!==true)return reply(origin,{error:'Use a verified Google Workspace or Discord staff session to enroll a workstation.'},403);
+    const method=await userClient.rpc('current_portal_human_verification_method');
+    if(method.error||!['google','discord'].includes(String(method.data||'')))return reply(origin,{error:'Owner recovery sessions cannot enroll shared workstations. Use Google Workspace or Discord.'},403);
+    const {data:actor,error:actorError}=await admin.from('profiles').select('id,location_id,role,active,account_type,display_name').eq('id',user.id).single();
+    if(actorError||!actor?.active||actor.account_type!=='staff'||!['owner','manager'].includes(actor.role))return reply(origin,{error:'Only a verified owner or manager can enroll a workstation.'},403);
     const permission=await userClient.rpc('has_permission',{permission_key:'staff.manage'});if(permission.error||permission.data!==true)return reply(origin,{error:'Staff management permission is required.'},403);
     const body=await request.json().catch(()=>({})),deviceId=String(body.deviceId||'').trim(),deviceLabel=String(body.deviceLabel||'Front Desk Workstation').trim().slice(0,120)||'Front Desk Workstation';
     if(deviceId.length<16||deviceId.length>256)return reply(origin,{error:'This browser could not create a valid device identity.'},400);

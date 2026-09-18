@@ -26,14 +26,25 @@ await test('OAuth routing reads session method, not linked identities',()=>{
  assert.equal(h.auth.isOAuthSession(token('password')),false);
  assert.equal(h.auth.isOAuthSession({access_token:'broken'}),false);
 });
-await test('Workspace plus linked Discord uses Workspace registration only',async()=>{
- const calls=[];
+await test('A server-registered human session wins over linked identity guesses',async()=>{
+ const calls=[],storage=new Map();
  const source=fs.readFileSync(new URL('workflow.js',root),'utf8');
  const routine=source.slice(source.indexOf('  async function prepareHumanSession('),source.indexOf('  async function loadProfile('));
- const context={window:{GotCrackedAuth:{isOAuthSession:()=>true},GotCrackedVerifyDiscord:async()=>{throw Error('Unexpected Discord verification');},supabaseClient:{rpc:async name=>{calls.push(name);return{data:true};},from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:{account_type:'staff'}})})})})}},localSignOut:async()=>{throw Error('Unexpected sign-out');},showLoginError:()=>{}};
+ const context={window:{GotCrackedAuth:{isOAuthSession:()=>true},GotCrackedVerifyDiscord:async()=>{throw Error('Unexpected Discord verification');},supabaseClient:{rpc:async name=>{calls.push(name);return{data:true};}}},sessionStorage:{getItem:key=>storage.get(key)||null,removeItem:key=>storage.delete(key)},localSignOut:async()=>{throw Error('Unexpected sign-out');},showLoginError:()=>{}};
  vm.createContext(context);vm.runInContext(routine,context);
  assert.equal(await context.prepareHumanSession({user:{id:'staff',identities:[{provider:'discord'},{provider:'google'}]}}),true);
- assert.deepEqual(calls,['register_google_human_session','portal_session_authorized']);
+ assert.deepEqual(calls,['portal_session_authorized']);
+});
+await test('Fresh Workspace OAuth uses the server-bound Workspace registration RPC',async()=>{
+ const calls=[],storage=new Map([['gc-oauth-provider','google'],['gc-staff-invite','invite-token']]);
+ const source=fs.readFileSync(new URL('workflow.js',root),'utf8');
+ const routine=source.slice(source.indexOf('  async function prepareHumanSession('),source.indexOf('  async function loadProfile('));
+ const context={window:{GotCrackedAuth:{isOAuthSession:()=>true},GotCrackedVerifyDiscord:async()=>{throw Error('Unexpected Discord verification');},supabaseClient:{rpc:async(name,args)=>{calls.push([name,args]);if(name==='portal_session_authorized')return{data:false};return{data:{authorized:true}};}}},sessionStorage:{getItem:key=>storage.get(key)||null,removeItem:key=>storage.delete(key)},localSignOut:async()=>{throw Error('Unexpected sign-out');},showLoginError:()=>{},URL,document:{title:'GotCracked Portal'},location:{href:'https://portal.gotcracked.co/?invite=invite-token'},history:{replaceState(){}}};
+ vm.createContext(context);vm.runInContext(routine,context);
+ assert.equal(await context.prepareHumanSession({user:{id:'staff',identities:[{provider:'discord'},{provider:'google'}]}}),true);
+ assert.equal(calls[0][0],'portal_session_authorized');
+ assert.equal(calls[1][0],'register_workspace_human_session');
+ assert.equal(calls[1][1].invite_token,'invite-token');
 });
 await test('Expired cached tokens trigger a fresh session lookup',async()=>{
   const h=browserHarness(),s=session(h);h.events.forEach(f=>f('SIGNED_IN',s));

@@ -73,7 +73,7 @@ window.supabaseClient = supabase.createClient(
   }
 
   function timeoutResult() {
-    const error = new Error('Remembered session restore timed out. Continue with Discord to reconnect.');
+    const error = new Error('Remembered session restore timed out. Continue with Google Workspace or Discord to reconnect.');
     error.code = 'GC_SESSION_TIMEOUT';
     return { session:null, error, source:'timeout' };
   }

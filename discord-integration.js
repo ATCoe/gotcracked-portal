@@ -31,6 +31,7 @@
 
   async function signInWithDiscord() {
     sessionStorage.setItem('gc-discord-auth-started', '1');
+    sessionStorage.setItem('gc-oauth-provider','discord');
     const invite = sessionStorage.getItem('gc-staff-invite');
     const approval = new URL(window.location.href).searchParams.get('marlon-approval');
     const redirect = new URL(window.location.href);
@@ -50,6 +51,7 @@
 
   async function signInWithGoogle() {
     sessionStorage.setItem('gc-google-auth-started','1');
+    sessionStorage.setItem('gc-oauth-provider','google');
     const redirect = new URL(window.location.href);
     const { error } = await client.auth.signInWithOAuth({
       provider: 'google',
@@ -67,17 +69,14 @@
     if (restored?.error || !session) return { authorized:false, reason:'no-session', transient:Boolean(restored?.error) };
 
     const federated=window.GotCrackedAuth?.isOAuthSession(session)===true;
-    const hasWorkspace=session.user.identities?.some(identity=>identity.provider==='google');
-    if(!federated||hasWorkspace)return {authorized:true,skipped:true};
-    const hasDiscord = session.user.identities?.some(identity => identity.provider === 'discord');
-    if (!hasDiscord) return { authorized:true, skipped:true };
-    // A cached user id does not prove this particular login was verified.
-    // Ask the database, which also checks revocation and the current session id.
+    if(!federated)return {authorized:true,skipped:true};
     const verified = await client.rpc('portal_session_authorized');
-    if (!force && !verified.error && verified.data === true) return { authorized:true, cached:true };
+    if(!verified.error&&verified.data===true)return {authorized:true,cached:true};
+    const hasDiscord=session.user.identities?.some(identity=>identity.provider==='discord');
+    if(!hasDiscord)return {authorized:false,reason:'No Discord identity is linked to this account.',transient:false};
 
-    const inviteToken = sessionStorage.getItem('gc-staff-invite');
-    const { data, error } = await client.functions.invoke('discord-verify', { body: { inviteToken: inviteToken || null } });
+    const inviteToken=sessionStorage.getItem('gc-staff-invite');
+    const {data,error}=await client.functions.invoke('discord-verify',{body:{inviteToken:inviteToken||null}});
     if (error) {
       console.warn('Discord verification deferred:', error.message);
       return { authorized:false, transient:true, reason:error.message || 'verification-unavailable' };
@@ -93,6 +92,7 @@
     sessionStorage.setItem('gc-discord-verified-user', session.user.id);
     sessionStorage.removeItem('gc-staff-invite');
     sessionStorage.removeItem('gc-discord-auth-started');
+    sessionStorage.removeItem('gc-oauth-provider');
     sessionStorage.removeItem('gc-auth-error');
     if (params.has('invite')) {
       params.delete('invite');
@@ -110,11 +110,28 @@
   window.GotCrackedVerifyDiscord = verifyOnce;
 
   async function linkDiscord() {
+    sessionStorage.setItem('gc-discord-link-started','1');
     const { error } = await client.auth.linkIdentity({
       provider: 'discord',
       options: { redirectTo: `${location.origin}${location.pathname}`, scopes: 'identify email' }
     });
-    if (error) throw error;
+    if (error) {
+      sessionStorage.removeItem('gc-discord-link-started');
+      throw error;
+    }
+  }
+  window.GotCrackedLinkDiscordFallback=linkDiscord;
+
+  async function completeDiscordFallbackLink() {
+    if(sessionStorage.getItem('gc-discord-link-started')!=='1')return false;
+    const restored=window.GotCrackedAuth?.restoreSession?await window.GotCrackedAuth.restoreSession({force:true}):null;
+    const session=restored?.session;
+    if(!session)return false;
+    const {data,error}=await client.rpc('sync_discord_fallback_identity');
+    if(error||!data?.authorized||!data?.fallbackLinked)throw new Error(data?.error||error?.message||'Discord fallback could not be linked.');
+    sessionStorage.removeItem('gc-discord-link-started');
+    document.dispatchEvent(new CustomEvent('gc-discord-fallback-linked',{detail:{discordUserId:data.discordUserId}}));
+    return true;
   }
 
   async function beginWorkstationEnrollment() {
@@ -154,6 +171,11 @@
     location.replace(`${location.pathname}#dashboard`);
     return true;
   }
+  window.GotCrackedBeginWorkstationEnrollment=async({label='Shared shop computer'}={})=>{
+    sessionStorage.setItem(WORKSTATION_INTENT,'1');
+    sessionStorage.setItem(WORKSTATION_REQUEST_LABEL,String(label||'Shared shop computer'));
+    return beginWorkstationEnrollment();
+  };
 
   async function resumeWorkstationEnrollment() {
     const grant = sessionStorage.getItem(WORKSTATION_GRANT);
@@ -167,7 +189,7 @@
       device_id:deviceId,
       device_label:sessionStorage.getItem(WORKSTATION_LABEL) || 'Shared shop computer'
     });
-    if (completed.error || !completed.data?.ok) throw completed.error || new Error('The workstation enrollment expired. Sign in with Discord and enroll it again.');
+    if (completed.error || !completed.data?.ok) throw completed.error || new Error('The workstation enrollment expired. Sign in with Google Workspace or Discord and enroll it again.');
     sessionStorage.removeItem(WORKSTATION_GRANT);
     sessionStorage.removeItem(WORKSTATION_LABEL);
     sessionStorage.removeItem('gotcracked-staff');
@@ -210,7 +232,7 @@
     const fields = Object.fromEntries(new FormData(form));
     const { data, error } = await client.functions.invoke('staff-invite', { body: fields });
     if (error || !data?.ok) throw new Error(data?.error || error?.message || 'Unable to onboard the employee.');
-    const packageText = `GotCracked welcome package\nEmployee: ${data.staff.displayName}\nRole: ${data.staff.jobTitle || data.staff.role}\nEmployee address: ${data.staff.portalEmail}\n\n1. Join the staff Discord: ${data.discordInviteUrl}\n2. Open the private Portal invitation: ${data.portalInviteUrl}\n3. Continue with Discord and complete the guided onboarding checklist.\n4. Create a personal workstation PIN when prompted.\n\nPortal access uses Discord. No temporary password is issued.`;
+    const packageText = `GotCracked welcome package\nEmployee: ${data.staff.displayName}\nRole: ${data.staff.jobTitle || data.staff.role}\nWorkspace address: ${data.staff.portalEmail}\n\n1. Sign in to Google Workspace as ${data.staff.portalEmail}.\n2. Open the private Portal invitation: ${data.portalInviteUrl}\n3. Choose Continue with Google Workspace and complete the guided onboarding checklist.\n4. Join the staff Discord for fallback sign-in and team access: ${data.discordInviteUrl}\n5. Create a personal workstation PIN when prompted.\n\nGoogle Workspace is the primary Portal identity. Discord is the fallback. No temporary Portal password is issued.`;
     let copied = false;
     try { await navigator.clipboard.writeText(packageText); copied = true; } catch {}
     return { ...data, packageText, copied };
@@ -242,7 +264,7 @@
     const heading=document.createElement('strong');
     heading.textContent=`Premium onboarding package ${result.copied ? 'created and copied' : 'created'}.`;
     output.append(heading,document.createElement('br'));
-    appendLine(output,'Employee address',result.staff?.portalEmail);
+    appendLine(output,'Workspace address',result.staff?.portalEmail);
     appendSafeLink(output,'Staff Discord',result.discordInviteUrl);
     appendSafeLink(output,'Private Portal invitation',result.portalInviteUrl);
     const note=document.createElement('small');
@@ -317,14 +339,17 @@
 
   client.auth.onAuthStateChange((event,session)=>{
     if(event==='SIGNED_OUT'){sessionStorage.removeItem('gc-discord-verified-user');return;}
-    if(event==='SIGNED_IN'&&session){
-      const oauthJustStarted=sessionStorage.getItem('gc-discord-auth-started')==='1';
-      scheduleBackgroundVerify(oauthJustStarted);
+    if(session&&['SIGNED_IN','USER_UPDATED'].includes(event)&&sessionStorage.getItem('gc-discord-link-started')==='1'){
+      setTimeout(()=>completeDiscordFallbackLink().catch(error=>{sessionStorage.setItem('gc-auth-error',error?.message||'Discord fallback could not be linked.');}),50);
+      return;
+    }
+    if(event==='SIGNED_IN'&&session&&sessionStorage.getItem('gc-oauth-provider')==='discord'){
+      scheduleBackgroundVerify(true);
     }
   });
 
+  completeDiscordFallbackLink().catch(error=>{sessionStorage.setItem('gc-auth-error',error?.message||'Discord fallback could not be linked.');});
   resumeWorkstationEnrollment().catch(error=>{sessionStorage.removeItem(WORKSTATION_GRANT);sessionStorage.removeItem(WORKSTATION_LABEL);sessionStorage.setItem('gc-auth-error',error?.message||'Workstation enrollment expired.');});
-  scheduleBackgroundVerify(false);
   wireUi();
 })();
 

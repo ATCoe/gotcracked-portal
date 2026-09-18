@@ -2,7 +2,8 @@
   'use strict';
 
   const VERSION = '20260903-boot-recovery1';
-  const ACCOUNT_PAGE_VERSION = '20260826-account-page2';
+  const ACCOUNT_PAGE_VERSION = '20260918-workspace-auth-final1';
+  const WORKSPACE_AUTH_VERSION = '20260918-workspace-auth-final1';
   const SALES_OPS_VERSION = '20260827-reconciliation2';
   const APPOINTMENTS_VERSION = '20260827-production9';
   const CUSTOMERS_VERSION = '20260902-global-master-data1';
@@ -39,7 +40,7 @@
   const loading=new Map(),delay=ms=>new Promise(resolve=>setTimeout(resolve,ms)),isTraining=()=>localStorage.getItem('gc-training-store')==='1';
   const profileIndependentScripts=new Set(['theme-controller.js','training-shared-sync.js','runtime-stability.js','mobile-runtime-regression-fixes.js','portal-refresh-stability.js','operations-v1-core.js']);
 
-  function srcFor(file){const versions={'account-page.js':ACCOUNT_PAGE_VERSION,'sales-ops.js':SALES_OPS_VERSION,'appointments-board.js':APPOINTMENTS_VERSION,'appointments-owner-guard.js':APPOINTMENTS_VERSION,'customers-board.js':CUSTOMERS_VERSION,'operations-v1-core.js':'20260903-store-menu-persistent1','reporting-capacity-enhancements.js':'20260903-subtle-capacity1','portal-mobile-app.js':'20260903-private-download-api1','portal-mobile-audit.js':'20260914-runtime-clean1','mobilesentrix-integration.js':'20260915-sync-recovery1','parts-registry-images.js':'20260915-lazy-images1'};return `${file}?v=${versions[file]||VERSION}`;}
+  function srcFor(file){const versions={'account-page.js':ACCOUNT_PAGE_VERSION,'premium-onboarding-v2.js':WORKSPACE_AUTH_VERSION,'workstation-admin.js':WORKSPACE_AUTH_VERSION,'sales-ops.js':SALES_OPS_VERSION,'appointments-board.js':APPOINTMENTS_VERSION,'appointments-owner-guard.js':APPOINTMENTS_VERSION,'customers-board.js':CUSTOMERS_VERSION,'operations-v1-core.js':'20260903-store-menu-persistent1','reporting-capacity-enhancements.js':'20260903-subtle-capacity1','portal-mobile-app.js':'20260903-private-download-api1','portal-mobile-audit.js':'20260914-runtime-clean1','mobilesentrix-integration.js':'20260915-sync-recovery1','parts-registry-images.js':'20260915-lazy-images1'};return `${file}?v=${versions[file]||VERSION}`;}
   function showBootRecovery(error){
     const recovery=document.getElementById('gc-portal-boot-recovery');
     if(!recovery)return;
