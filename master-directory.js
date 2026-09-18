@@ -109,7 +109,7 @@
     }
     const leadsView=document.querySelector('#leads'), legacyHost=leadsView?.querySelector('#portal-leads'); if (!leadsView||!legacyHost) return null; const card=legacyHost.closest('.card'); card?.classList.add('gc-leads-directory-card'); const toolbar=card?.querySelector(':scope > .toolbar'); if (toolbar) toolbar.hidden=true; legacyHost.classList.add('gc-directory'); return legacyHost;
   }
-  function markDashboardMetrics() { const cards=document.querySelectorAll('#dashboard .metrics article'), openRepairs=cards[0], ready=cards[2]; if (openRepairs) { openRepairs.dataset.gcDirectoryFilter='open_repairs'; openRepairs.setAttribute('aria-label','Filter master directory to open repairs'); openRepairs.title='Filter master directory to open repairs'; } if (ready) { ready.dataset.gcDirectoryFilter='ready'; ready.setAttribute('aria-label','Filter master directory to ready for pickup'); ready.title='Filter master directory to ready for pickup'; } }
+  function markDashboardMetrics() { const cards=document.querySelectorAll('#dashboard .metrics article'), openRepairs=cards[0], ready=cards[2]; const mark=(card,filter,label)=>{if(!card)return;card.dataset.gcDirectoryFilter=filter;card.removeAttribute('aria-label');card.title=label;card.querySelector(':scope > .gc-metric-action')?.setAttribute('aria-label',label)}; mark(openRepairs,'open_repairs','Filter master directory to open repairs'); mark(ready,'ready','Filter master directory to ready for pickup'); }
 
   function setPreset(scope,preset) {
     const s=state[scope]; Object.assign(s,{preset,query:'',device:'all',assigned:'all',intake:'all',from:'',to:'',sort:DEFAULT_SORT}); s.types.clear(); s.statuses.clear();

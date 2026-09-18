@@ -76,6 +76,20 @@ async function syncTechSupport() {
   if (updates) updates = await discord('PATCH', `/channels/${updates.id}`, { parent_id: category.id, topic: updatesTopic });
   else updates = await discord('POST', `/guilds/${guild.id}/channels`, { name: 'updates-and-patch-notes', type: 0, parent_id: category.id, topic: updatesTopic });
 
+  const ideasTopic = 'Employee ideas and requests for future Portal improvements. Marlon groups related ideas and feeds them into the existing suggestion/release-planning workflow.';
+  let ideas = channels.find(c => c.type === 0 && /^future-portal-updates$/i.test(String(c.name || '')));
+  if (ideas) ideas = await discord('PATCH', `/channels/${ideas.id}`, { parent_id: category.id, topic: ideasTopic });
+  else ideas = await discord('POST', `/guilds/${guild.id}/channels`, { name: 'future-portal-updates', type: 0, parent_id: category.id, topic: ideasTopic });
+
+  const bugTopic = 'Human-caught bugs, regressions, and Marlon mistakes that escaped automated detection. Marlon correlates duplicates and opens or updates the appropriate incident when evidence is sufficient.';
+  let bugs = channels.find(c => c.type === 0 && /^bug-log$/i.test(String(c.name || '')));
+  if (bugs) bugs = await discord('PATCH', `/channels/${bugs.id}`, { parent_id: category.id, topic: bugTopic });
+  else bugs = await discord('POST', `/guilds/${guild.id}/channels`, { name: 'bug-log', type: 0, parent_id: category.id, topic: bugTopic });
+
+  let voice = channels.find(c => c.type === 2 && /^marlon tech support$/i.test(String(c.name || '')));
+  if (voice) voice = await discord('PATCH', `/channels/${voice.id}`, { parent_id: category.id });
+  else voice = await discord('POST', `/guilds/${guild.id}/channels`, { name: 'Marlon Tech Support', type: 2, parent_id: category.id, bitrate: 64000, user_limit: 0 });
+
   const { data: settings, error: settingsError } = await db.from('business_settings').select('location_id').order('updated_at',{ascending:false}).limit(1).maybeSingle();
   if (settingsError || !settings?.location_id) throw settingsError || new Error('Location settings unavailable.');
   const { data: existing } = await db.from('marlon_discord_config').select('bug_log_channel_id,lead_dm_profile_id,tech_support_voice_channel_id').eq('location_id',settings.location_id).maybeSingle();
@@ -84,10 +98,10 @@ async function syncTechSupport() {
     guild_id: guild.id,
     category_id: category.id,
     tech_support_channel_id: support.id,
-    future_updates_channel_id: updates.id,
-    bug_log_channel_id: existing?.bug_log_channel_id || support.id,
+    future_updates_channel_id: ideas.id,
+    bug_log_channel_id: bugs.id,
     lead_dm_profile_id: existing?.lead_dm_profile_id || null,
-    tech_support_voice_channel_id: existing?.tech_support_voice_channel_id || null,
+    tech_support_voice_channel_id: voice.id,
     updated_at: new Date().toISOString()
   }, { onConflict: 'location_id' });
   if (saveError) throw saveError;
@@ -96,7 +110,10 @@ async function syncTechSupport() {
     guild: { id: guild.id, name: guild.name },
     category: { id: category.id, name: category.name },
     channel: { id: support.id, name: support.name, parent_id: support.parent_id },
+    ideas: { id: ideas.id, name: ideas.name, parent_id: ideas.parent_id },
+    bugs: { id: bugs.id, name: bugs.name, parent_id: bugs.parent_id },
     updates: { id: updates.id, name: updates.name, parent_id: updates.parent_id },
+    voice: { id: voice.id, name: voice.name, parent_id: voice.parent_id },
     standalone: true
   };
 }
@@ -104,28 +121,43 @@ async function syncTechSupport() {
 function proposalDiscordPayload(suggestion: any, decidedBy = '') {
   const pending = suggestion.owner_review_state === 'pending';
   const approved = suggestion.owner_review_state === 'approved';
-  const stateLabel = pending ? 'Awaiting Owner Review' : approved ? `Approved by ${decidedBy || 'Owner'}` : `Declined by ${decidedBy || 'Owner'}`;
+  const capability = suggestion.evidence?.capability_required === true;
+  const fingerprint = clean(suggestion.proposal_fingerprint, 128).slice(0,12);
+  const stateLabel = pending ? 'Awaiting Owner Review' : approved
+    ? capability ? `Approved by ${decidedBy || 'Owner'} · waiting for install/connect` : `Approved by ${decidedBy || 'Owner'}`
+    : `Declined by ${decidedBy || 'Owner'}`;
   const fields: any[] = [
     { name: 'Surface', value: clean(suggestion.surface || 'portal', 80), inline: true },
     { name: 'Complexity', value: clean(suggestion.implementation_complexity || 'medium', 80), inline: true },
     { name: 'Status', value: stateLabel, inline: false }
   ];
+  if (capability) {
+    fields.push({ name:'Tool / access needed', value:clean(suggestion.evidence?.capability_name || 'Additional capability', 700), inline:false });
+    if (suggestion.evidence?.capability_reason) fields.push({ name:'Why Marlon needs it', value:clean(suggestion.evidence.capability_reason, 900), inline:false });
+    if (suggestion.evidence?.capability_install) fields.push({ name:'Owner action', value:clean(suggestion.evidence.capability_install, 900), inline:false });
+    if (suggestion.evidence?.capability_cost) fields.push({ name:'Cost class', value:clean(suggestion.evidence.capability_cost, 80), inline:true });
+  }
   if (suggestion.business_value) fields.push({ name: 'Business value', value: clean(suggestion.business_value, 900), inline: false });
   if (suggestion.user_impact) fields.push({ name: 'User impact', value: clean(suggestion.user_impact, 900), inline: false });
+  const controls:any[] = [];
+  if (pending && fingerprint) {
+    controls.push({type:2,style:3,label:capability?'Approve request':'Approve exact scope',custom_id:`proposal:approve:${suggestion.id}:${fingerprint}`});
+    controls.push({type:2,style:4,label:capability?'Not installing':'Decline',custom_id:`proposal:deny:${suggestion.id}:${fingerprint}`});
+  }
+  controls.push({ type: 2, style: 5, label: 'Open Portal', url: 'https://portal.gotcracked.co/#support-tickets' });
   return {
     allowed_mentions: { parse: [] },
     embeds: [{
-      title: pending ? 'Marlon feature proposal' : approved ? 'Marlon feature proposal approved' : 'Marlon feature proposal declined',
+      title: pending ? capability ? 'Marlon capability request' : 'Marlon feature proposal'
+        : approved ? capability ? 'Marlon capability request approved' : 'Marlon feature proposal approved'
+        : capability ? 'Marlon capability request declined' : 'Marlon feature proposal declined',
       description: `**${clean(suggestion.title, 180)}**\n${clean(suggestion.description, 3000)}`,
       color: pending ? 0x159bd3 : approved ? 0x2fbf71 : 0xe5484d,
       fields,
-      footer: { text: pending ? 'GotCracked · Owner feature review' : `GotCracked · ${stateLabel}` },
+      footer: { text: pending ? 'GotCracked · Secure Owner review' : `GotCracked · ${stateLabel}` },
       timestamp: new Date(suggestion.owner_review_decided_at || suggestion.owner_review_requested_at || suggestion.created_at || Date.now()).toISOString()
     }],
-    components: [{
-      type: 1,
-      components: [{ type: 2, style: 5, label: pending ? 'Review in Portal' : 'Open Portal', url: 'https://portal.gotcracked.co/#support-tickets' }]
-    }]
+    components: [{ type:1, components:controls }]
   };
 }
 

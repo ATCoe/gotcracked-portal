@@ -82,9 +82,17 @@
       const view = metricViews[index];
       if (!view || card.dataset.v1MetricLink) return;
       card.dataset.v1MetricLink = view;
-      card.tabIndex = 0;
-      card.setAttribute('role', 'link');
-      card.setAttribute('aria-label', `Open ${view.replaceAll('-', ' ')}`);
+      card.removeAttribute('tabindex');
+      card.removeAttribute('role');
+      card.removeAttribute('aria-label');
+      let action = card.querySelector(':scope > .gc-metric-action');
+      if (!action) {
+        action = document.createElement('button');
+        action.type = 'button';
+        action.className = 'gc-metric-action';
+        card.appendChild(action);
+      }
+      action.setAttribute('aria-label', `Open ${view.replaceAll('-', ' ')}`);
     });
 
     document.querySelectorAll('[data-open-ticket]').forEach(button => {

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; connect-src https://uvpmmbioerejeyybfntb.supabase.co wss://uvpmmbioerejeyybfntb.supabase.co http://127.0.0.1:8788 http://localhost:8788; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>Secure workstation setup · GotCracked</title><link rel="stylesheet" href="workstation-pairing.css">
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js" integrity="sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC" crossorigin="anonymous"></script>
+<script defer src="supabase.js?v=20260914-auth-persistence1"></script><script defer src="workstation-pairing.js?v=20260918-secure-pairing1"></script>
+</head><body><main class="pairing-card">
+<div class="brand">GOTCRACKED <span>WORKSTATION SETUP</span></div>
+<h1>One browser. Individual accountability.</h1>
+<p>Approve this exact browser using the secure Discord button. The browser then becomes a trusted shared workstation. Each employee still chooses their name and enters their own PIN.</p>
+<button id="request-approval" type="button">Send secure approval to Discord</button>
+<form id="pairing-form" novalidate><label for="request-id">Enrollment request ID</label>
+<input id="request-id" name="request-id" type="text" autocomplete="off" spellcheck="false" maxlength="36" aria-describedby="request-help">
+<p id="request-help" class="help">Provided by your administrator after this browser is registered. This is a request identifier, not a password or pairing code.</p>
+<button id="check-approval" type="submit">Check Discord approval</button></form>
+<section aria-labelledby="status-heading"><h2 id="status-heading">Enrollment status</h2><p id="pairing-status" role="status" aria-live="polite">Preparing this browser…</p>
+<button id="complete-pairing" type="button" hidden>Resume enrollment</button><a id="open-portal" href="./#dashboard" hidden>Open Portal and choose your operator</a></section>
+<p class="security-note">Approval expires automatically. No codes, credentials, or personal PINs belong in chat or address-bar URLs. Keep this window open while approving.</p>
+</main></body></html>

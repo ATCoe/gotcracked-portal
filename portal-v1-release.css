@@ -125,7 +125,9 @@ body.v1-overlay-open,body.v1-workflow-open{overflow:hidden}
    ------------------------------------------------------------------------- */
 .metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
 .metrics article{min-width:0}
-#dashboard .metrics article[data-v1-metric-link]{cursor:pointer}
+#dashboard .metrics article[data-v1-metric-link]{cursor:pointer;position:relative}
+#dashboard .metrics .gc-metric-action{position:absolute;inset:0;z-index:3;width:100%;height:100%;margin:0;padding:0;border:0;border-radius:inherit;background:transparent;color:transparent;cursor:pointer}
+#dashboard .metrics .gc-metric-action:focus-visible{outline:3px solid #0b5fc7;outline-offset:-3px}
 
 /* Master Directory is the dashboard directory. The older parallel Work Order
    and Lead dashboard tables remain available on their dedicated pages only. */
@@ -134,6 +136,9 @@ body.v1-overlay-open,body.v1-workflow-open{overflow:hidden}
 .table-wrap,.v1-table-wrap,.audit-table-wrap,.schedule-grid,.bar-chart{max-width:100%;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}
 .v1-table-wrap{overflow-x:auto;overflow-y:visible}
 .v1-table{width:100%}
+#repairs .v1-table th{color:#475c71}
+#repairs .v1-actions .primary-button{background:#0b65c8}
+#repairs .v1-actions .primary-button:hover{background:#0959b1}
 .gc-directory{max-width:100%}
 .gc-dir-row{max-width:100%}
 
@@ -141,6 +146,8 @@ body.v1-overlay-open,body.v1-workflow-open{overflow:hidden}
    FORMS / DIALOGS / CARDS
    ------------------------------------------------------------------------- */
 .primary-button,.secondary-button,.discord-button,.search,.toolbar select,.v1-form input,.v1-form select,.v1-form textarea,.v1-form-grid input,.v1-form-grid select,.v1-form-grid textarea{min-height:var(--gc-touch)}
+#repairs .primary-button[data-open-ticket]{background:#0b66d2!important;color:#fff!important}
+#inventory .gc-inv-table td small{color:#5b6978!important}
 .card,.v1-ops-card,.v1-device-card,.v1-workflow-panel,.v1-guide,.v1-permission-person{border-color:#dce4ec;box-shadow:var(--gc-panel-shadow)}
 dialog{max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain}
 dialog::backdrop,#v1-intake-dialog::backdrop,#v1-po-dialog::backdrop,#portal-v1-lead-dialog::backdrop{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
@@ -402,6 +409,7 @@ dialog::backdrop,#v1-intake-dialog::backdrop,#v1-po-dialog::backdrop,#portal-v1-
   .form-grid,.v1-form-grid{grid-template-columns:1fr!important;gap:11px}
   .form-grid input,.form-grid select,.form-grid textarea,.v1-form input,.v1-form select,.v1-form textarea,.v1-form-grid input,.v1-form-grid select,.v1-form-grid textarea,.settings-list input,.settings-list select,.settings-list textarea{width:100%!important;font-size:16px}
   .full,.v1-form-grid .full{grid-column:1!important}
+  #dashboard>.page-heading .eyebrow,.gc-rail-empty>span{color:#647184}
   #v1-intake-dialog,#portal-v1-lead-dialog{width:100vw!important;max-width:none!important;height:100dvh!important;max-height:100dvh!important;margin:0!important;border:0!important;border-radius:0!important}
   #v1-intake-dialog .v1-intake-shell,#portal-v1-lead-dialog .v1-lead-dialog-shell{height:100dvh;max-height:100dvh}
   .v1-intake-body,#portal-v1-lead-dialog .v1-lead-dialog-body{padding:14px}

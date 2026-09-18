@@ -31,6 +31,7 @@ function supportPayload(row:any){
   const code=p.ticket_number?`SUP-${String(p.ticket_number).padStart(4,'0')}`:'Support ticket';
   const created=row.event_type==='support_ticket_created';
   const fields:any[]=[{name:'Status',value:titleCase(p.status),inline:true},{name:'Priority',value:titleCase(p.priority),inline:true},{name:'Surface',value:titleCase(p.surface),inline:true},{name:'Managed by',value:text(p.managed_by,'Marlon'),inline:true}];
+  if(p.execution_stage) fields.push({name:'Execution stage',value:titleCase(p.execution_stage),inline:true});
   if(p.requires_approval) fields.push({name:'Approval',value:titleCase(p.approval_status || 'pending'),inline:true});
   if(p.diagnosis) fields.push({name:'Diagnosis',value:text(p.diagnosis).slice(0,900),inline:false});
   if(p.action_taken) fields.push({name:'Action',value:text(p.action_taken).slice(0,900),inline:false});
@@ -38,7 +39,9 @@ function supportPayload(row:any){
   const approvalPending=Boolean(p.requires_approval)&&String(p.approval_status||'pending')==='pending';
   const supportUrl=approvalPending?`${portalUrl}/?marlon-approval=${encodeURIComponent(String(row.entity_id||''))}#support-tickets`:`${portalUrl}/#support-tickets`;
   const buttonLabel=approvalPending?'Review Approval':'Open Support Desk';
-  return {flags:4096,allowed_mentions:{parse:[]},embeds:[{title:`${created?'New Marlon support request':'Marlon support update'} · ${code}`,description:`**${text(p.title,'Portal support request')}**\n${text(p.description,'Support activity logged by Marlon').slice(0,3200)}`,color:p.status==='resolved'||p.status==='closed'?0x2fbf71:p.priority==='critical'?0xe5484d:p.priority==='high'?0xf59e0b:0x159bd3,fields,footer:{text:'GotCracked Tech Support · silent log'},timestamp:new Date(row.created_at).toISOString()}],components:[{type:1,components:[{type:2,style:5,label:buttonLabel,url:supportUrl}]}]};
+  const progress=row.event_type==='support_ticket_progress';
+  const heading=created?'New Marlon support request':progress?'Marlon execution progress':'Marlon support update';
+  return {flags:4096,allowed_mentions:{parse:[]},embeds:[{title:`${heading} · ${code}`,description:`**${text(p.title,'Portal support request')}**\n${text(p.description,'Support activity logged by Marlon').slice(0,3200)}`,color:p.status==='resolved'||p.status==='closed'?0x2fbf71:p.execution_failed||p.execution_blocked?0xe5484d:p.priority==='critical'?0xe5484d:p.priority==='high'?0xf59e0b:0x159bd3,fields,footer:{text:'GotCracked Tech Support · Marlon execution log'},timestamp:new Date(row.created_at).toISOString()}],components:[{type:1,components:[{type:2,style:5,label:buttonLabel,url:supportUrl}]}]};
 }
 
 function releasePayload(row:any){
@@ -116,6 +119,37 @@ function pcBuildDmPayload(row:any){
   return {allowed_mentions:{parse:[]},embeds:[{title:'New custom PC build request',description:`**${text(p.customer_name,'Potential customer')}**\n${text(p.marlon_summary,'A custom PC request was submitted and may need clarification before the build can move forward.').slice(0,2600)}`,color:0x7757d5,fields:[{name:'Phone',value:text(p.customer_phone),inline:true},{name:'Email',value:text(p.customer_email),inline:true},{name:'Preferred contact',value:titleCase(p.preferred_contact),inline:true}],footer:{text:'Customer follow-up may be needed'},timestamp:new Date(row.created_at).toISOString()}],components:[{type:1,components:[{type:2,style:5,label:'Open Request',url:p.portal_url||`${portalUrl}/#leads/${p.lead_id||row.entity_id}`}]}]};
 }
 
+function supportDmPayload(row:any){
+  const p=row.payload||{};
+  const code=p.ticket_number?`SUP-${String(p.ticket_number).padStart(4,'0')}`:'Support ticket';
+  const stage=p.execution_stage?titleCase(p.execution_stage):titleCase(p.status);
+  const fields:any[]=[{name:'Stage',value:stage,inline:true},{name:'Status',value:titleCase(p.status),inline:true}];
+  if(p.requires_approval) fields.push({name:'Approval',value:titleCase(p.approval_status||'pending'),inline:true});
+  if(p.diagnosis) fields.push({name:'Diagnosis',value:text(p.diagnosis).slice(0,700),inline:false});
+  if(p.action_taken) fields.push({name:'Latest action',value:text(p.action_taken).slice(0,700),inline:false});
+  if(p.resolution) fields.push({name:'Resolution',value:text(p.resolution).slice(0,700),inline:false});
+  const needsAttention=Boolean(p.requires_approval)&&String(p.approval_status||'pending')==='pending';
+  const url=needsAttention?`${portalUrl}/?marlon-approval=${encodeURIComponent(String(row.entity_id||''))}#support-tickets`:`${portalUrl}/#support-tickets`;
+  const color=p.status==='resolved'||p.status==='closed'?0x2fbf71:p.execution_failed||p.execution_blocked?0xe5484d:needsAttention?0xf59e0b:0x159bd3;
+  return {allowed_mentions:{parse:[]},embeds:[{title:`Marlon update · ${code}`,description:`**${text(p.title,'Portal release work')}**`,color,fields,footer:{text:'GotCracked · Marlon release progress'},timestamp:new Date(row.created_at).toISOString()}],components:[{type:1,components:[{type:2,style:5,label:needsAttention?'Review in Portal':'Open Support Desk',url}]}]};
+}
+
+function workstationDmPayload(row:any){
+  const p=row.payload||{};
+  if(row.event_type==='workstation_enrollment_code'){
+    return {allowed_mentions:{parse:[]},embeds:[{title:'AuroraServer enrollment code',description:'Enter this one-time code in the AuroraServer GotCracked Portal to finish trusted-workstation setup.',color:0x2fbf71,
+      fields:[{name:'Device',value:text(p.device_label,'AuroraServer GotCracked'),inline:false},{name:'One-time code',value:`**${text(p.code)}**`,inline:false},{name:'Expires',value:'15 minutes',inline:true}],
+      footer:{text:'GotCracked · use once · do not share'},timestamp:new Date(row.created_at).toISOString()}]};
+  }
+  return {allowed_mentions:{parse:[]},embeds:[{title:'Approve GotCracked workstation?',description:'AuroraServer is requesting trusted Front Desk workstation access.',color:0x2f80ed,
+    fields:[{name:'Device',value:text(p.device_label,'AuroraServer GotCracked'),inline:false},{name:'Trust',value:'Session-bound shared workstation · employees still use personal PINs',inline:false},{name:'Expires',value:'10 minutes',inline:true}],
+    footer:{text:'GotCracked · secure device enrollment'},timestamp:new Date(row.created_at).toISOString()}],
+    components:[{type:1,components:[
+      {type:2,style:3,label:'Approve',custom_id:`workstation:approve:${p.request_id}:${p.fingerprint}`},
+      {type:2,style:4,label:'Deny',custom_id:`workstation:deny:${p.request_id}:${p.fingerprint}`}
+    ]}]};
+}
+
 async function deliveryChannel(db:any,row:any){
   if(row.entity_type==='support_ticket'){
     const cfg=await db.from('marlon_discord_config').select('tech_support_channel_id,bug_log_channel_id').eq('location_id',row.location_id).maybeSingle();
@@ -140,6 +174,8 @@ async function leadDmUserId(db:any,row:any){
 }
 
 function shouldDm(row:any){
+  if(row.entity_type==='support_ticket'&&row.event_type==='support_ticket_progress'&&row.payload?.notify_owner===true) return ['started','diagnosed','testing','blocked','completed','failed'].includes(String(row.payload?.execution_stage||''));
+  if(row.entity_type==='workstation_enrollment'&&['workstation_enrollment_approval_requested','workstation_enrollment_code'].includes(row.event_type)) return true;
   if(row.entity_type==='pc_build_request'&&row.event_type==='pc_build_request_created') return true;
   if(row.entity_type==='lead'&&row.event_type==='lead_created'){
     const source=String(row.payload?.source||'').toLowerCase();
@@ -184,7 +220,7 @@ async function sendDm(db:any,token:string,row:any){
   const userId=await leadDmUserId(db,row);
   const dm=await discordFetch('https://discord.com/api/v10/users/@me/channels',{method:'POST',headers:{Authorization:`Bot ${token}`,'Content-Type':'application/json'},body:JSON.stringify({recipient_id:userId})},'DM channel');
   const channel=await dm.json();
-  const payload=row.entity_type==='pc_build_request'?pcBuildDmPayload(row):leadDmPayload(row);
+  const payload=row.entity_type==='workstation_enrollment'?workstationDmPayload(row):row.entity_type==='support_ticket'?supportDmPayload(row):row.entity_type==='pc_build_request'?pcBuildDmPayload(row):leadDmPayload(row);
   await sendMessage(token,String(channel.id),payload);
 }
 
@@ -206,16 +242,21 @@ Deno.serve(async request=>{
     const rowResult=await db.from('discord_notification_outbox').select('*').eq('id',id).maybeSingle();
     if(rowResult.error) throw rowResult.error;
     const row=rowResult.data;
-    if(!row||row.delivered_at||!['work_order','support_ticket','lead','pc_build_request','portal_release'].includes(row.entity_type)) return new Response(JSON.stringify({ok:true,skipped:true}),{headers:{'Content-Type':'application/json'}});
+    if(!row||row.delivered_at||!['work_order','support_ticket','lead','pc_build_request','portal_release','workstation_enrollment'].includes(row.entity_type)) return new Response(JSON.stringify({ok:true,skipped:true}),{headers:{'Content-Type':'application/json'}});
     const token=Deno.env.get('DISCORD_BOT_TOKEN');
-    const channelId=await deliveryChannel(db,row);
-    if(!token||!channelId) throw new Error(`Discord ${row.entity_type} delivery is not configured.`);
+    const dmOnly=row.entity_type==='workstation_enrollment';
+    const channelId=dmOnly?null:await deliveryChannel(db,row);
+    if(!token||(!dmOnly&&!channelId)) throw new Error(`Discord ${row.entity_type} delivery is not configured.`);
 
-    const channelPayload=row.entity_type==='support_ticket'?supportPayload(row):row.entity_type==='portal_release'?releasePayload(row):row.entity_type==='lead'?leadPayload(row):row.entity_type==='pc_build_request'?pcBuildPayload(row):workOrderPayload(row);
-    await sendMessage(token,String(channelId),channelPayload);
+    if(!dmOnly){
+      const channelPayload=row.entity_type==='support_ticket'?supportPayload(row):row.entity_type==='portal_release'?releasePayload(row):row.entity_type==='lead'?leadPayload(row):row.entity_type==='pc_build_request'?pcBuildPayload(row):workOrderPayload(row);
+      await sendMessage(token,String(channelId),channelPayload);
+    }
     if(shouldDm(row)) await sendDm(db,token,row);
 
-    await db.from('discord_notification_outbox').update({delivered_at:new Date().toISOString(),attempts:Number(row.attempts||0)+1,last_error:null}).eq('id',id);
+    const deliveryPatch:any={delivered_at:new Date().toISOString(),attempts:Number(row.attempts||0)+1,last_error:null};
+    if(row.entity_type==='workstation_enrollment') deliveryPatch.payload={delivered:true,event_type:row.event_type};
+    await db.from('discord_notification_outbox').update(deliveryPatch).eq('id',id);
     return new Response(JSON.stringify({ok:true,dm:shouldDm(row)}),{headers:{'Content-Type':'application/json'}});
   }catch(error){
     console.error(error);

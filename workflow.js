@@ -76,6 +76,12 @@
     if(profile.account_type==='shared_workstation'){
       const trusted=await window.supabaseClient.rpc('get_my_trusted_workstation_status');
       if(trusted.error||!trusted.data?.trusted){await rejectUntrustedWorkstation();return false;}
+    }else if(profile.account_type==='automation'){
+      const authorized=await window.supabaseClient.rpc('portal_session_authorized');
+      if(authorized.error||authorized.data!==true){
+        await localSignOut('This automation session is not authorized for Portal access.');
+        return false;
+      }
     }else{
       const activeSession=session||(await window.supabaseClient.auth.getSession()).data?.session||null;
       const viaDiscord=activeSession?.user?.identities?.some(identity=>identity.provider==='discord');
@@ -105,7 +111,7 @@
 
     const staff={id:userId,name:profile.display_name||'Staff',role:profile.role||'Staff',account_type:profile.account_type||'staff'};
     sessionStorage.setItem('gotcracked-staff',JSON.stringify(staff));setStaff(staff);
-    window.GotCrackedNeedsDiscordLink=profile.account_type!=='shared_workstation'&&!profile.discord_user_id;
+    window.GotCrackedNeedsDiscordLink=profile.account_type==='staff'&&!profile.discord_user_id;
     loginScreen?.classList.add('hidden');
     document.dispatchEvent(new CustomEvent('gc-portal-authenticated',{detail:staff}));
     if(window.GotCrackedNeedsDiscordLink){

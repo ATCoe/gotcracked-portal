@@ -173,6 +173,7 @@
       extras.forEach(status=>ensureOption(select,status,LABELS[status]||friendly(status)));
     }
     const filter=document.getElementById('v1-repair-status');
+    filter?.setAttribute('aria-label','Filter work orders by status');
     ensureOption(filter,'awaiting_diagnostic',LABELS.awaiting_diagnostic);
     ensureOption(filter,'testing_in_progress',LABELS.testing_in_progress);
     document.querySelectorAll('.v1-status.awaiting_diagnostic').forEach(node=>setText(node,LABELS.awaiting_diagnostic));
