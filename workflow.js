@@ -71,10 +71,14 @@
         await localSignOut('This Google Workspace account is not linked to an active GotCracked staff profile. Contact an owner or manager.');
         return false;
       }
-      const authorized=await window.supabaseClient.rpc('portal_session_authorized');
-      if(authorized.error||authorized.data!==true){
-        await localSignOut('This Google Workspace account is not an active GotCracked staff account. Contact an owner or manager.');
-        return false;
+      const {data:googleProfile,error:googleProfileError}=await window.supabaseClient.from('profiles').select('account_type').eq('id',session.user.id).maybeSingle();
+      if(googleProfileError){await localSignOut('Your Google Workspace profile could not be loaded. Contact an owner or manager.');return false;}
+      if(googleProfile?.account_type!=='shared_workstation'){
+        const authorized=await window.supabaseClient.rpc('portal_session_authorized');
+        if(authorized.error||authorized.data!==true){
+          await localSignOut('This Google Workspace account is not an active GotCracked staff account. Contact an owner or manager.');
+          return false;
+        }
       }
     }
     return true;

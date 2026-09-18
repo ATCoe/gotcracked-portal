@@ -20,7 +20,7 @@ begin
   if auth.uid() is null then return false; end if;
   if not exists(select 1 from auth.sessions s where s.id=nullif(auth.jwt()->>'session_id','')::uuid and s.user_id=auth.uid() and s.not_after > now()) then return false; end if;
   select * into p from public.profiles where id=auth.uid() and active=true;
-  if p.id is null or coalesce(p.account_type,'staff')<>'staff' then return false; end if;
+  if p.id is null or coalesce(p.account_type,'staff') not in ('staff','shared_workstation') then return false; end if;
   select exists(select 1 from auth.identities i where i.user_id=auth.uid() and i.provider='google') into has_google;
   if not has_google then return false; end if;
   sid:=nullif(auth.jwt()->>'session_id','')::uuid;
