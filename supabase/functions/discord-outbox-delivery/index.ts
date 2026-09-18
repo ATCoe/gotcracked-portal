@@ -41,7 +41,11 @@ function supportPayload(row:any){
   const buttonLabel=approvalPending?'Review Approval':'Open Support Desk';
   const progress=row.event_type==='support_ticket_progress';
   const heading=created?'New Marlon support request':progress?'Marlon execution progress':'Marlon support update';
-  return {flags:4096,allowed_mentions:{parse:[]},embeds:[{title:`${heading} · ${code}`,description:`**${text(p.title,'Portal support request')}**\n${text(p.description,'Support activity logged by Marlon').slice(0,3200)}`,color:p.status==='resolved'||p.status==='closed'?0x2fbf71:p.execution_failed||p.execution_blocked?0xe5484d:p.priority==='critical'?0xe5484d:p.priority==='high'?0xf59e0b:0x159bd3,fields,footer:{text:'GotCracked Tech Support · Marlon execution log'},timestamp:new Date(row.created_at).toISOString()}],components:[{type:1,components:[{type:2,style:5,label:buttonLabel,url:supportUrl}]}]};
+  // Milestones are operational alerts, not a silent audit trail. Routine ticket
+  // messages stay quiet; Marlon's started/diagnosed/testing/blocked/completed
+  // events notify the configured support channel and owner DM.
+  const deliveryFlags=progress ? {} : {flags:4096};
+  return {...deliveryFlags,allowed_mentions:{parse:[]},embeds:[{title:`${heading} · ${code}`,description:`**${text(p.title,'Portal support request')}**\n${text(p.description,'Support activity logged by Marlon').slice(0,3200)}`,color:p.status==='resolved'||p.status==='closed'?0x2fbf71:p.execution_failed||p.execution_blocked?0xe5484d:p.priority==='critical'?0xe5484d:p.priority==='high'?0xf59e0b:0x159bd3,fields,footer:{text:'GotCracked Tech Support · Marlon execution log'},timestamp:new Date(row.created_at).toISOString()}],components:[{type:1,components:[{type:2,style:5,label:buttonLabel,url:supportUrl}]}]};
 }
 
 function releasePayload(row:any){
