@@ -58,7 +58,9 @@
     const providers=(session.user?.identities||[]).map(identity=>identity.provider);
     const hasDiscord=providers.includes('discord');
     const hasGoogle=providers.includes('google');
-    if(hasDiscord){
+    const federated=window.GotCrackedAuth?.isOAuthSession(session)===true;
+    if(!federated)return true; // Owner recovery and automation have separate server gates.
+    if(hasDiscord&&!hasGoogle){
       const verified=await window.GotCrackedVerifyDiscord?.({force:true});
       if(!verified?.authorized){
         if(!verified?.transient)await localSignOut(verified?.reason||'Discord access could not be verified.');
@@ -103,7 +105,7 @@
     }else{
       const activeSession=session||(await window.supabaseClient.auth.getSession()).data?.session||null;
       const providers=(activeSession?.user?.identities||[]).map(identity=>identity.provider);
-      const viaHumanProvider=providers.includes('discord')||providers.includes('google');
+      const viaHumanProvider=window.GotCrackedAuth?.isOAuthSession(activeSession)===true&&(providers.includes('discord')||providers.includes('google'));
       if(!viaHumanProvider){
         if(profile.role!=='owner'){
           await localSignOut('Human staff access requires Google Workspace or Discord authentication.');
@@ -130,7 +132,7 @@
 
     const staff={id:userId,name:profile.display_name||'Staff',role:profile.role||'Staff',account_type:profile.account_type||'staff'};
     sessionStorage.setItem('gotcracked-staff',JSON.stringify(staff));setStaff(staff);
-    window.GotCrackedNeedsDiscordLink=profile.account_type==='staff'&&!profile.discord_user_id;
+    window.GotCrackedNeedsDiscordLink=false; // Discord is optional; Workspace is primary.
     loginScreen?.classList.add('hidden');
     document.dispatchEvent(new CustomEvent('gc-portal-authenticated',{detail:staff}));
     if(window.GotCrackedNeedsDiscordLink){

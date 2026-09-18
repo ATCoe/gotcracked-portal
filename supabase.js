@@ -152,7 +152,15 @@ window.supabaseClient = supabase.createClient(
     }
   });
 
-  window.GotCrackedAuth = { restoreSession, readPersistedSession, clear };
+  // Routing only: the database independently verifies this session's method.
+  function isOAuthSession(session) {
+    try {
+      const part=session.access_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+      const claims=JSON.parse(atob(part.padEnd(Math.ceil(part.length/4)*4,'=')));
+      return Array.isArray(claims.amr)&&claims.amr.some(item=>item.method==='oauth');
+    } catch { return false; }
+  }
+  window.GotCrackedAuth = { restoreSession, readPersistedSession, clear, isOAuthSession };
   window.addEventListener('storage', event => {
     if (event.key === GC_AUTH_STORAGE_KEY || event.key === null) clear();
   });

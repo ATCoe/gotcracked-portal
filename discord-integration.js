@@ -66,6 +66,9 @@
     const session = restored?.session;
     if (restored?.error || !session) return { authorized:false, reason:'no-session', transient:Boolean(restored?.error) };
 
+    const federated=window.GotCrackedAuth?.isOAuthSession(session)===true;
+    const hasWorkspace=session.user.identities?.some(identity=>identity.provider==='google');
+    if(!federated||hasWorkspace)return {authorized:true,skipped:true};
     const hasDiscord = session.user.identities?.some(identity => identity.provider === 'discord');
     if (!hasDiscord) return { authorized:true, skipped:true };
     // A cached user id does not prove this particular login was verified.
