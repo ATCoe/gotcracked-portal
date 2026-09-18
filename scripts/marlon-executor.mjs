@@ -2,6 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import {
+  MAX_PLANNER_ATTEMPTS,
+  classifyAutonomousWork,
+  investigationRequest,
+  isRecipeBlocker,
+  retryDelay
+} from './marlon-autonomy-policy.mjs';
 
 const AUDIENCE='gotcracked-marlon-executor';
 const BRIDGE='https://uvpmmbioerejeyybfntb.supabase.co/functions/v1/marlon-executor-bridge';
@@ -73,6 +80,10 @@ function protectedTicket(ticket){
   const raw=[ticket.title,ticket.description,ticket.category,ticket.surface,JSON.stringify(ticket.context||{})].join(' ').toLowerCase();
   const status=String(ticket.context?.status||'');
   return ['401','403'].includes(status) || /\b(authentication|authorization|permission|permissions|rls|payment|billing|secret|credential|schema|migration|deploy|deployment)\b/.test(raw);
+}
+
+function boundedInvestigation(ticket, plan) {
+  return !classifyAutonomousWork(ticket).protected && (isRecipeBlocker(plan) || plan?.outcome === 'blocked');
 }
 
 function auditIntent(ticket){
@@ -192,15 +203,40 @@ async function prepare(){
     const repositoryScope=String(ticket.context?.repository_execution_scope||'').trim();
     const ticketWithHistory=repositoryScope?{...ticket,description:repositoryScope,context:{...(ticket.context||{}),parent_requested_scope:ticket.context?.requested_scope||ticket.description||'',requested_scope:repositoryScope},prior_history:claim.history||[]}:{...ticket,prior_history:claim.history||[]};
     const candidates=candidateFiles(ticketWithHistory);
-    const planned=await post(PLANNER,token,{ticket:ticketWithHistory,candidates});
-    const plan=planned.plan||{};
+    const requiredStages=['inspect','understand','plan','edit','test','release_gate','verify','journal'];
+    if (String(ticket.surface||'') === 'portal' || String(ticket.surface||'') === 'website') requiredStages.splice(5,0,'browser_ui_qa');
+    let planned=await post(PLANNER,token,{ticket:ticketWithHistory,candidates,workflow:'general-purpose-engineering',requiredStages});
+    let plan=planned.plan||{};
+    if (boundedInvestigation(ticketWithHistory, plan)) {
+      for (let attempt=1; attempt<MAX_PLANNER_ATTEMPTS && (!Array.isArray(plan.edits)||plan.edits.length===0); attempt++) {
+        await report(token,runId,'diagnosing',{
+          diagnosis:'The first planner pass requested a bounded investigation; retrying without recipe-only assumptions.',
+          metadata:{bounded_investigation:true,planner_attempt:attempt + 1,retry_delay_ms:retryDelay(attempt)}
+        });
+        await sleep(retryDelay(attempt));
+        planned=await post(PLANNER,token,{
+          ticket:investigationRequest(ticketWithHistory,plan),
+          candidates,
+          workflow:'general-purpose-engineering',
+          investigation:true,
+          requiredStages,
+          attempt:attempt + 1
+        });
+        plan=planned.plan||{};
+      }
+    }
     if(!Array.isArray(plan.edits)||plan.edits.length===0){
       if(String(plan.outcome||'')==='clean'&&auditIntent(ticket)){
         const patchSummary='Audit completed without a deterministic code change requirement.';
         fs.writeFileSync(STATE,JSON.stringify({runId,ticketId:ticket.id,ticketNumber:ticket.ticket_number,baseSha:git('rev-parse','HEAD'),diagnosis:plan.diagnosis||'No deterministic repair was required by the supplied audit evidence.',patchSummary,changedPaths:[],verificationPlan:plan.verification||[],changeSize:'small',featureUpdate:false,architectureImpact:'neutral',preservedCapabilities:Array.isArray(plan.preservedCapabilities)?plan.preservedCapabilities:[],auditOnly:true},null,2));
         output('has_work','true'); output('audit_only','true'); return;
       }
-      await report(token,runId,'blocked',{diagnosis:plan.diagnosis||null,error:plan.blocker||'No deterministic safe patch was produced.',metadata:{prior_history_count:(claim.history||[]).length,outcome:plan.outcome||'blocked'}});
+      const investigation = boundedInvestigation(ticketWithHistory, plan);
+      await report(token,runId, investigation ? 'failed' : 'blocked',{
+        diagnosis:plan.diagnosis||null,
+        error:plan.blocker||'No deterministic safe patch was produced after bounded investigation.',
+        metadata:{prior_history_count:(claim.history||[]).length,outcome:plan.outcome||'blocked',bounded_investigation:investigation,planner_attempts:MAX_PLANNER_ATTEMPTS}
+      });
       output('has_work','false'); return;
     }
     const removed=Array.isArray(plan.removedCapabilities)?plan.removedCapabilities.filter(Boolean):[];
