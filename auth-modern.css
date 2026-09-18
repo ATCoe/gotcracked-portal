@@ -17,10 +17,14 @@
 .login-panel .eyebrow { color: #1dc9ff; letter-spacing: .12em; }
 .login-panel h1 { color: #fff; font-size: 34px; letter-spacing: -.8px; }
 .login-panel .subtle { color: #9eb2ca; margin: 8px 0 25px; }
-.login-panel .discord-button { min-height: 50px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: linear-gradient(135deg,#5865f2,#376cf4); box-shadow: 0 10px 25px rgba(55,108,244,.24); }
-.login-panel .discord-button:hover { background: linear-gradient(135deg,#6672ff,#247bff); }
-.login-panel .google-button { min-height: 50px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; background: #fff; color: #172236; font-weight: 800; box-shadow: 0 10px 25px rgba(0,0,0,.16); }
-.login-panel .google-button:hover { background: #edf5ff; }
+.login-panel .provider-button { display:flex; align-items:center; justify-content:center; gap:11px; width:100%; min-height:48px; border-radius:9px; font-size:13px; font-weight:800; letter-spacing:.01em; transition:background .18s ease,border-color .18s ease,transform .18s ease; }
+.login-panel .provider-button:hover { transform:translateY(-1px); }
+.login-panel .provider-button:focus-visible { outline:2px solid #7dd3fc; outline-offset:3px; }
+.login-panel .provider-logo { width:19px; height:19px; flex:0 0 19px; }
+.login-panel .google-button { margin-bottom:10px; border:1px solid rgba(126,184,255,.46); background:rgba(21,48,79,.7); color:#f2f7ff; box-shadow:0 8px 22px rgba(0,0,0,.16); }
+.login-panel .google-button:hover { background:rgba(28,65,104,.86); border-color:rgba(126,201,255,.75); }
+.login-panel .discord-button { border:1px solid rgba(126,169,255,.42); background:linear-gradient(135deg,rgba(67,82,181,.9),rgba(45,96,190,.9)); color:#fff; box-shadow:0 8px 22px rgba(17,49,124,.22); }
+.login-panel .discord-button:hover { background:linear-gradient(135deg,rgba(80,95,205,.95),rgba(44,112,211,.95)); border-color:rgba(164,190,255,.72); }
 .login-panel .owner-recovery { margin: 22px 0 0; color: #91a6bf; }
 .login-panel .owner-recovery summary { padding: 4px; color: #65b8ff; font-weight: 750; }
 .login-panel .owner-recovery[open] summary { margin-bottom: 18px; }
