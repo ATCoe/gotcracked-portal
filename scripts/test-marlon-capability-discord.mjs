@@ -126,4 +126,18 @@ await verify('non-capability approval becomes planned',async()=>{
   assert.equal(f.proposal.owner_review_state,'approved');assert.equal(f.proposal.status,'planned');
 });
 
+await verify('verifier permission failure is not falsely reported as changed scope',async()=>{
+  const f=fixture({rpcError:true});const r=await f.handler(await f.request('approve'));const body=await r.text();
+  assert.deepEqual(f.counts(),{writes:0,audits:0});
+  assert.match(body,/scope verification is temporarily unavailable/i);
+  assert.doesNotMatch(body,/scope changed|Capability request approved/);
+  assert.equal(f.proposal.owner_review_state,'pending');
+});
+await verify('verification failure cannot deny a request either',async()=>{
+  const f=fixture({rpcError:true});const r=await f.handler(await f.request('deny'));const body=await r.text();
+  assert.deepEqual(f.counts(),{writes:0,audits:0});
+  assert.match(body,/No decision was recorded/);
+  assert.equal(f.proposal.owner_review_state,'pending');
+});
+
 console.log(JSON.stringify({ok:true,passed,operationsSha256:createHash('sha256').update(operationsSource).digest('hex'),interactionsSha256:createHash('sha256').update(interactionsSource).digest('hex'),network:'disabled',productionWrites:0}));
