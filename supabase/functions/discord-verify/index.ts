@@ -30,7 +30,7 @@ Deno.serve(async request=>{
     if(!Array.isArray(claims.amr)||!claims.amr.some((entry:any)=>entry.method==='oauth'))return reply(origin,{authorized:false,error:'Continue with Discord to verify this session.'},403);
     const discordIdentity=user.identities?.find(identity=>identity.provider==='discord');
     const discordId=String(discordIdentity?.identity_data?.provider_id||discordIdentity?.identity_data?.sub||discordIdentity?.id||'');
-    if(!discordId)return reply(origin,{authorized:false,error:'No Discord identity was found.'},403);
+    if(!discordIdentity||!discordId)return reply(origin,{authorized:false,error:'No Discord identity was found.'},403);
 
     const guildId=Deno.env.get('DISCORD_GUILD_ID')!,botToken=Deno.env.get('DISCORD_BOT_TOKEN')!;
     if(!guildId||!botToken)throw new Error('Discord verification is not configured.');
