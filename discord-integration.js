@@ -264,25 +264,7 @@
     notice.append(heading,detail); staffView.insertAdjacentElement('afterend',notice);
   }
 
-  function injectWorkstationEnrollmentUi() {
-    if (document.getElementById('workstation-enroll')) return;
-    const discord=document.getElementById('discord-login');
-    if (!discord) return;
-    const wrap=document.createElement('div'); wrap.className='gc-workstation-enroll-login';
-    const heading=document.createElement('p'); heading.className='gc-shop-setup-heading'; heading.textContent='Set up this shop device';
-    const label=document.createElement('label'); label.className='gc-workstation-label'; label.htmlFor='workstation-device-label'; label.textContent='Computer name';
-    const input=document.createElement('input'); input.id='workstation-device-label'; input.name='workstation-device-label'; input.type='text'; input.maxLength=120; input.autocomplete='off'; input.placeholder='e.g. Front desk, Bench 2, Receiving';
-    const button=document.createElement('button'); button.id='workstation-enroll'; button.type='button'; button.className='secondary-button'; button.textContent='Set up shared shop computer';
-    const kiosk=document.createElement('button'); kiosk.id='kiosk-setup-download'; kiosk.type='button'; kiosk.className='text-button gc-kiosk-login-action'; kiosk.textContent='Download self-service kiosk setup';
-    const note=document.createElement('small'); note.textContent='Owners and managers authorize shared shop computers with Discord. Kiosk setup is prepared only for an approved tablet.';
-    wrap.append(heading,label,input,button,kiosk,note); discord.insertAdjacentElement('afterend',wrap);
-    if (!document.getElementById('gc-workstation-enroll-login-style')) {
-      const style=document.createElement('style'); style.id='gc-workstation-enroll-login-style'; style.textContent='.gc-workstation-enroll-login{display:grid;gap:9px;margin-top:18px;padding-top:18px;border-top:1px solid rgba(143,183,221,.18)}.gc-shop-setup-heading{margin:0;color:#dceafb;font-size:12px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.gc-workstation-label{display:grid;gap:6px;color:#9eb2ca;font-size:12px;font-weight:750}.gc-workstation-label+input{width:100%;min-height:44px}.gc-workstation-enroll-login .secondary-button{width:100%}.gc-kiosk-login-action{justify-self:start;padding:4px 0;color:#79c8ff;font-weight:750}.gc-workstation-enroll-login small{display:block;line-height:1.45;opacity:.72}'; document.head.appendChild(style);
-    }
-  }
-
   function wireUi() {
-    injectWorkstationEnrollmentUi();
     document.querySelector('#google-login')?.addEventListener('click', async event => {
       const button=event.currentTarget; button.disabled=true; button.textContent='Connecting to Google…';
       try { await signInWithGoogle(); }
@@ -293,20 +275,6 @@
       try { await signInWithDiscord(); }
       catch (error) { authMessage(error.message,true); button.disabled=false; button.textContent='Continue with Discord'; }
     });
-    document.querySelector('#workstation-enroll')?.addEventListener('click', async event => {
-      const button=event.currentTarget; const deviceLabel=document.querySelector('#workstation-device-label')?.value?.trim() || 'Shared shop computer'; button.disabled=true; button.textContent='Opening secure authorization…';
-      sessionStorage.setItem(WORKSTATION_INTENT,'1');
-      sessionStorage.setItem(WORKSTATION_REQUEST_LABEL,deviceLabel);
-      try { await signInWithDiscord(); }
-      catch(error){sessionStorage.removeItem(WORKSTATION_INTENT);sessionStorage.removeItem(WORKSTATION_REQUEST_LABEL);authMessage(error.message,true);button.disabled=false;button.textContent='Set up shared shop computer';}
-    });
-    document.querySelector('#kiosk-setup-download')?.addEventListener('click', async event => {
-      const button=event.currentTarget; button.disabled=true; button.textContent='Opening secure authorization…';
-      sessionStorage.setItem(KIOSK_INTENT,'1');
-      try { await signInWithDiscord(); }
-      catch(error){sessionStorage.removeItem(KIOSK_INTENT);authMessage(error.message,true);button.disabled=false;button.textContent='Download self-service kiosk setup';}
-    });
-
     const priorError=sessionStorage.getItem('gc-auth-error');
     if(priorError){authMessage(priorError,true);sessionStorage.removeItem('gc-auth-error');}
     const onboardingMessage=sessionStorage.getItem('gc-onboarding-message');
