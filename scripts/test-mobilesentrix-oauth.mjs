@@ -125,7 +125,7 @@ assert.match(
 );
 assert.match(
   portalIndex,
-  /portal-runtime-loader\.js\?v=20260915-ms-sync-recovery1/,
+  /portal-runtime-loader\.js\?v=20260918-workspace-auth-final1/,
   'The runtime-loader cache key must change with the OAuth callback bootstrap.',
 );
 assert.match(

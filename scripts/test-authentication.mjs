@@ -9,14 +9,14 @@ async function test(name,run){await run();passed++;console.log('PASS',name);}
 const root=new URL('../',import.meta.url);
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 function browserHarness(){
-  const events=[],storageEvents=[],storage=new Map();
+  const events=[],storageEvents=[],storage=new Map(),sessionStore=new Map();
   let now=1700000000000,calls=0,sessionProvider=async()=>({data:{session:null},error:null});
   const client={auth:{getSession:()=>{calls++;return sessionProvider();},getUser:async()=>({data:{user:null}}),onAuthStateChange:f=>events.push(f)},realtime:{setAuth:async()=>{}},functions:{invoke:async()=>({data:null})}};
-  const context={supabase:{createClient:()=>client},localStorage:{getItem:k=>storage.get(k)||null},sessionStorage:{getItem:()=>null},window:{localStorage:{},addEventListener:(e,f)=>{if(e==='storage')storageEvents.push(f)}},document:{getElementById:()=>null},console,AbortController,DOMException,Date:class extends Date{static now(){return now;}},setTimeout:f=>{const t=setTimeout(f,11000);t.unref();return t;},clearTimeout,fetch:async()=>new Response('{}'),CustomEvent:class{}};
+  const context={supabase:{createClient:()=>client},localStorage:{getItem:k=>storage.get(k)||null},sessionStorage:{getItem:key=>sessionStore.get(key)||null,setItem:(key,value)=>sessionStore.set(key,String(value)),removeItem:key=>sessionStore.delete(key)},window:{localStorage:{},addEventListener:(e,f)=>{if(e==='storage')storageEvents.push(f)}},document:{getElementById:()=>null},console,AbortController,DOMException,Date:class extends Date{static now(){return now;}},setTimeout:f=>{const t=setTimeout(f,11000);t.unref();return t;},clearTimeout,fetch:async()=>new Response('{}'),CustomEvent:class{}};
   context.atob=atob;
   context.window.window=context.window;
   vm.runInNewContext(fs.readFileSync(new URL('supabase.js',root),'utf8'),context);
-  return {client,events,storageEvents,storage,now:()=>now,advance:ms=>now+=ms,provider:f=>sessionProvider=f,calls:()=>calls,auth:context.window.GotCrackedAuth};
+  return {client,events,storageEvents,storage,sessionStore,now:()=>now,advance:ms=>now+=ms,provider:f=>sessionProvider=f,calls:()=>calls,auth:context.window.GotCrackedAuth};
 }
 const session=(h,id='staff')=>({access_token:'valid-token',expires_at:h.now()/1000+3600,user:{id}});
 await test('OAuth routing reads session method, not linked identities',()=>{
@@ -26,14 +26,35 @@ await test('OAuth routing reads session method, not linked identities',()=>{
  assert.equal(h.auth.isOAuthSession(token('password')),false);
  assert.equal(h.auth.isOAuthSession({access_token:'broken'}),false);
 });
-await test('Workspace plus linked Discord uses Workspace registration only',async()=>{
- const calls=[];
+await test('OAuth provider proof is captured immediately and can be cleared',()=>{
+ const h=browserHarness(),s={...session(h),provider_token:'synthetic-provider-proof'};
+ h.events.forEach(f=>f('SIGNED_IN',s));
+ assert.equal(h.auth.providerToken({}),'synthetic-provider-proof');
+ assert.equal(h.sessionStore.get('gc-oauth-provider-token'),'synthetic-provider-proof');
+ h.auth.clearProviderProof();
+ assert.equal(h.auth.providerToken({}),'');
+});
+await test('A server-registered human session wins over linked identity guesses',async()=>{
+ const calls=[],removed=[];
  const source=fs.readFileSync(new URL('workflow.js',root),'utf8');
  const routine=source.slice(source.indexOf('  async function prepareHumanSession('),source.indexOf('  async function loadProfile('));
- const context={window:{GotCrackedAuth:{isOAuthSession:()=>true},GotCrackedVerifyDiscord:async()=>{throw Error('Unexpected Discord verification');},supabaseClient:{rpc:async name=>{calls.push(name);return{data:true};},from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:{account_type:'staff'}})})})})}},localSignOut:async()=>{throw Error('Unexpected sign-out');},showLoginError:()=>{}};
+ const context={window:{GotCrackedAuth:{isOAuthSession:()=>true},GotCrackedVerifyDiscord:async()=>{throw Error('Unexpected Discord verification');},supabaseClient:{rpc:async name=>{calls.push(name);return{data:true};},functions:{invoke:async()=>{throw Error('Unexpected provider verification');}}}},sessionStorage:{getItem:()=>null,removeItem:key=>removed.push(key)},localSignOut:async()=>{throw Error('Unexpected sign-out');},showLoginError:()=>{},URL,location:{href:'https://portal.gotcracked.co/'},history:{replaceState(){}}};
  vm.createContext(context);vm.runInContext(routine,context);
  assert.equal(await context.prepareHumanSession({user:{id:'staff',identities:[{provider:'discord'},{provider:'google'}]}}),true);
- assert.deepEqual(calls,['register_google_human_session','portal_session_authorized']);
+ assert.deepEqual(calls,['portal_session_authorized']);
+ assert.ok(removed.includes('gc-oauth-provider'));
+});
+await test('Fresh Workspace OAuth proves the current provider token server-side',async()=>{
+ const calls=[],invocations=[],storage=new Map([['gc-oauth-provider','google'],['gc-staff-invite','invite-token']]);
+ const source=fs.readFileSync(new URL('workflow.js',root),'utf8');
+ const routine=source.slice(source.indexOf('  async function prepareHumanSession('),source.indexOf('  async function loadProfile('));
+ const context={window:{GotCrackedAuth:{isOAuthSession:()=>true},GotCrackedVerifyDiscord:async()=>{throw Error('Unexpected Discord verification');},supabaseClient:{rpc:async name=>{calls.push(name);return{data:false};},functions:{invoke:async(name,options)=>{invocations.push([name,options]);return{data:{authorized:true}};}}}},sessionStorage:{getItem:key=>storage.get(key)||null,removeItem:key=>storage.delete(key)},localSignOut:async()=>{throw Error('Unexpected sign-out');},showLoginError:()=>{},URL,document:{title:'GotCracked Portal'},location:{href:'https://portal.gotcracked.co/?invite=invite-token'},history:{replaceState(){}}};
+ vm.createContext(context);vm.runInContext(routine,context);
+ assert.equal(await context.prepareHumanSession({provider_token:'google-provider-token',user:{id:'staff',identities:[{provider:'discord'},{provider:'google'}]}}),true);
+ assert.deepEqual(calls,['portal_session_authorized']);
+ assert.equal(invocations[0][0],'workspace-verify');
+ assert.equal(invocations[0][1].body.providerToken,'google-provider-token');
+ assert.equal(invocations[0][1].body.inviteToken,'invite-token');
 });
 await test('Expired cached tokens trigger a fresh session lookup',async()=>{
   const h=browserHarness(),s=session(h);h.events.forEach(f=>f('SIGNED_IN',s));

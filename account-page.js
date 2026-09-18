@@ -152,11 +152,16 @@
   async function linkDiscord(button){
     if (button) button.disabled = true;
     try {
+      if(typeof window.GotCrackedLinkDiscordFallback==='function'){
+        await window.GotCrackedLinkDiscordFallback();
+        return;
+      }
+      sessionStorage.setItem('gc-discord-link-started','1');
       const { error } = await client.auth.linkIdentity({
         provider:'discord',
         options:{ redirectTo:`${location.origin}${location.pathname}#profile`, scopes:'identify email' }
       });
-      if (error) throw error;
+      if (error){sessionStorage.removeItem('gc-discord-link-started');throw error;}
     } catch (error) {
       window.GotCrackedDiagnostics?.error?.(error,{context:'Unable to link Discord'});
       if (button) button.disabled = false;

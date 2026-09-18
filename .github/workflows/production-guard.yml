@@ -51,7 +51,7 @@ jobs:
           required_functions = [
               'public-chat','public-intake','public-media','track-repair','staff-invite',
               'create-lead','manage-staff','send-receipt','sync-media',
-              'discord-verify','discord-interactions','custom-pc-build'
+              'discord-verify','workspace-verify','discord-interactions','custom-pc-build'
           ]
           for name in required_functions:
               entry = Path('supabase/functions') / name / 'index.ts'

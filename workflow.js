@@ -50,38 +50,49 @@
   window.GotCrackedPortalAuth={signOut:localSignOut};
 
   async function rejectUntrustedWorkstation(){
-    await localSignOut('This shared workstation is not enrolled or has been revoked. Choose “Set up Front Desk Workstation” and authorize it with an owner or manager Discord account.');
+    await localSignOut('This shared workstation is not enrolled or has been revoked. Choose “Set up Front Desk Workstation” and authorize it with a verified owner or manager Google Workspace or Discord session.');
   }
 
   async function prepareHumanSession(session){
     if(!session)return false;
-    const providers=(session.user?.identities||[]).map(identity=>identity.provider);
-    const hasDiscord=providers.includes('discord');
-    const hasGoogle=providers.includes('google');
     const federated=window.GotCrackedAuth?.isOAuthSession(session)===true;
     if(!federated)return true; // Owner recovery and automation have separate server gates.
-    if(hasDiscord&&!hasGoogle){
+    const current=await window.supabaseClient.rpc('portal_session_authorized');
+    if(!current.error&&current.data===true){
+      sessionStorage.removeItem('gc-oauth-provider');
+      sessionStorage.removeItem('gc-google-auth-started');
+      sessionStorage.removeItem('gc-discord-auth-started');
+      return true;
+    }
+
+    const provider=sessionStorage.getItem('gc-oauth-provider')
+      ||(sessionStorage.getItem('gc-google-auth-started')==='1'?'google':'')
+      ||(sessionStorage.getItem('gc-discord-auth-started')==='1'?'discord':'');
+    if(provider==='discord'){
       const verified=await window.GotCrackedVerifyDiscord?.({force:true});
       if(!verified?.authorized){
         if(!verified?.transient)await localSignOut(verified?.reason||'Discord access could not be verified.');
         else showLoginError('Discord verification is temporarily unavailable. Please retry in a moment.');
         return false;
       }
-    }else if(hasGoogle){
-      const registered=await window.supabaseClient.rpc('register_google_human_session');
-      if(registered.error||registered.data!==true){
-        await localSignOut('This Google Workspace account is not linked to an active GotCracked staff profile. Contact an owner or manager.');
+    }else if(provider==='google'){
+      const inviteToken=sessionStorage.getItem('gc-staff-invite');
+      const providerToken=window.GotCrackedAuth?.providerToken?.(session)||session.provider_token||'';
+      const {data,error}=await window.supabaseClient.functions.invoke('workspace-verify',{body:{inviteToken:inviteToken||null,providerToken}});
+      if(error||!data?.authorized){
+        await localSignOut(data?.error||error?.message||'This Google Workspace account is not authorized for the GotCracked Portal.');
         return false;
       }
-      const {data:googleProfile,error:googleProfileError}=await window.supabaseClient.from('profiles').select('account_type').eq('id',session.user.id).maybeSingle();
-      if(googleProfileError){await localSignOut('Your Google Workspace profile could not be loaded. Contact an owner or manager.');return false;}
-      if(googleProfile?.account_type!=='shared_workstation'){
-        const authorized=await window.supabaseClient.rpc('portal_session_authorized');
-        if(authorized.error||authorized.data!==true){
-          await localSignOut('This Google Workspace account is not an active GotCracked staff account. Contact an owner or manager.');
-          return false;
-        }
-      }
+      sessionStorage.removeItem('gc-staff-invite');
+      sessionStorage.removeItem('gc-google-auth-started');
+      sessionStorage.removeItem('gc-oauth-provider');
+      sessionStorage.removeItem('gc-auth-error');
+      window.GotCrackedAuth?.clearProviderProof?.();
+      const url=new URL(location.href);
+      if(url.searchParams.has('invite')){url.searchParams.delete('invite');history.replaceState({},document.title,url.pathname+(url.searchParams.size?`?${url.searchParams}`:'')+url.hash);}
+    }else{
+      await localSignOut('Choose Google Workspace or Discord to reconnect this OAuth session.');
+      return false;
     }
     return true;
   }
@@ -113,7 +124,7 @@
         }
         const registered=await window.supabaseClient.rpc('register_owner_recovery_session');
         if(registered.error||registered.data!==true){
-          await localSignOut('Owner password access is only available as a verified recovery session. Use Discord for normal Portal access.');
+          await localSignOut('Owner password access is only available as a verified recovery session. Use Google Workspace for normal Portal access, or Discord as fallback.');
           return false;
         }
       }else{
@@ -136,7 +147,7 @@
     loginScreen?.classList.add('hidden');
     document.dispatchEvent(new CustomEvent('gc-portal-authenticated',{detail:staff}));
     if(window.GotCrackedNeedsDiscordLink){
-      const message='Link your individual Discord account in Staff access. Discord is the normal human sign-in method; owner password access is recovery-only.';
+      const message='Link your individual Discord account in Staff access if you want the fallback sign-in. Google Workspace is the primary human sign-in method; owner password access is recovery-only.';
       sessionStorage.setItem('gc-onboarding-message',message);
       document.dispatchEvent(new CustomEvent('gc-onboarding-required',{detail:message}));
       setTimeout(()=>document.querySelector('[data-view="staff"]')?.click(),0);
@@ -205,7 +216,7 @@
     try{
       const {data,error}=await window.supabaseClient.auth.signInWithPassword({email,password});if(error){showLoginError(error.message||'Unable to sign in.');return;}if(!data?.user){showLoginError('Sign-in completed without a user account.');return;}
       const profileCheck=await window.supabaseClient.from('profiles').select('role,account_type').eq('id',data.user.id).maybeSingle();
-      if(profileCheck.error||profileCheck.data?.role!=='owner'||profileCheck.data?.account_type==='shared_workstation'){try{await window.supabaseClient.auth.signOut({scope:'local'});}catch{}showLoginError('Password sign-in is reserved for owner account recovery. Staff use Discord; shared computers use secure workstation enrollment.');return;}
+      if(profileCheck.error||profileCheck.data?.role!=='owner'||profileCheck.data?.account_type==='shared_workstation'){try{await window.supabaseClient.auth.signOut({scope:'local'});}catch{}showLoginError('Password sign-in is reserved for owner account recovery. Staff use Google Workspace first, with Discord as fallback; shared computers use secure workstation enrollment.');return;}
       if(!(await loadProfile(data.user.id,data.session)))return;await loadRepairs();
     }catch(error){showLoginError(error?.message||'An unexpected error occurred while signing in.');}finally{if(submitButton){submitButton.disabled=false;submitButton.textContent='Sign in to portal';}loginInProgress=false;}
   }
