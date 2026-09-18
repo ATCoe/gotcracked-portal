@@ -3,6 +3,17 @@
 // reports booleans/counts only: no tokens, customer records, or user details.
 import fs from 'node:fs';
 
+function loadServiceEnvironment(){
+  // Direct invocations do not inherit systemd's EnvironmentFile. Parse only
+  // simple KEY=VALUE lines and never print the resulting values.
+  try{
+    for(const line of fs.readFileSync(new URL('./.env',import.meta.url),'utf8').split(/\r?\n/)){
+      const match=line.match(/^([A-Z0-9_]+)=(.*)$/);
+      if(match&&!process.env[match[1]]) process.env[match[1]]=match[2].replace(/^['"]|['"]$/g,'');
+    }
+  }catch{}
+}
+loadServiceEnvironment();
 const portalUrl=(process.env.PORTAL_URL||'https://portal.gotcracked.co').replace(/\/$/,'');
 const supabaseUrl=(process.env.SUPABASE_URL||'').replace(/\/$/,'');
 const serviceKey=process.env.SUPABASE_SERVICE_ROLE_KEY||'';
