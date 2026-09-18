@@ -62,7 +62,11 @@ Deno.serve(async request => {
       const fullFingerprint=String(pending.data.proposal_fingerprint||'');
       if (!fullFingerprint || fullFingerprint.slice(0,12) !== fingerprint) return response('Marlon request fingerprint mismatch. Review the current request before deciding.');
       const recomputed=await admin.rpc('marlon_improvement_fingerprint',{p_surface:pending.data.surface,p_title:pending.data.title,p_description:pending.data.description});
-      if (recomputed.error || recomputed.data !== fullFingerprint) return response('Marlon request scope changed. Review the current request before deciding.');
+      if (recomputed.error) {
+        console.error('discord-interactions: proposal scope verifier unavailable (details redacted)');
+        return response('Marlon request scope verification is temporarily unavailable. No decision was recorded. Please try again after the service is restored.');
+      }
+      if (recomputed.data !== fullFingerprint) return response('Marlon request scope changed. Review the current request before deciding.');
       const capability=pending.data.evidence?.capability_required===true;
       const patch=action==='approve'
         ? {owner_review_state:'approved',owner_review_decided_at:new Date().toISOString(),owner_review_decided_by:staff.data.id,status:capability?'new':'planned'}
