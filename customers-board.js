@@ -9,6 +9,7 @@
     data:null,
     selectedId:null,
     search:'',
+    restoreSearchFocus:false,
     loading:false,
     requestId:0
   };
@@ -216,7 +217,11 @@
       <section class="gc-customer-list-card"><div class="gc-customer-toolbar"><div class="gc-customer-search"><span>⌕</span><input data-customer-search type="search" value="${esc(state.search)}" placeholder="Search customer, phone, email, device, serial, IMEI, or GC ticket" aria-label="Search customer, phone, email, device, serial, IMEI, or GC ticket"></div><span class="subtle">${Number(data.total)||0} result${Number(data.total)===1?'':'s'}</span></div><div class="gc-customer-results"><div class="gc-customer-row gc-customer-columns"><span>Customer</span><span>Location / contact</span><span>Devices</span><span>Open work</span><span>Last activity</span></div>${rows.map(customerRow).join('')||'<div class="gc-customer-empty"><strong>No matching customers.</strong><p>Try a different name, phone number, email, device, or ticket number.</p></div>'}</div></section>
     </div>`;
     const input=target.querySelector('[data-customer-search]');
-    if(input&&document.activeElement?.dataset?.customerSearch!==undefined){input.focus();input.setSelectionRange(input.value.length,input.value.length);}
+    if(input&&state.restoreSearchFocus){
+      input.focus();
+      input.setSelectionRange(input.value.length,input.value.length);
+      state.restoreSearchFocus=false;
+    }
   }
 
   function customerRow(c){
@@ -346,6 +351,7 @@
     const input=event.target instanceof Element?event.target.closest('[data-customer-search]'):null;
     if(!input)return;
     state.search=input.value;
+    state.restoreSearchFocus=true;
     clearTimeout(searchTimer);
     searchTimer=setTimeout(()=>load({selectedId:null,quiet:true}),220);
   });
