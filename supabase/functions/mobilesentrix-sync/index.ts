@@ -11,6 +11,7 @@ const PORTAL_ORIGIN = "https://portal.gotcracked.co";
 const SOURCE_NAME = "mobilesentrix";
 const DEFAULT_API_BASE = "https://www.mobilesentrix.com";
 const DEFAULT_CATALOG_PATH = "/api/rest/products";
+const AURORA_RELAY = "https://auroraserver.tail317407.ts.net/internal/mobilesentrix-relay";
 const MAX_CSV_BYTES = 8_000_000;
 const MAX_CSV_ROWS = 25_000;
 
@@ -37,10 +38,30 @@ const slug = (value: unknown) =>
 
 const cents = (value: unknown) => {
   const number = Number(String(value ?? "").replace(/[$,]/g, ""));
-  return Number.isFinite(number) && number >= 0
-    ? Math.round(number * 100)
+  if (!Number.isFinite(number) || number < 0) return null;
+  const rounded = Math.round(number * 100);
+  return Number.isSafeInteger(rounded) && rounded <= 2_147_483_647
+    ? rounded
     : null;
 };
+
+function diagnosticError(error: unknown, fallback: string) {
+  const values: unknown[] = [];
+  if (error instanceof Error) values.push(error.message);
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    values.push(record.message, record.details, record.hint, record.code);
+  } else {
+    values.push(error);
+  }
+  const message = values
+    .map((value) => clean(value))
+    .filter((value) => value && value !== "[object Object]")
+    .join(" · ")
+    .replace(/(authorization|token|secret|key)\s*[:=]\s*["']?[^"',\s}]+/gi, "$1=[REDACTED]")
+    .slice(0, 600);
+  return message || fallback;
+}
 
 function textValue(value: unknown): string {
   if (value == null) return "";
@@ -369,7 +390,7 @@ function totalCount(json: any, headers: Headers, fallback: number | null) {
   ];
   for (const value of candidates) {
     const number = Number(value);
-    if (Number.isFinite(number) && number >= 0) return number;
+    if (Number.isFinite(number) && number > 0) return number;
   }
   return fallback;
 }
@@ -554,6 +575,36 @@ async function authHeaders(
   return headers;
 }
 
+async function relayVendorRequest(
+  portalAuthorization: string,
+  url: URL,
+  vendorHeaders: Record<string, string>,
+) {
+  const relay = await fetch(AURORA_RELAY, {
+    method: "POST",
+    headers: {
+      Authorization: portalAuthorization,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      method: "GET",
+      path: `${url.pathname}${url.search}`,
+      vendorHeaders,
+      body: "",
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const payload = await relay.json().catch(() => null);
+  if (!payload || !Number.isFinite(Number(payload.status))) {
+    throw new Error(payload?.error || `AuroraServer MobileSentrix relay failed (HTTP ${relay.status}).`);
+  }
+  return new Response(String(payload.text || ""), {
+    status: Number(payload.status),
+    headers: { "Content-Type": String(payload.contentType || "") },
+  });
+}
+
 function apiUrl(
   base: string,
   path: string,
@@ -634,31 +685,62 @@ function withoutSyncRun(config: any) {
   return next;
 }
 
+function inFilterChunks(values: string[], maxEncodedChars = 2_800, maxItems = 25) {
+  const chunks: string[][] = [];
+  let chunk: string[] = [];
+  let encodedChars = 0;
+  for (const value of values) {
+    const text = clean(value);
+    if (!text) continue;
+    const cost = encodeURIComponent(text).length + 3;
+    if (chunk.length && (chunk.length >= maxItems || encodedChars + cost > maxEncodedChars)) {
+      chunks.push(chunk);
+      chunk = [];
+      encodedChars = 0;
+    }
+    chunk.push(text);
+    encodedChars += cost;
+  }
+  if (chunk.length) chunks.push(chunk);
+  return chunks;
+}
+
 async function persistBatch(
   admin: any,
   normalized: any[],
   syncStarted: string,
 ) {
-  const deduped = [
+  const canonicalDeduped = [
     ...new Map(
       normalized
         .filter((item) => item.canonicalKey && item.name && item.sourceUrl)
         .map((item) => [item.canonicalKey, item]),
     ).values(),
   ];
+  const seenSourceUrls = new Set<string>();
+  const deduped = canonicalDeduped.filter((item) => {
+    const sourceUrl = clean(item.sourceUrl);
+    if (!sourceUrl || seenSourceUrls.has(sourceUrl)) return false;
+    seenSourceUrls.add(sourceUrl);
+    return true;
+  });
   if (!deduped.length) {
     return { seen: 0, newParts: 0, changed: 0, priceObservations: 0 };
   }
 
   const keys = deduped.map((item) => item.canonicalKey);
-  const existingResult = await admin
-    .from("parts_registry")
-    .select("id,canonical_key")
-    .in("canonical_key", keys);
-  if (existingResult.error) throw existingResult.error;
+  const existingRows: any[] = [];
+  for (const keyChunk of inFilterChunks(keys, 2_800, 40)) {
+    const existingResult = await admin
+      .from("parts_registry")
+      .select("id,canonical_key")
+      .in("canonical_key", keyChunk);
+    if (existingResult.error) throw existingResult.error;
+    existingRows.push(...(existingResult.data || []));
+  }
 
   const existing = new Map(
-    (existingResult.data || []).map((row: any) => [row.canonical_key, row.id]),
+    existingRows.map((row: any) => [row.canonical_key, row.id]),
   );
   const partRows = deduped.map((item) => ({
     canonical_key: item.canonicalKey,
@@ -720,15 +802,19 @@ async function persistBatch(
   }));
 
   const sourceUrls = listingRows.map((row) => row.source_url);
-  const priorResult = await admin
-    .from("part_source_listings")
-    .select("id,source_url,price_cents,availability")
-    .eq("source_name", SOURCE_NAME)
-    .in("source_url", sourceUrls);
-  if (priorResult.error) throw priorResult.error;
+  const priorRows: any[] = [];
+  for (const urlChunk of inFilterChunks(sourceUrls, 2_800, 20)) {
+    const priorResult = await admin
+      .from("part_source_listings")
+      .select("id,source_url,price_cents,availability")
+      .eq("source_name", SOURCE_NAME)
+      .in("source_url", urlChunk);
+    if (priorResult.error) throw priorResult.error;
+    priorRows.push(...(priorResult.data || []));
+  }
 
   const priorMap = new Map<string, any>(
-    (priorResult.data || []).map((row: any) => [row.source_url, row]),
+    priorRows.map((row: any) => [row.source_url, row]),
   );
   let changed = 0;
   for (const row of listingRows) {
@@ -1073,8 +1159,7 @@ Deno.serve(async (request) => {
         authoritative,
       });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "CSV import failed";
+      const message = diagnosticError(error, "CSV import failed");
       await markSource(admin, {
         last_status: "error",
         last_completed_at: new Date().toISOString(),
@@ -1118,11 +1203,11 @@ Deno.serve(async (request) => {
       try {
         const url = apiUrl(base, path, config, 1, pageSize);
         const headers = await authHeaders(config, savedSecret, "GET", url);
-        const vendorResponse = await fetch(url.toString(), {
-          method: "GET",
+        const vendorResponse = await relayVendorRequest(
+          authorization,
+          url,
           headers,
-          redirect: "follow",
-        });
+        );
         const text = await vendorResponse.text();
         if (!vendorResponse.ok) {
           throw new Error(
@@ -1160,10 +1245,7 @@ Deno.serve(async (request) => {
             .map(({ raw, ...rest }: any) => rest),
         });
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "MobileSentrix API test failed";
+        const message = diagnosticError(error, "MobileSentrix API test failed");
         await markSource(admin, {
           last_status: "error",
           last_completed_at: new Date().toISOString(),
@@ -1232,11 +1314,11 @@ Deno.serve(async (request) => {
       ) {
         const url = apiUrl(base, path, config, page, pageSize);
         const headers = await authHeaders(config, savedSecret, "GET", url);
-        const vendorResponse = await fetch(url.toString(), {
-          method: "GET",
+        const vendorResponse = await relayVendorRequest(
+          authorization,
+          url,
           headers,
-          redirect: "follow",
-        });
+        );
         const text = await vendorResponse.text();
         if (!vendorResponse.ok) {
           throw new Error(
@@ -1362,10 +1444,7 @@ Deno.serve(async (request) => {
         emptyCatalogProtected,
       });
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "MobileSentrix API sync failed";
+      const message = diagnosticError(error, "MobileSentrix API sync failed");
       const errorConfig = {
         ...config,
         sync_run_started_at: runStarted,
