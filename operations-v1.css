@@ -25,7 +25,7 @@
 .v1-table tbody tr{cursor:pointer}
 .v1-table tbody tr:hover{background:#f7fbff}
 .v1-table td strong{display:block;color:#15283c}
-.v1-table td small{display:block;margin-top:2px;color:#77889a}
+.v1-table td small{display:block;margin-top:2px;color:#526579}
 .v1-status{display:inline-flex;align-items:center;gap:6px;max-width:220px;padding:5px 9px;border-radius:999px;background:#eef3f8;color:#40556b;font-size:.72rem;font-weight:800;white-space:normal}
 .v1-status::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.7}
 .v1-status.need_to_contact,.v1-status.need_to_order_part,.v1-status.need_to_order_parts,.v1-status.awaiting_repair{background:#fde8e7;color:#b42318}
