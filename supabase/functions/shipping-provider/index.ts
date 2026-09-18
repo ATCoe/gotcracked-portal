@@ -80,7 +80,7 @@ Deno.serve(async request => {
 
   const settingsResult=await admin.from('business_settings').select('location_id,shipping_provider,shipping_provider_secret_id,shipping_provider_mode,shipping_default_parcel,shipping_require_label_confirmation,shipping_return_address,default_shipping_carrier,device_shipping_preference').eq('location_id',profile.location_id).maybeSingle();
   if(settingsResult.error) return response({ok:false,error:settingsResult.error.message},500);
-  const settings=settingsResult.data||{};
+  const settings:{shipping_provider?:string;shipping_provider_secret_id?:string|null;shipping_provider_mode?:string;shipping_default_parcel?:Record<string,unknown>;shipping_require_label_confirmation?:boolean;shipping_return_address?:Record<string,unknown>;device_shipping_preference?:string}=settingsResult.data||{};
 
   if(action==='status') return response({ok:true,status:{provider:settings.shipping_provider||'easypost',mode:settings.shipping_provider_mode||'test',hasCredentials:Boolean(settings.shipping_provider_secret_id),defaultParcel:settings.shipping_default_parcel||{length:10,width:8,height:4,weight_oz:32},confirmationRequired:settings.shipping_require_label_confirmation!==false,preference:settings.device_shipping_preference||'balanced'}});
 

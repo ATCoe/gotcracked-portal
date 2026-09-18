@@ -69,7 +69,7 @@ async function metrics(locationId: string) {
   if (connectionResult.error) throw connectionResult.error;
   if (!connectionResult.data) return { connected:false };
   const accessToken = await refreshAccessToken(connectionResult.data.refresh_token);
-  const settings = settingsResult.data || {};
+  const settings: {google_search_console_property?:string|null;google_analytics_property_id?:string|null} = settingsResult.data || {};
   const grantedScopes = Array.isArray(connectionResult.data.scopes) ? connectionResult.data.scopes : [];
   const end = new Date(); end.setUTCDate(end.getUTCDate()-1);
   const start = new Date(end); start.setUTCDate(start.getUTCDate()-27);
