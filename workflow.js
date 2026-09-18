@@ -66,6 +66,11 @@
         return false;
       }
     }else if(hasGoogle){
+      const registered=await window.supabaseClient.rpc('register_google_human_session');
+      if(registered.error||registered.data!==true){
+        await localSignOut('This Google Workspace account is not linked to an active GotCracked staff profile. Contact an owner or manager.');
+        return false;
+      }
       const authorized=await window.supabaseClient.rpc('portal_session_authorized');
       if(authorized.error||authorized.data!==true){
         await localSignOut('This Google Workspace account is not an active GotCracked staff account. Contact an owner or manager.');
