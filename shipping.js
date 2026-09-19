@@ -43,10 +43,10 @@
             return `<button class="shipping-row" data-ticket="${ticket.ticket_number}"><span class="shipping-status status-${esc(ticket.shipping_status)}">${esc(friendly(ticket.shipping_status))}</span><span class="row-main"><strong>GC-${String(ticket.ticket_number).padStart(6, '0')} · ${esc([ticket.customers?.first_name, ticket.customers?.last_name].filter(Boolean).join(' ') || 'Customer')}</strong><small>${esc([ticket.devices?.manufacturer, ticket.devices?.model].filter(Boolean).join(' ') || 'Device')} · ${esc(addressText(ticket.shipping_address) || 'Return address needed')}</small></span><span class="tracking-links">${inbound ? `<a href="${inbound}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Inbound ↗</a>` : ''}${outbound ? `<a href="${outbound}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Outbound ↗</a>` : ''}</span><em>›</em></button>`;
           }).join('') : '<p class="empty-state">No mail-in repair tickets yet.</p>'}</div>
         </article>
-        <aside class="shipping-side">
+        <div class="shipping-side">
           <article class="card"><div class="card-title"><div><h2>New mail-in requests</h2><p>Qualify these leads before the customer ships.</p></div></div>${waitingLeads.map(lead => `<button class="shipping-lead" data-lead-id="${lead.id}"><span class="status ${esc(lead.status)}">${esc(friendly(lead.status))}</span><span><strong>${esc(lead.name)}</strong><small>${esc(lead.device_model || lead.service || 'Device repair')}</small></span><em>›</em></button>`).join('') || '<p class="empty-state">No open mail-in requests.</p>'}</article>
           <article class="card shipping-tools"><h2>Carrier tools</h2><p class="subtle">Create labels with your selected carrier, then save the tracking number on the repair.</p><a href="https://ship.pirateship.com/" target="_blank" rel="noopener">Pirate Ship ↗</a><a href="https://www.usps.com/ship/" target="_blank" rel="noopener">USPS ↗</a><a href="https://www.ups.com/ship" target="_blank" rel="noopener">UPS ↗</a><a href="https://www.fedex.com/en-us/shipping.html" target="_blank" rel="noopener">FedEx ↗</a></article>
-        </aside>
+        </div>
       </section>`;
   }
 
