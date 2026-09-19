@@ -29,11 +29,23 @@
   };
   const today = () => isoDate(new Date());
   const host = () => document.getElementById('appointments');
+  const ensureApptAccessibility = () => {
+    const dayHead = document.querySelectorAll('.gc-appt-day-head > span');
+    dayHead.forEach(el => {
+      if (!el.style.color || el.style.color === 'rgb(105, 117, 134)') el.style.color = '#47586c';
+    });
+    const filter = document.querySelector('select[data-appt-filter]');
+    if (filter && !filter.getAttribute('aria-label')) filter.setAttribute('aria-label', 'Appointment status filter');
+    const search = document.querySelector('input[data-appt-search]');
+    if (search && !search.getAttribute('aria-label')) search.setAttribute('aria-label', 'Search appointments');
+  };
 
   function timezone(){ return state.data?.timezone || 'America/New_York'; }
   function formatDate(value,options={weekday:'short',month:'short',day:'numeric'}){
     if(!value)return'';
-    return new Intl.DateTimeFormat('en-US',options).format(parseDate(value));
+    const formatted = new Intl.DateTimeFormat('en-US',options).format(parseDate(value));
+    if (window.requestAnimationFrame) requestAnimationFrame(ensureApptAccessibility);
+    return formatted;
   }
   function partsInZone(value){
     if(!value)return null;
