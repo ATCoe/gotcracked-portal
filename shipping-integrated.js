@@ -12,6 +12,19 @@
   function style(){if(document.getElementById('gc-integrated-shipping-style'))return;const s=document.createElement('style');s.id='gc-integrated-shipping-style';s.textContent=`
     .gc-ship-integrated{margin-bottom:16px}.gc-ship-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.gc-ship-badge{display:inline-flex;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:900}.gc-ship-badge.good{background:#e8f8ef;color:#176f4b}.gc-ship-badge.warn{background:#fff2cf;color:#8c6500}.gc-ship-form{display:grid;grid-template-columns:1.1fr 2fr repeat(4,1fr) auto;gap:9px;align-items:end;margin-top:14px}.gc-ship-form label{display:grid;gap:5px}.gc-ship-rates{display:grid;gap:8px;margin-top:12px}.gc-ship-rate{display:grid;grid-template-columns:1fr 1fr 100px 120px;gap:10px;align-items:center;border:1px solid var(--line,#dce5ec);border-radius:12px;padding:10px}.gc-ship-rate small{display:block;opacity:.66}.gc-ship-history{display:grid;gap:8px;margin-top:14px}.gc-ship-history-row{display:grid;grid-template-columns:1.2fr .9fr .8fr auto;gap:10px;align-items:center;border-top:1px solid var(--line,#e2e8ed);padding-top:10px}.gc-ship-history-row small{display:block;opacity:.68}.gc-ship-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.gc-ship-settings-grid label{display:grid;gap:5px}.gc-ship-note{font-size:12px;opacity:.72}@media(max-width:980px){.gc-ship-form{grid-template-columns:1fr 1fr}.gc-ship-form label:nth-child(2){grid-column:1/-1}.gc-ship-rate,.gc-ship-history-row{grid-template-columns:1fr 1fr}}@media(max-width:560px){.gc-ship-form,.gc-ship-rate,.gc-ship-history-row,.gc-ship-settings-grid{grid-template-columns:1fr}.gc-ship-form label:nth-child(2){grid-column:auto}}`;document.head.appendChild(s)}
 
+  function renderLoadError(error){
+    style();
+    const message=esc(error?.message||'Integrated shipping could not be loaded.');
+    if(location.hash.startsWith('#shipping')){
+      const workspace=document.getElementById('shipping-workspace');
+      if(workspace){document.getElementById('gc-integrated-shipping')?.remove();workspace.insertAdjacentHTML('afterbegin',`<article id="gc-integrated-shipping" class="card gc-ship-integrated" role="alert"><div class="card-title"><div><p class="eyebrow">Integrated shipping</p><h2>Carrier tools could not be loaded.</h2><p>${message}</p></div></div><button class="secondary-button" type="button" data-integrated-shipping-retry>Retry</button></article>`);}
+    }
+    if(location.hash.startsWith('#settings')){
+      const host=document.getElementById('settings');
+      if(host){document.getElementById('gc-shipping-provider-settings')?.remove();host.insertAdjacentHTML('beforeend',`<section id="gc-shipping-provider-settings"><article class="card" role="alert" style="margin-top:18px"><div class="card-title"><div><p class="eyebrow">Integrated shipping</p><h2>Shipping provider settings could not be loaded.</h2><p>${message}</p></div></div><button class="secondary-button" type="button" data-integrated-shipping-retry>Retry</button></article></section>`);}
+    }
+  }
+
   async function loadBase(){
     state.profile=currentProfile();if(!state.profile?.location_id)return;
     const loc=state.profile.location_id;
@@ -23,7 +36,9 @@
       client.rpc('has_permission',{permission_key:'settings.manage'})
     ]);
     if(tickets.error)throw tickets.error;if(leads.error)throw leads.error;if(shipments.error)throw shipments.error;
-    state.status=status.status;state.tickets=tickets.data||[];state.leads=leads.data||[];state.shipments=shipments.data||[];state.settingsCanManage=state.profile.role==='owner'||settingsPerm.data===true;renderShipping();renderSettings();
+    if(settingsPerm.error){state.settingsCanManage=false;window.GotCrackedDiagnostics?.error?.(settingsPerm.error,{context:'Shipping settings permission check failed'});}
+    else state.settingsCanManage=state.profile.role==='owner'||settingsPerm.data===true;
+    state.status=status.status;state.tickets=tickets.data||[];state.leads=leads.data||[];state.shipments=shipments.data||[];renderShipping();renderSettings();
   }
 
   function targetOptions(){
@@ -60,7 +75,7 @@
   async function saveSettings(form){const status=form.querySelector('.auth-message'),fd=new FormData(form);status.textContent='Saving encrypted shipping settings…';try{const data=await invoke('configure',{api_key:fd.get('api_key'),mode:fd.get('mode'),default_parcel:{length:Number(fd.get('length')),width:Number(fd.get('width')),height:Number(fd.get('height')),weight_oz:Number(fd.get('weight_oz'))}});status.textContent=data.hasCredentials?'Shipping connection saved. Label purchase still requires manual confirmation.':'Shipping defaults saved. Add an EasyPost API key to enable live rates.';await loadBase()}catch(error){status.textContent=error.message||'Unable to save shipping settings.'}}
 
   document.addEventListener('submit',event=>{if(event.target?.id==='gc-ship-rate-form'){event.preventDefault();void getRates(event.target)}else if(event.target?.id==='gc-shipping-provider-form'){event.preventDefault();void saveSettings(event.target)}});
-  document.addEventListener('click',event=>{const t=event.target instanceof Element?event.target:null;if(!t)return;const buy=t.closest('[data-gc-buy-rate]');if(buy)return void buyRate(buy);const shipped=t.closest('[data-gc-mark-shipped]');if(shipped)return void markShipped(shipped.dataset.gcMarkShipped)});
-  const maybe=()=>{if(location.hash.startsWith('#shipping')||location.hash.startsWith('#settings'))setTimeout(()=>void loadBase().catch(error=>console.warn('Integrated shipping failed to load',error)),140)};document.addEventListener('gc-view-changed',maybe);window.addEventListener('hashchange',maybe);window.addEventListener('gotcracked:staff-ready',maybe);const obs=new MutationObserver(()=>{if(location.hash.startsWith('#shipping')&&!document.getElementById('gc-integrated-shipping')&&state.status)renderShipping();if(location.hash.startsWith('#settings')&&!document.getElementById('gc-shipping-provider-settings')&&state.settingsCanManage)renderSettings()});obs.observe(document.body,{childList:true,subtree:true});maybe();
+  document.addEventListener('click',event=>{const t=event.target instanceof Element?event.target:null;if(!t)return;if(t.closest('[data-integrated-shipping-retry]'))return void loadBase().catch(error=>{renderLoadError(error);window.GotCrackedDiagnostics?.error?.(error,{context:'Integrated shipping could not load'});});const buy=t.closest('[data-gc-buy-rate]');if(buy)return void buyRate(buy);const shipped=t.closest('[data-gc-mark-shipped]');if(shipped)return void markShipped(shipped.dataset.gcMarkShipped)});
+  const maybe=()=>{if(location.hash.startsWith('#shipping')||location.hash.startsWith('#settings'))setTimeout(()=>void loadBase().catch(error=>{console.error('Integrated shipping failed to load',error);renderLoadError(error);window.GotCrackedDiagnostics?.error?.(error,{context:'Integrated shipping could not load'});}),140)};document.addEventListener('gc-view-changed',maybe);window.addEventListener('hashchange',maybe);window.addEventListener('gotcracked:staff-ready',maybe);const obs=new MutationObserver(()=>{if(location.hash.startsWith('#shipping')&&!document.getElementById('gc-integrated-shipping')&&state.status)renderShipping();if(location.hash.startsWith('#settings')&&!document.getElementById('gc-shipping-provider-settings')&&state.settingsCanManage)renderSettings()});obs.observe(document.body,{childList:true,subtree:true});maybe();
   window.GotCrackedIntegratedShipping={version:'1.1.0',state,load:loadBase};
 })();
