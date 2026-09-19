@@ -8,6 +8,12 @@ const registry = read('parts-registry.js');
 const analytics = read('analytics.js');
 const shipping = read('shipping.js');
 const inventory = read('inventory-command-center.js');
+const pricing = read('pricing-settings.js');
+const staff = read('staff-profiles.js');
+const workstation = read('workstation-admin.js');
+const procurement = read('procurement-settings.js');
+const integratedShipping = read('shipping-integrated.js');
+const mobileSentrix = read('mobilesentrix-integration.js');
 
 for (const fragment of [
   'id="repair-search" aria-label="Search repair tickets"',
@@ -65,6 +71,42 @@ for (const fragment of [
   'type="submit">Receive package</button>'
 ]) assert.ok(inventory.includes(fragment), `Missing Inventory release guard: ${fragment}`);
 
+for (const fragment of [
+  'Pricing settings could not be loaded.',
+  'data-pricing-settings-retry',
+  "const failed=[['business settings',business],['inventory',parts],['repair guides',refs],['labor basis',basis]].find"
+]) assert.ok(pricing.includes(fragment), `Missing Pricing release guard: ${fragment}`);
+
+for (const fragment of [
+  'Staff profiles could not load',
+  'compensationError',
+  'No pay values are being inferred or shown.',
+  'data-staff-profiles-retry'
+]) assert.ok(staff.includes(fragment), `Missing Staff release guard: ${fragment}`);
+
+for (const fragment of [
+  'Trusted workstations could not be loaded.',
+  'data-retry-workstations'
+]) assert.ok(workstation.includes(fragment), `Missing workstation release guard: ${fragment}`);
+
+for (const fragment of [
+  'Procurement settings could not be loaded.',
+  'data-procurement-retry',
+  ".select('marlon_auto_prepare_orders').maybeSingle()"
+]) assert.ok(procurement.includes(fragment), `Missing procurement release guard: ${fragment}`);
+
+for (const fragment of [
+  'Carrier tools could not be loaded.',
+  'Shipping provider settings could not be loaded.',
+  'data-integrated-shipping-retry'
+]) assert.ok(integratedShipping.includes(fragment), `Missing integrated Shipping release guard: ${fragment}`);
+
+for (const fragment of [
+  'MobileSentrix settings could not be loaded.',
+  'data-ms-refresh',
+  'if(account.error)throw account.error'
+]) assert.ok(mobileSentrix.includes(fragment), `Missing MobileSentrix release guard: ${fragment}`);
+
 console.log(JSON.stringify({
   ok: true,
   checks: [
@@ -77,6 +119,12 @@ console.log(JSON.stringify({
     'range-scoped repair export',
     'accessible sales trend',
     'Shipping fail-visible data loading and deep links',
-    'Inventory fail-visible data loading and explicit controls'
+    'Inventory fail-visible data loading and explicit controls',
+    'Pricing fail-visible complete data loading',
+    'Staff profile and compensation error integrity',
+    'trusted-workstation visible failure state',
+    'procurement save confirmation and visible failure',
+    'integrated shipping visible failure state',
+    'MobileSentrix account and load integrity'
   ]
 }));
