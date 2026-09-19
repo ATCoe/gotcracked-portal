@@ -6,7 +6,7 @@
   if (!client) return;
 
   const VERSION = '20260828-compensation2';
-  const state = {profiles:[], compensation:[], selected:null, canManage:false, canManagePay:false, busy:false, previewUrl:null};
+  const state = {profiles:[], compensation:[], compensationError:null, selected:null, canManage:false, canManagePay:false, busy:false, previewUrl:null, loadError:null};
 
   const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
@@ -21,6 +21,7 @@
   const payFor = id => state.compensation.find(x => x.profile_id === id) || null;
   function paySummaryMarkup(p) {
     if (!state.canManagePay) return '';
+    if(state.compensationError)return `<article class="gc-profile-bio" role="alert"><h2>Compensation</h2><p>Compensation data could not be loaded. No pay values are being inferred or shown.</p></article>`;
     const pay=payFor(p.id), type=pay?.employment_type || (p.role==='owner'?'owner':'hourly');
     let amount='Not set';
     if(type==='hourly') amount=pay?.hourly_rate_cents>0?`${dollars(pay.hourly_rate_cents)}/hr`:'Not set';
@@ -115,36 +116,60 @@
     return d;
   }
 
+  function renderLoadError(error){
+    state.loadError=error;
+    ensureProfileView();
+    const message=esc(error?.message||'Staff profiles could not be loaded.');
+    const profileHost=document.getElementById('gc-profile-view');
+    if(profileHost)profileHost.innerHTML=`<div class="empty-card" role="alert"><h2>Staff profile unavailable</h2><p>${message}</p><button class="secondary-button" type="button" data-staff-profiles-retry>Retry</button></div>`;
+    const staff=document.getElementById('staff');
+    if(staff){
+      let host=document.getElementById('gc-staff-profiles');
+      if(!host){host=document.createElement('section');host.id='gc-staff-profiles';host.className='card gc-staff-profiles';staff.appendChild(host);}
+      host.innerHTML=`<div class="empty-card" role="alert"><h2>Employee profiles could not be loaded.</h2><p>${message}</p><button class="secondary-button" type="button" data-staff-profiles-retry>Retry</button></div>`;
+    }
+  }
+
   async function load() {
-    const p = current();
-    if (!p?.location_id) return;
+    const p=current();
+    if(!p?.location_id)return;
+    state.loadError=null;
 
-    const perm = await client.rpc('has_permission', {permission_key:'staff.manage'});
-    state.canManage = Boolean(perm.data);
-    state.canManagePay = current()?.role === 'owner';
+    const perm=await client.rpc('has_permission',{permission_key:'staff.manage'});
+    if(perm.error){
+      state.canManage=p.role==='owner';
+      window.GotCrackedDiagnostics?.error?.(perm.error,{context:'Staff permission check failed'});
+    }else state.canManage=p.role==='owner'||Boolean(perm.data);
+    state.canManagePay=p.role==='owner';
 
-    const {data, error} = await client
+    const {data,error}=await client
       .from('profiles')
       .select('id,location_id,display_name,role,active,avatar_url,job_title,phone,bio,discord_user_id,discord_username,recovery_email,portal_email,onboarding_status,discord_invite_expires_at,created_at,updated_at')
-      .eq('location_id', p.location_id)
+      .eq('location_id',p.location_id)
       .order('display_name');
 
-    if (error) {
-      console.warn('Staff profiles unavailable:', error.message);
+    if(error){
+      console.error('Staff profiles unavailable:',error);
+      renderLoadError(error);
+      window.GotCrackedDiagnostics?.error?.(error,{context:'Staff profiles could not load'});
       return;
     }
 
-    state.profiles = data || [];
-    if (state.canManagePay) {
-      const pay = await client.from('staff_compensation').select('*').eq('location_id', p.location_id);
-      if (pay.error) console.warn('Staff compensation unavailable:', pay.error.message);
-      state.compensation = pay.data || [];
-    } else state.compensation = [];
+    state.profiles=data||[];
+    state.compensationError=null;
+    if(state.canManagePay){
+      const pay=await client.from('staff_compensation').select('*').eq('location_id',p.location_id);
+      if(pay.error){
+        state.compensationError=pay.error;
+        state.compensation=[];
+        window.GotCrackedDiagnostics?.error?.(pay.error,{context:'Staff compensation could not load'});
+      }else state.compensation=pay.data||[];
+    }else state.compensation=[];
     syncCurrentProfile();
-    renderProfileView(state.selected || current()?.id);
+    renderProfileView(state.selected||current()?.id);
     renderStaffCards();
-    if (window.GotCrackedOperationsV1?.state && !window.GotCrackedOperationsV1.state.staff.length) {
-      window.GotCrackedOperationsV1.state.staff = state.profiles;
+    if(window.GotCrackedOperationsV1?.state&&!window.GotCrackedOperationsV1.state.staff.length){
+      window.GotCrackedOperationsV1.state.staff=state.profiles;
     }
     window.dispatchEvent(new CustomEvent('gc-staff-profiles-loaded'));
     decorateActivity();
@@ -421,6 +446,7 @@
       return;
     }
 
+    if(t.closest('[data-staff-profiles-retry]')){void load();return;}
     if (t.closest('[data-profile-close]')) {
       revokePreview();
       document.getElementById('gc-staff-profile-dialog')?.close();
