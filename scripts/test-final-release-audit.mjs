@@ -33,7 +33,11 @@ for (const fragment of [
   'tabindex="0" role="button" aria-label="Open lead for',
   "event.key==='Enter'||event.key===' '",
   "const blockingFailures=[]",
-  "throw new Error(\`\${key.replaceAll('_',' ')} data could not be loaded:"
+  "throw new Error(\`\${key.replaceAll('_',' ')} data could not be loaded:",
+  "'appointments.view','View appointments','Appointments'",
+  "'schedule.view','View published schedule','Schedule'",
+  "'timeclock.use','Use time clock','Schedule'",
+  "appointments:can('appointments.view')?client.from('appointments')"
 ]) assert.ok(operations.includes(fragment), `Missing operational release guard: ${fragment}`);
 
 for (const fragment of [
@@ -114,6 +118,7 @@ console.log(JSON.stringify({
     'operations control labels',
     'keyboard-operable work and lead rows',
     'fail-closed core operational data loading',
+    'frontend role defaults aligned to appointment/schedule/timeclock permissions',
     'Parts Registry labels',
     'Reports fail-visible data guard',
     'range-scoped repair export',
