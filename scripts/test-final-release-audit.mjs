@@ -6,6 +6,8 @@ const html = read('index.html');
 const operations = read('operations-v1-core.js');
 const registry = read('parts-registry.js');
 const analytics = read('analytics.js');
+const shipping = read('shipping.js');
+const inventory = read('inventory-command-center.js');
 
 for (const fragment of [
   'id="repair-search" aria-label="Search repair tickets"',
@@ -43,8 +45,25 @@ for (const fragment of [
   'role="img" aria-label='
 ]) assert.ok(analytics.includes(fragment), `Missing Reports release guard: ${fragment}`);
 
-assert.doesNotMatch(analytics, /report=\{profile,repairs:repairs\.data\|\|\[\].*render\(\);\s*\}/s,
-  'Reports must not silently render partial query results without checking errors first.');
+const reportErrorCheck = analytics.indexOf('const failed=Object.entries(results).find');
+const reportAssignment = analytics.indexOf('report={profile,repairs:repairs.data||[]');
+assert.ok(reportErrorCheck >= 0 && reportAssignment > reportErrorCheck,
+  'Reports must validate query errors before accepting report data.');
+
+for (const fragment of [
+  'data-shipping-work-order=',
+  'data-shipping-lead=',
+  'Shipping could not be loaded.',
+  'data-shipping-retry',
+  ".eq('location_id',profile.location_id).eq('intake_method','mail_in')"
+]) assert.ok(shipping.includes(fragment), `Missing Shipping release guard: ${fragment}`);
+
+for (const fragment of [
+  'Inventory could not be loaded.',
+  'data-gc-inventory-retry',
+  'aria-pressed=',
+  'type="submit">Receive package</button>'
+]) assert.ok(inventory.includes(fragment), `Missing Inventory release guard: ${fragment}`);
 
 console.log(JSON.stringify({
   ok: true,
@@ -56,6 +75,8 @@ console.log(JSON.stringify({
     'Parts Registry labels',
     'Reports fail-visible data guard',
     'range-scoped repair export',
-    'accessible sales trend'
+    'accessible sales trend',
+    'Shipping fail-visible data loading and deep links',
+    'Inventory fail-visible data loading and explicit controls'
   ]
 }));
