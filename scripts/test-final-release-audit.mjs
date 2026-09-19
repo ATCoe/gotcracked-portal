@@ -23,8 +23,10 @@ for (const fragment of [
   'id="v1-line-search" aria-label="Scan or search parts and services"',
   'tabindex="0" role="button" aria-label="Open work order',
   'tabindex="0" role="button" aria-label="Open lead for',
-  "event.key==='Enter'||event.key===' '"
-]) assert.ok(operations.includes(fragment), `Missing operational accessibility guard: ${fragment}`);
+  "event.key==='Enter'||event.key===' '",
+  "const blockingFailures=[]",
+  "throw new Error(\`\${key.replaceAll('_',' ')} data could not be loaded:"
+]) assert.ok(operations.includes(fragment), `Missing operational release guard: ${fragment}`);
 
 for (const fragment of [
   'data-registry-search aria-label="Search Parts Registry"',
@@ -50,6 +52,7 @@ console.log(JSON.stringify({
     'shell control labels',
     'operations control labels',
     'keyboard-operable work and lead rows',
+    'fail-closed core operational data loading',
     'Parts Registry labels',
     'Reports fail-visible data guard',
     'range-scoped repair export',
