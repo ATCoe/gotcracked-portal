@@ -78,8 +78,11 @@
       client.rpc('has_permission',{permission_key:'inventory.manage'}),
       client.rpc('has_permission',{permission_key:'settings.manage'})
     ]);
-    state.canManage=current.role==='owner'||inventory.data===true||settings.data===true;
-    return state.canManage;
+    if(current.role==='owner'){state.canManage=true;return true;}
+    if(inventory.data===true||settings.data===true){state.canManage=true;return true;}
+    if(inventory.error||settings.error)throw inventory.error||settings.error;
+    state.canManage=false;
+    return false;
   }
 
   async function load(){
@@ -94,9 +97,17 @@
         .eq('supplier_key','mobilesentrix')
         .maybeSingle()
     ]);
+    if(account.error)throw account.error;
     state.status=data.status;
-    state.account=account.error?null:account.data;
+    state.account=account.data||null;
     render();
+  }
+
+  function renderLoadError(error){
+    const host=document.getElementById('settings');if(!host)return;
+    style();
+    document.getElementById('gc-mobilesentrix-settings')?.remove();
+    host.insertAdjacentHTML('beforeend',`<section id="gc-mobilesentrix-settings"><article class="card gc-ms-card" role="alert"><div class="card-title"><div><p class="eyebrow">Supplier integration</p><h2>MobileSentrix settings could not be loaded.</h2><p>${esc(error?.message||'A required supplier integration source failed.')}</p></div></div><button class="secondary-button" type="button" data-ms-refresh>Retry</button></article></section>`);
   }
 
   function authFields(config){
@@ -557,17 +568,17 @@
     const syncButton=target.closest('[data-ms-sync]');
     if(syncButton)return void sync(syncButton);
     if(target.closest('[data-ms-reset]'))return void resetSync().catch(error=>setMessage('gc-ms-api-form',error.message));
-    if(target.closest('[data-ms-refresh]'))return void load();
+    if(target.closest('[data-ms-refresh]'))return void load().catch(error=>{renderLoadError(error);window.GotCrackedDiagnostics?.error?.(error,{context:'MobileSentrix settings could not load'});});
   });
 
   const maybeLoad=()=>{
     if(location.hash.startsWith('#settings')){
-      setTimeout(()=>void load().catch(error=>console.warn('MobileSentrix settings failed to load',error)),120);
+      setTimeout(()=>void load().catch(error=>{console.error('MobileSentrix settings failed to load',error);renderLoadError(error);window.GotCrackedDiagnostics?.error?.(error,{context:'MobileSentrix settings could not load'});}),120);
     }
   };
   const refreshAfterOAuth=()=>{
     if(location.hash.startsWith('#settings')){
-      setTimeout(()=>void load().catch(error=>console.warn('MobileSentrix OAuth refresh failed',error)),120);
+      setTimeout(()=>void load().catch(error=>{console.error('MobileSentrix OAuth refresh failed',error);renderLoadError(error);window.GotCrackedDiagnostics?.error?.(error,{context:'MobileSentrix settings could not refresh'});}),120);
     }
   };
   document.addEventListener('gc-view-changed',maybeLoad);

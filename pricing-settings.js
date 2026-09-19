@@ -19,19 +19,23 @@
   async function identity(){
     profile = window.GotCrackedRuntimeProfile || window.GotCrackedOperationsV1?.state?.profile || profile;
     if (!profile?.id) {
-      const { data:{user} } = await client.auth.getUser();
+      const authResult=await client.auth.getUser();
+      if(authResult.error)throw authResult.error;
+      const user=authResult.data?.user;
       if (!user) return null;
       const result = await client.from('profiles').select('id,location_id,display_name,role,active').eq('id',user.id).maybeSingle();
-      if (!result.error) profile = result.data;
+      if(result.error)throw result.error;
+      profile=result.data;
     }
     if (!profile?.id) return null;
     const [settingsPermission,inventoryPermission] = await Promise.all([
       client.rpc('has_permission',{permission_key:'settings.manage'}),
       client.rpc('has_permission',{permission_key:'inventory.manage'})
     ]);
-    const roleFallback = ['owner','manager'].includes(profile.role);
-    canManageSettings = settingsPermission.error ? roleFallback : Boolean(settingsPermission.data);
-    canManageInventory = inventoryPermission.error ? roleFallback : Boolean(inventoryPermission.data);
+    if(settingsPermission.error)throw settingsPermission.error;
+    if(inventoryPermission.error)throw inventoryPermission.error;
+    canManageSettings=Boolean(settingsPermission.data);
+    canManageInventory=Boolean(inventoryPermission.data);
     return profile;
   }
 
@@ -55,10 +59,12 @@
       client.from('repair_guides').select('id,title,device_category,manufacturer,model_family,bench_time_minutes').eq('location_id',profile.location_id).eq('active',true).order('device_category').order('title'),
       client.rpc('get_pricing_labor_basis')
     ]);
-    if (!business.error) settings=business.data;
-    if (!parts.error) inventory=parts.data||[];
-    if (!refs.error) guides=refs.data||[];
-    if (!basis.error) laborBasis=basis.data||null;
+    const failed=[['business settings',business],['inventory',parts],['repair guides',refs],['labor basis',basis]].find(([,result])=>result?.error);
+    if(failed)throw new Error(`${failed[0]} could not be loaded: ${failed[1].error?.message||'unknown data error'}`);
+    settings=business.data||{};
+    inventory=parts.data||[];
+    guides=refs.data||[];
+    laborBasis=basis.data||null;
   }
 
   function partOptions(){
@@ -156,6 +162,24 @@
     if(event.target.id==='gc-part-pricing-map-form'){event.preventDefault();savePartMap(event.target);}
   });
 
-  async function init(){ await identity(); if(!profile?.active||!isManager())return; await load(); render(); }
-  init();
+  function renderLoadError(error){
+    const host=document.getElementById('settings');if(!host)return;
+    document.getElementById('gc-pricing-engine-settings')?.remove();
+    host.insertAdjacentHTML('beforeend',`<section id="gc-pricing-engine-settings" class="card" role="alert"><div class="card-title"><div><p class="eyebrow">Pricing engine</p><h2>Pricing settings could not be loaded.</h2><p>${esc(error?.message||'A required pricing data source failed.')}</p></div></div><button class="secondary-button" type="button" data-pricing-settings-retry>Retry</button></section>`);
+  }
+
+  async function init(){
+    try{
+      await identity();
+      if(!profile?.active||!isManager())return;
+      await load();
+      render();
+    }catch(error){
+      console.error('Pricing settings failed to load:',error);
+      renderLoadError(error);
+      window.GotCrackedDiagnostics?.error?.(error,{context:'Pricing settings could not load'});
+    }
+  }
+  document.addEventListener('click',event=>{if(event.target instanceof Element&&event.target.closest('[data-pricing-settings-retry]'))void init();});
+  void init();
 })();
