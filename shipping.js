@@ -40,11 +40,11 @@
           <div class="shipping-list">${repairs.length ? repairs.map(ticket => {
             const inbound = trackingUrl(ticket.inbound_carrier, ticket.inbound_tracking);
             const outbound = trackingUrl(ticket.outbound_carrier, ticket.outbound_tracking);
-            return `<button class="shipping-row" data-ticket="${ticket.ticket_number}"><span class="shipping-status status-${esc(ticket.shipping_status)}">${esc(friendly(ticket.shipping_status))}</span><span class="row-main"><strong>GC-${String(ticket.ticket_number).padStart(6, '0')} · ${esc([ticket.customers?.first_name, ticket.customers?.last_name].filter(Boolean).join(' ') || 'Customer')}</strong><small>${esc([ticket.devices?.manufacturer, ticket.devices?.model].filter(Boolean).join(' ') || 'Device')} · ${esc(addressText(ticket.shipping_address) || 'Return address needed')}</small></span><span class="tracking-links">${inbound ? `<a href="${inbound}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Inbound ↗</a>` : ''}${outbound ? `<a href="${outbound}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Outbound ↗</a>` : ''}</span><em>›</em></button>`;
+            return `<button class="shipping-row" type="button" data-shipping-work-order="${esc(ticket.id)}" aria-label="Open ${esc(`GC-${String(ticket.ticket_number).padStart(6, '0')}`)} work order"><span class="shipping-status status-${esc(ticket.shipping_status)}">${esc(friendly(ticket.shipping_status))}</span><span class="row-main"><strong>GC-${String(ticket.ticket_number).padStart(6, '0')} · ${esc([ticket.customers?.first_name, ticket.customers?.last_name].filter(Boolean).join(' ') || 'Customer')}</strong><small>${esc([ticket.devices?.manufacturer, ticket.devices?.model].filter(Boolean).join(' ') || 'Device')} · ${esc(addressText(ticket.shipping_address) || 'Return address needed')}</small></span><span class="tracking-links">${inbound ? `<a href="${inbound}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Inbound ↗</a>` : ''}${outbound ? `<a href="${outbound}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Outbound ↗</a>` : ''}</span><em>›</em></button>`;
           }).join('') : '<p class="empty-state">No mail-in repair tickets yet.</p>'}</div>
         </article>
         <div class="shipping-side">
-          <article class="card"><div class="card-title"><div><h2>New mail-in requests</h2><p>Qualify these leads before the customer ships.</p></div></div>${waitingLeads.map(lead => `<button class="shipping-lead" data-lead-id="${lead.id}"><span class="status ${esc(lead.status)}">${esc(friendly(lead.status))}</span><span><strong>${esc(lead.name)}</strong><small>${esc(lead.device_model || lead.service || 'Device repair')}</small></span><em>›</em></button>`).join('') || '<p class="empty-state">No open mail-in requests.</p>'}</article>
+          <article class="card"><div class="card-title"><div><h2>New mail-in requests</h2><p>Qualify these leads before the customer ships.</p></div></div>${waitingLeads.map(lead => `<button class="shipping-lead" type="button" data-shipping-lead="${esc(lead.id)}" aria-label="Open mail-in lead for ${esc(lead.name||'customer')}"><span class="status ${esc(lead.status)}">${esc(friendly(lead.status))}</span><span><strong>${esc(lead.name)}</strong><small>${esc(lead.device_model || lead.service || 'Device repair')}</small></span><em>›</em></button>`).join('') || '<p class="empty-state">No open mail-in requests.</p>'}</article>
           <article class="card shipping-tools"><h2>Carrier tools</h2><p class="subtle">Create labels with your selected carrier, then save the tracking number on the repair.</p><a href="https://ship.pirateship.com/" target="_blank" rel="noopener">Pirate Ship ↗</a><a href="https://www.usps.com/ship/" target="_blank" rel="noopener">USPS ↗</a><a href="https://www.ups.com/ship" target="_blank" rel="noopener">UPS ↗</a><a href="https://www.fedex.com/en-us/shipping.html" target="_blank" rel="noopener">FedEx ↗</a></article>
         </div>
       </section>`;
@@ -58,22 +58,45 @@
   }
 
   async function load() {
-    const { data: { user } } = await client.auth.getUser();
-    if (!user) return;
-    const profileResult = await client.from('profiles').select('id,location_id,role').eq('id', user.id).maybeSingle();
-    if (!profileResult.data) return;
-    profile = profileResult.data;
-    const [repairResult, leadResult, settingsResult] = await Promise.all([
-      client.from('repair_tickets').select('id,ticket_number,intake_method,shipping_status,shipping_address,inbound_carrier,inbound_tracking,outbound_carrier,outbound_tracking,shipping_charge_cents,customers(first_name,last_name),devices(manufacturer,model)').eq('intake_method', 'mail_in').order('updated_at', { ascending: false }),
-      client.from('leads').select('id,name,status,service,device_model,shipping_address').eq('intake_method', 'mail_in').order('created_at', { ascending: false }),
-      client.from('business_settings').select('*').eq('location_id', profile.location_id).maybeSingle()
-    ]);
-    repairs = repairResult.data || [];
-    leads = leadResult.data || [];
-    settings = settingsResult.data || { location_id: profile.location_id, accepts_mail_in_repairs: true, default_shipping_carrier: 'USPS', default_shipping_charge_cents: 0, shipping_return_address: { line1: '700 North Main St', line2: 'Ste D', city: 'Blacksburg', state: 'VA', postal_code: '24060', country: 'US' } };
-    render();
-    setTimeout(addSettingsPanel, 150);
+    const host=document.querySelector('#shipping-workspace');
+    try {
+      const authResult=await client.auth.getUser();
+      if(authResult.error)throw authResult.error;
+      const user=authResult.data?.user;
+      if(!user)return;
+      const profileResult=await client.from('profiles').select('id,location_id,role').eq('id',user.id).maybeSingle();
+      if(profileResult.error)throw profileResult.error;
+      if(!profileResult.data?.location_id)throw new Error('An active store assignment is required to load shipping.');
+      profile=profileResult.data;
+      const [repairResult,leadResult,settingsResult]=await Promise.all([
+        client.from('repair_tickets').select('id,ticket_number,intake_method,shipping_status,shipping_address,inbound_carrier,inbound_tracking,outbound_carrier,outbound_tracking,shipping_charge_cents,customers(first_name,last_name),devices(manufacturer,model)').eq('location_id',profile.location_id).eq('intake_method','mail_in').order('updated_at',{ascending:false}),
+        client.from('leads').select('id,name,status,service,device_model,shipping_address').eq('location_id',profile.location_id).eq('intake_method','mail_in').order('created_at',{ascending:false}),
+        client.from('business_settings').select('*').eq('location_id',profile.location_id).maybeSingle()
+      ]);
+      const failed=[['repair tickets',repairResult],['mail-in leads',leadResult],['shipping settings',settingsResult]].find(([,result])=>result.error);
+      if(failed)throw new Error(`${failed[0]} could not be loaded: ${failed[1].error?.message||'unknown data error'}`);
+      repairs=repairResult.data||[];
+      leads=leadResult.data||[];
+      settings=settingsResult.data||{location_id:profile.location_id,accepts_mail_in_repairs:true,default_shipping_carrier:'USPS',default_shipping_charge_cents:0,shipping_return_address:{line1:'700 North Main St',line2:'Ste D',city:'Blacksburg',state:'VA',postal_code:'24060',country:'US'}};
+      render();
+      setTimeout(addSettingsPanel,150);
+    } catch(error) {
+      repairs=[];leads=[];settings=null;
+      console.error('Shipping workspace failed to load:',error);
+      if(host)host.innerHTML=`<div class="empty-card" role="alert"><span>!</span><h2>Shipping could not be loaded.</h2><p>${esc(error?.message||'A required shipping data source failed.')}</p><button class="secondary-button" type="button" data-shipping-retry>Retry</button></div>`;
+      window.GotCrackedDiagnostics?.error?.(error,{context:'Shipping workspace could not load'});
+    }
   }
+
+  document.addEventListener('click',event=>{
+    const target=event.target instanceof Element?event.target:null;
+    if(!target)return;
+    if(target.closest('[data-shipping-retry]')){void load();return;}
+    const workOrder=target.closest('[data-shipping-work-order]');
+    if(workOrder){event.preventDefault();location.hash=`#work-order/${workOrder.dataset.shippingWorkOrder}`;return;}
+    const lead=target.closest('[data-shipping-lead]');
+    if(lead){event.preventDefault();location.hash=`#leads/${lead.dataset.shippingLead}`;}
+  });
 
   document.addEventListener('submit', async event => {
     if (event.target.id !== 'shipping-settings-form') return;
