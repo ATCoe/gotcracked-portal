@@ -178,14 +178,29 @@
     }
     const entries=Object.entries(jobs);
     const results=await Promise.all(entries.map(([,promise])=>promise));
+    const optionalFallbacks=new Set(['guides','templates','intakes','staff','overrides']);
+    const blockingFailures=[];
     results.forEach((result,index)=>{
       const key=entries[index][0];
-      if(result.error){if(['guides','templates','purchaseOrders','poItems','intakes','overrides'].includes(key))state.migrationReady=false;return;}
+      if(result.error){
+        if(['guides','templates','intakes','overrides'].includes(key))state.migrationReady=false;
+        if(optionalFallbacks.has(key)){
+          console.warn(`Optional Portal data source failed: ${key}`,result.error);
+          window.GotCrackedDiagnostics?.error?.(result.error,{context:`${key.replaceAll('_',' ')} data could not be loaded`});
+          return;
+        }
+        blockingFailures.push([key,result.error]);
+        return;
+      }
       if(key==='staff')state.staff=result.data?.staff||[];
       else if(key==='settings')state.settings=result.data||null;
       else if(key==='overrides')state.overrides=result.data||[];
       else state[key]=result.data||[];
     });
+    if(blockingFailures.length){
+      const [key,error]=blockingFailures[0];
+      throw new Error(`${key.replaceAll('_',' ')} data could not be loaded: ${error?.message||'unknown data error'}`);
+    }
     if(!state.guides.length)state.guides=BUILTIN_GUIDES;
   }
 
