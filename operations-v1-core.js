@@ -58,13 +58,16 @@
     ['inventory.manage','Manage inventory','Inventory'],['inventory.count','Perform inventory counts','Inventory'],['purchasing.view','View purchase orders','Purchasing'],
     ['purchasing.manage','Manage purchase orders','Purchasing'],['reference.view','View repair reference','Knowledge'],['reference.manage','Manage repair reference','Knowledge'],
     ['reports.view','View reports','Management'],['staff.manage','Manage staff access','Management'],['settings.manage','Manage settings','Management'],
-    ['pricing.override','Override prices / discounts','Management'],['labels.work_order','Print work-order labels','Labels'],['labels.inventory','Print inventory labels','Labels']
+    ['pricing.override','Override prices / discounts','Management'],['schedule.manage','Build and publish schedules','Management'],['timeclock.manage','Manage time records','Management'],
+    ['appointments.view','View appointments','Appointments'],['appointments.manage','Create, schedule, and update appointments','Appointments'],
+    ['schedule.view','View published schedule','Schedule'],['timeclock.use','Use time clock','Schedule'],
+    ['labels.work_order','Print work-order labels','Labels'],['labels.inventory','Print inventory labels','Labels']
   ];
   const ROLE_DEFAULTS = {
     owner:new Set(PERMISSIONS.map(([key])=>key)),
     manager:new Set(PERMISSIONS.map(([key])=>key)),
-    technician:new Set(['dashboard.view','repairs.view','repairs.intake','repairs.workflow','ready_pickup.view','leads.view','leads.manage','customers.view','inventory.view','reference.view','labels.work_order']),
-    front_desk:new Set(['dashboard.view','repairs.view','repairs.intake','ready_pickup.view','ready_pickup.checkout','leads.view','leads.manage','customers.view','customers.edit','inventory.view','reference.view','labels.work_order']),
+    technician:new Set(['dashboard.view','repairs.view','repairs.intake','repairs.workflow','ready_pickup.view','leads.view','leads.manage','appointments.view','customers.view','inventory.view','reference.view','labels.work_order','schedule.view','timeclock.use']),
+    front_desk:new Set(['dashboard.view','repairs.view','repairs.intake','ready_pickup.view','ready_pickup.checkout','leads.view','leads.manage','appointments.view','appointments.manage','customers.view','customers.edit','inventory.view','reference.view','labels.work_order','schedule.view','timeclock.use']),
     automation:new Set(['dashboard.view','repairs.view','repairs.workflow','leads.view','appointments.view','customers.view','inventory.view','reference.view'])
   };
 
@@ -169,7 +172,7 @@
       poItems:can('purchasing.view')?client.from('purchase_order_items').select('*,inventory_items(name,sku,sell_price_cents,quantity_on_hand)').order('created_at'):Promise.resolve({data:[]}),
       intakes:can('repairs.view')?client.from('intake_sessions').select('*').eq('location_id',loc).order('created_at',{ascending:false}):Promise.resolve({data:[]}),
       suppliers:can('purchasing.view')?client.from('suppliers').select('*').eq('active',true).order('name'):Promise.resolve({data:[]}),
-      appointments:client.from('appointments').select('*').order('preferred_date').limit(200),
+      appointments:can('appointments.view')?client.from('appointments').select('*').eq('location_id',loc).order('preferred_date').limit(200):Promise.resolve({data:[]}),
       settings:client.from('business_settings').select('*').eq('location_id',loc).maybeSingle()
     };
     if(can('staff.manage')){
@@ -287,7 +290,7 @@
   }
 
   function applyPermissions(){
-    const mapping={repairs:'repairs.view','ready-pickup':'ready_pickup.view',leads:'leads.view',customers:'customers.view',inventory:'inventory.view','repair-reference':'reference.view',purchasing:'purchasing.view',reports:'reports.view',staff:'staff.manage',settings:'settings.manage'};
+    const mapping={repairs:'repairs.view','ready-pickup':'ready_pickup.view',leads:'leads.view',appointments:'appointments.view',schedule:'schedule.view',customers:'customers.view',inventory:'inventory.view','repair-reference':'reference.view',purchasing:'purchasing.view',reports:'reports.view',staff:'staff.manage',settings:'settings.manage'};
     for(const [view,key] of Object.entries(mapping))document.querySelectorAll(`[data-view="${view}"]`).forEach(node=>node.classList.toggle('v1-hidden',!can(key)));
     document.querySelectorAll('[data-v1-walkin]').forEach(node=>node.classList.toggle('v1-hidden',!canPreviewIntake()));
     document.querySelectorAll('[data-live-action="inventory"],[data-adjust-part],[data-loss-part],[data-audit-action]').forEach(node=>node.classList.toggle('v1-hidden',!can('inventory.manage')));
