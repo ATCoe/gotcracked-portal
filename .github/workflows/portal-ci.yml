@@ -241,3 +241,6 @@ jobs:
               raise SystemExit('Dedicated printable schedule rendering is incomplete.')
 
           print('Portal v1.1 architecture checks passed.')
+
+      - name: Final release regression guard
+        run: node scripts/test-final-release-audit.mjs
